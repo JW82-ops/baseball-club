@@ -6,6 +6,8 @@ import { userTeam } from '../../engine/season.js';
 import { batLine, pitLine } from '../../engine/player.js';
 import { teamOvr } from '../../engine/roster.js';
 import { fmtAvg, fmtEra } from '../../core/util.js';
+import { SEASON_KEYS, careerLeaders } from '../../engine/records.js';
+import { LEAGUES } from '../../data/club.js';
 
 function standingsView() {
   const user = userTeam(state);
@@ -77,10 +79,34 @@ function historyView() {
     </div>`).join('');
 }
 
+function recordsView() {
+  const R = state.records || { season: {}, team: {} };
+  const len = state.settings.seasonLength;
+  const S = R.season[len] || {};
+  const T = R.team || {};
+  const car = (title, key, type, unit) => {
+    const rows = careerLeaders(state, key, type, 5);
+    return `<div class="panel"><div class="sec-h"><h2 style="font-size:15px">${title}</h2></div><table class="tbl">${rows.map((r, i) => `<tr class="${r.user ? 'me' : ''}"><td>${i + 1}. ${esc(r.name)} <span class="muted">${esc(r.team || '')}${r.active ? '' : ' · 은퇴'}</span></td><td><b>${r.v}${unit}</b></td></tr>`).join('') || '<tr><td class="muted">기록 없음</td></tr>'}</table></div>`;
+  };
+  return `
+    <div class="sec-h"><h2>단일 시즌 기록</h2><span class="sub">${len}경기 시즌</span></div>
+    <div class="panel"><table class="tbl">${SEASON_KEYS.map((d) => { const r = S[d.k]; return `<tr class="${r?.user ? 'me' : ''}"><td>${d.ko}</td><td>${r ? `<b>${d.fmt(r.v)}</b> ${esc(r.name)} <span class="muted">${esc(r.team || '')} ${r.season}</span>` : '<span class="muted">-</span>'}</td></tr>`; }).join('')}</table></div>
+    <div class="sec-h mt-l"><h2>우리 구단 기록</h2></div>
+    <div class="panel small">${T.mostWins ? `시즌 최다승 <b>${T.mostWins.v}승</b> (${T.mostWins.season}) · 최고 승률 <b>${T.bestPct.v.toFixed(3).replace(/^0/, '')}</b> (${T.bestPct.season}, ${T.bestPct.rec})` : '첫 시즌이 끝나면 기록돼요.'}</div>
+    <div class="sec-h mt-l"><h2>통산 순위</h2><span class="sub">현역 + 은퇴</span></div>
+    ${car('통산 홈런', 'hr', 'B', '')}${car('통산 안타', 'h', 'B', '')}${car('통산 승리', 'w', 'P', '')}${car('통산 세이브', 'sv', 'P', '')}`;
+}
+
+function paperView() {
+  const pp = state.paper || [];
+  if (!pp.length) return '<div class="panel empty">첫 주가 지나면 신문이 발행돼요.</div>';
+  return pp.slice(0, 12).map((x) => `<div class="paper"><div class="paper-h"><span>주간 베이스볼 ${LEAGUES[x.league || 'KBO'].flag}</span><span>${x.season} · ${x.week}주차</span></div><h3>${esc(x.head)}</h3>${x.lines.map((l) => `<p>· ${esc(l)}</p>`).join('')}</div>`).join('');
+}
+
 export function renderLeague() {
   return `
   <section class="sec">
-    <div class="seg">${[['standings', '순위'], ['leaders', '개인기록'], ['schedule', '일정'], ['history', '역대']].map(([k, l]) => `<button class="${ui.leagueView === k ? 'on' : ''}" data-act="leagueView" data-v="${k}">${l}</button>`).join('')}</div>
-    <div class="mt">${{ standings: standingsView, leaders: leadersView, schedule: scheduleView, history: historyView }[ui.leagueView]()}</div>
+    <div class="seg scrollseg">${[['standings', '순위'], ['leaders', '개인기록'], ['schedule', '일정'], ['paper', '신문'], ['records', '기록실'], ['history', '역대']].map(([k, l]) => `<button class="${ui.leagueView === k ? 'on' : ''}" data-act="leagueView" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="mt">${{ standings: standingsView, leaders: leadersView, schedule: scheduleView, history: historyView, paper: paperView, records: recordsView }[ui.leagueView]()}</div>
   </section>`;
 }

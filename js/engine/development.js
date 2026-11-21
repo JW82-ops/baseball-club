@@ -52,7 +52,7 @@ export function developWeek(p, ctx = {}) {
   const tickScale = ctx.tickScale ?? 1;
 
   // 출전 경험 보너스 (이번 주 출전 수 기반)
-  const playF = 1 + Math.min(p.xp || 0, 6) * 0.05;
+  const playF = 1 + Math.min((p.xp || 0) + (ctx.extraXp || 0), 7) * 0.05;
   p.xp = 0;
 
   const g = GROWTH_TYPES[p.growth] || GROWTH_TYPES.normal;
@@ -60,7 +60,7 @@ export function developWeek(p, ctx = {}) {
     const gap = p.cap[k] - p.r[k];
     let inc = 0;
     if (gap > 0 && ageF > 0) {
-      inc = gap * 0.024 * ageF * focusMult(focus, k) * mult * playF * inten.growth * tickScale;
+      inc = gap * 0.024 * ageF * focusMult(focus, k) * mult * playF * inten.growth * tickScale * (ctx.attrMult?.[k] ?? 1);
       inc += gauss(0, 0.1) * (focus === 'rest' ? 0 : 1);
     }
     if (p.age > g.peakEnd) {

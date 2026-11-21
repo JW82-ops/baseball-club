@@ -7,6 +7,7 @@ import { firstTeam, futures, rosterCounts, fieldAt } from '../../engine/roster.j
 import { fmtAvg, fmtEra, fmtIP } from '../../core/util.js';
 import { ROSTER, POS_KO } from '../../data/constants.js';
 import { scoutLevel } from './draft.js';
+import { moodLabel } from '../../engine/mood.js';
 
 export function statSnippet(p) {
   if (p.type === 'B') {
@@ -24,7 +25,7 @@ export function playerRow(p, color, opts = {}) {
   return `<button class="prow ${opts.sel ? 'sel' : ''}" data-act="${opts.act || 'openPlayer'}" data-pid="${p.id}">
     ${avatar(p, color, 40)}
     <div class="grow">
-      <div class="nm">${esc(p.name)} <span class="num">${p.num != null ? '#' + p.num : ''}</span>${p.foreign ? ' 🌏' : ''} ${condDot(p)}</div>
+      <div class="nm">${esc(p.name)} <span class="num">${p.num != null ? '#' + p.num : ''}</span>${p.foreign ? ' 🌏' : ''}${p.tradeBlock ? ' 🔁' : ''} ${condDot(p)} <span title="기분 ${moodLabel(p.morale).ko}" style="font-size:13px">${moodLabel(p.morale).e}</span></div>
       <div class="meta">${posShort(p)} · ${p.age}세${sn ? ` · ${sn}` : ''}${p.injury ? ` · <span class="bad">${esc(p.injury.name)} ${p.injury.weeks}주</span>` : ''}</div>
     </div>
     <div class="right">${gradeTag(calcOvr(p))}${opts.pot ? potTag(p, scoutLevel()) : ''}</div>

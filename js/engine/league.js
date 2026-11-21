@@ -4,10 +4,14 @@ import { KBO_TEAMS, CLUB_COLORS } from '../data/teams.js';
 import { PHILOSOPHIES, SAVE_VERSION } from '../data/constants.js';
 import { createPlayer, resetSeasonStats, calcOvr } from './player.js';
 import { autoAssignLevels } from './roster.js';
-import { ensureClub, facVal, genStaffMarket } from './club.js';
+import { ensureClub, genStaffMarket } from './club.js';
 import { assignNumber } from './hof.js';
 import { genForeignPool } from './market.js';
 import { offerMissions, emptyWeekStats } from './events.js';
+import { initRelations } from './mood.js';
+import { ensureContract } from './contracts.js';
+import { genSponsorOffers } from './sponsor.js';
+import { clubEffects, bInfo } from './club.js';
 
 // ───────── 로스터 생성 ─────────
 function addP(state, team, opts) {
@@ -113,7 +117,11 @@ export function createNewGame(opts) {
   }
   for (const id of state.teamOrder) autoAssignLevels(state, state.teams[id]);
   ensureClub(user);
-  user.capacity = facVal(user, 'stadium');
+  user.capacity = bInfo(user, 'stadium').cap;
+  state.league = 'KBO';
+  state.inbox = []; state.promises = []; state.rels = {}; state.paper = [];
+  for (const id in state.players) ensureContract(state.players[id]);
+  initRelations(state, user);
   genStaffMarket(state);
   genForeignPool(state);
   state.weekStats = emptyWeekStats();
@@ -123,6 +131,7 @@ export function createNewGame(opts) {
   state.faPool = [];
   state.schedule = makeSchedule(state.teamOrder, state.settings.seasonLength);
   offerMissions(state);
+  genSponsorOffers(state);
   addNews(state, `${user.name} 창단! ${state.season} 시즌 KBO 리그에 참가합니다.`, 'big');
   return state;
 }

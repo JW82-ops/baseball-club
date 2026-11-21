@@ -2,11 +2,14 @@ import { randInt, pick, chance, gauss } from '../core/rng.js';
 import { createPlayer, resetSeasonStats, calcOvr, salaryFor } from './player.js';
 import { teamPlayers, ensureLineupValid, autoAssignLevels } from './roster.js';
 import { ROSTER } from '../data/constants.js';
+import { LEAGUES } from '../data/club.js';
+import { relNewcomer } from './mood.js';
 
 const FOREIGN_FIRST = ['마이클', '데이비드', '라이언', '조시', '케빈', '타일러', '브랜든', '호세', '루이스', '카를로스', '라파엘', '미겔', '알렉스', '네이선', '코디', '저스틴', '에릭', '헥터', '안드레', '윌머', '다니엘', '오스틴', '케이시', '로니'];
 const FOREIGN_LAST = ['존슨', '스미스', '로드리게스', '마르티네스', '가르시아', '페레스', '윌리엄스', '브라운', '데이비스', '로페즈', '에르난데스', '앤더슨', '톰슨', '화이트', '클락', '레예스', '산체스', '라미레스', '페냐', '카브레라', '알칸타라', '스톤', '헤이즈', '메디나'];
 const FOREIGN_FROM = ['미국', '미국', '미국', '도미니카', '도미니카', '베네수엘라', '쿠바', '푸에르토리코', '멕시코', '호주', '캐나다', '대만', '일본'];
 export const FOREIGN_MAX = 3;
+export const foreignMax = (state) => LEAGUES[state.league || 'KBO'].foreignMax;
 
 export function foreignCount(state, team) {
   return teamPlayers(state, team).filter((p) => p.foreign).length;
@@ -41,7 +44,7 @@ export function signingFee(p) {
 
 export function canSign(state, team, p) {
   if (team.roster.length >= ROSTER.TOTAL_MAX) return '구단 정원(65명)이 꽉 찼어요';
-  if (p.foreign && foreignCount(state, team) >= FOREIGN_MAX) return '외국인 선수는 최대 3명이에요';
+  if (p.foreign && foreignCount(state, team) >= foreignMax(state)) return `외국인 선수는 최대 ${foreignMax(state)}명이에요`;
   if (team.cash < signingFee(p)) return '계약금이 부족해요';
   return null;
 }
@@ -62,7 +65,10 @@ export function signPlayer(state, team, pid, assignNumber) {
   if (p.market === 'foreign') state.foreignPool = state.foreignPool.filter((x) => x !== pid);
   if (p.market === 'fa') state.faPool = state.faPool.filter((x) => x !== pid);
   p.market = null;
+  p.contract = { years: 1, type: p.foreign ? 'foreign' : 'fa' };
+  p.service = p.service ?? 5;
   assignNumber?.(state, team, p);
+  relNewcomer(state, team, p);
   return { ok: true, msg: `${p.name} 영입 완료! (계약금 ${fee.toLocaleString()}만)` };
 }
 
@@ -95,6 +101,8 @@ export function settleFA(state, assignNumber) {
     const tid = ai.sort((a, b) => state.teams[a].roster.length - state.teams[b].roster.length)[0];
     const t = state.teams[tid];
     p.team = tid; p.market = null; p.level = 2;
+    if (p.askSalary) p.salary = p.askSalary;
+    p.contract = { years: p.askYears || 1, type: 'fa' };
     t.roster.push(pid);
     assignNumber?.(state, t, p);
   }

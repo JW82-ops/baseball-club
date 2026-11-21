@@ -35,3 +35,27 @@ export const EMBLEMS = {
 };
 
 export const CITIES = ['서울', '인천', '수원', '대전', '대구', '광주', '부산', '창원', '울산', '청주', '전주', '제주', '포항', '춘천'];
+
+export const NPB_TEAMS = [
+  { id: 'hawks', city: '후쿠오카', name: '소프트뱅크 호크쓰', short: '호크쓰', color: '#f59e0b', color2: '#111827', emblem: 'wings', strength: 72, style: 'win' },
+  { id: 'tigers', city: '오사카', name: '한신 타이거쓰', short: '한신', color: '#eab308', color2: '#111827', emblem: 'flame', strength: 71, style: 'balanced' },
+  { id: 'giants', city: '도쿄', name: '요미우리 자이언쓰', short: '요미우리', color: '#f97316', color2: '#111827', emblem: 'crown', strength: 71, style: 'win' },
+  { id: 'buffaloes', city: '오사카', name: '오릭스 버팔로쓰', short: '오릭스', color: '#1e3a8a', color2: '#c7a84f', emblem: 'bolt', strength: 70, style: 'develop' },
+  { id: 'swallows', city: '도쿄', name: '야쿠르트 스왈로쓰', short: '야쿠르트', color: '#15803d', color2: '#e5e7eb', emblem: 'wings', strength: 69, style: 'balanced' },
+  { id: 'baystars', city: '요코하마', name: '요코하마 베이스타쓰', short: '요코하마', color: '#2563eb', color2: '#e5e7eb', emblem: 'star', strength: 69, style: 'develop' },
+  { id: 'carp', city: '히로시마', name: '히로시마 카프쓰', short: '히로시마', color: '#dc2626', color2: '#e5e7eb', emblem: 'anchor', strength: 68, style: 'develop' },
+  { id: 'fighters', city: '삿포로', name: '니혼햄 파이터쓰', short: '니혼햄', color: '#0284c7', color2: '#111827', emblem: 'shield', strength: 68, style: 'develop' },
+  { id: 'marines', city: '지바', name: '지바 마린쓰', short: '지바', color: '#334155', color2: '#e5e7eb', emblem: 'anchor', strength: 67, style: 'balanced' },
+];
+
+export const MLB_TEAMS = [
+  { id: 'dodgers', city: 'LA', name: 'LA 다저쓰', short: '다저쓰', color: '#005a9c', color2: '#e5e7eb', emblem: 'star', strength: 73, style: 'win' },
+  { id: 'yankees', city: '뉴욕', name: '뉴욕 양키쓰', short: '양키쓰', color: '#1e293b', color2: '#e5e7eb', emblem: 'crown', strength: 72, style: 'win' },
+  { id: 'braves', city: '애틀랜타', name: '애틀랜타 브레이브쓰', short: '브레이브쓰', color: '#ce1141', color2: '#13274f', emblem: 'flame', strength: 71, style: 'balanced' },
+  { id: 'phillies', city: '필라델피아', name: '필라델피아 필리쓰', short: '필리쓰', color: '#e81828', color2: '#002d72', emblem: 'bolt', strength: 71, style: 'win' },
+  { id: 'astros', city: '휴스턴', name: '휴스턴 애스트로쓰', short: '애스트로쓰', color: '#eb6e1f', color2: '#002d62', emblem: 'star', strength: 70, style: 'balanced' },
+  { id: 'padres', city: '샌디에이고', name: '샌디에이고 파드레쓰', short: '파드레쓰', color: '#78350f', color2: '#ffc425', emblem: 'shield', strength: 70, style: 'balanced' },
+  { id: 'orioles', city: '볼티모어', name: '볼티모어 오리올쓰', short: '오리올쓰', color: '#df4601', color2: '#111827', emblem: 'wings', strength: 69, style: 'develop' },
+  { id: 'rangers', city: '텍사스', name: '텍사스 레인저쓰', short: '레인저쓰', color: '#003278', color2: '#c0111f', emblem: 'bolt', strength: 69, style: 'balanced' },
+  { id: 'cubs', city: '시카고', name: '시카고 컵쓰', short: '컵쓰', color: '#0e3386', color2: '#cc3433', emblem: 'ball', strength: 68, style: 'develop' },
+];

@@ -6,7 +6,8 @@ import { calcOvr } from './player.js';
 import { fieldAt, firstTeam, offenseValue } from './roster.js';
 import { injure } from './development.js';
 import { computeSynergies } from './synergy.js';
-import { staffBonus } from './club.js';
+import { staffStat, mgrStyle, clubEffects } from './club.js';
+import { teamChem, moodPerf } from './mood.js';
 import { velocityKmh } from './player.js';
 
 // 리그 평균 1군 능력치(≈65)를 기준점으로
@@ -51,7 +52,11 @@ function side(state, team) {
   return {
     syn: syn.list,
     alumni: syn.alumniSchool,
-    mgr: team.isUser ? staffBonus(team, 'manager') : 1,
+    tac: ((team.isUser ? staffStat(team, 'manager', 'tactics') : 55) - 50) / 14,
+    pitMgmt: ((team.isUser ? staffStat(team, 'manager', 'pitching') : 55) - 50) / 20,
+    style: team.isUser ? mgrStyle(team) : null,
+    chem: team.isUser ? teamChem(state, team) : 0,
+    homeAdv: 0,
     teamId: team.id,
     lineup,
     idx: 0,
@@ -88,6 +93,8 @@ export function createGame(state, home, away, opts = {}) {
   };
   g.home.line.push(0);
   g.away.line.push(0);
+  if (home.isUser) g.home.homeAdv = clubEffects(home).homeAdv + 0.5;
+  else g.home.homeAdv = 1;
   for (const s of [g.home, g.away]) for (const l of s.lineup) touchBat(g, l.pid).g = 1;
   touchPit(g, g.home.starter).gs = 1;
   touchPit(g, g.away.starter).gs = 1;
@@ -118,7 +125,7 @@ function addLog(g, type, text, extra = {}) {
 }
 
 // ───────── 능력치 산출 (컨디션·상황 보정) ─────────
-function condMult(p) { return 0.86 + 0.14 * clamp(p.cond, 0, 100) / 100 + ((p.morale ?? 70) - 70) * 0.0012; }
+function condMult(p) { return 0.86 + 0.14 * clamp(p.cond, 0, 100) / 100 + moodPerf(p.morale); }
 
 function batterEff(state, g, b, pit, slotIdx = 0) {
   const m = condMult(b);
@@ -130,7 +137,10 @@ function batterEff(state, g, b, pit, slotIdx = 0) {
   if (o.syn.includes('cleanup') && slotIdx >= 2 && slotIdx <= 4) pAdj += 4;
   if (o.syn.includes('tableSetter') && slotIdx <= 1) eAdj += 3;
   if (o.syn.includes('homegrown')) cAdj += 1;
-  if (risp) adj += (o.mgr - 1) * 0.6;
+  if (risp) adj += o.tac;
+  adj += o.homeAdv + o.chem * 0.25;
+  if (o.style === 'bigball') pAdj += 2;
+  if (o.style === 'smallball') cAdj += 1;
   if (risp && hasTrait(b, 'clutch')) adj += 6;
   if (risp && hasTrait(b, 'chokeBat')) adj -= 6;
   if (g.post && hasTrait(b, 'bigGame')) adj += 4;
@@ -162,7 +172,10 @@ function pitcherEff(state, g, p, sd) {
   if (g.post && hasTrait(p, 'bigGame')) adj += 4;
   if (sd.syn.includes('battery')) adj += 2;
   if (sd.syn.includes('bullpen') && sd.pitcher !== sd.starter && g.inning >= 7) adj += 3;
-  if (risp) adj += (sd.mgr - 1) * 0.6;
+  if (risp) adj += sd.tac * 0.7;
+  adj += sd.homeAdv + sd.chem * 0.2;
+  if (sd.pitcher !== sd.starter) adj += sd.pitMgmt;
+  if (sd.style === 'pitching') adj += 1.5;
   return {
     stuff: (p.r.velo * 0.5 + p.r.breaking * 0.5) * m - tired + adj,
     control: p.r.control * m - tired * 0.8 + adj * 0.5,
@@ -347,7 +360,7 @@ function attemptSteal(state, g, forced = false) {
   const r = state.players[b[from].pid];
   const o = off(g);
   const arm = catcherArm(state, def(g));
-  let succ = 0.7 + (r.r.speed - 64) / 110 - (arm - 62) / 160 + (hasTrait(r, 'thief') ? 0.07 : 0) + (o.syn.includes('tableSetter') ? 0.05 : 0);
+  let succ = 0.7 + (r.r.speed - 64) / 110 - (arm - 62) / 160 + (hasTrait(r, 'thief') ? 0.07 : 0) + (o.syn.includes('tableSetter') ? 0.05 : 0) + (o.style === 'smallball' ? 0.05 : 0);
   if (from === 1) succ -= 0.08;
   succ = clamp(succ, 0.3, 0.95);
   const pit = touchPit(g, def(g).pitcher);
@@ -458,7 +471,7 @@ export function currentSlot(g) { const o = off(g); return o.idx % o.lineup.lengt
 function buntPA(state, g, batter, pitcher, bs, ps) {
   const before = basesSnap(g);
   const ctx = { batter: batter.id, pitcher: pitcher.id, before };
-  const succ = clamp(0.74 + (batter.r.contact - 60) / 160, 0.5, 0.92);
+  const succ = clamp(0.74 + (batter.r.contact - 60) / 160 + (off(g).style === 'smallball' ? 0.06 : 0), 0.5, 0.95);
   const hitCh = clamp(0.05 + (batter.r.speed - 60) / 300, 0.02, 0.14);
   const r = rng();
   if (!g.bases.some(Boolean) || r < hitCh) {

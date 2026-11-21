@@ -18,13 +18,22 @@ import {
   finishDraft, runCampAndStartSeason, releasePlayer, fillUserFirstTeam,
 } from './engine/season.js';
 import { simToEnd } from './engine/match.js';
-import { startUpgrade, hireStaff, fireStaff } from './engine/club.js';
+import { upgradeBuilding, buildSub, hireStaff, fireStaff, bNext } from './engine/club.js';
+import { slotSheetHtml, subSheetHtml, staffMarketHtml } from './ui/screens/club.js';
+import { renderMail } from './ui/screens/mail.js';
+import { resolveMail, unreadCount } from './engine/mail.js';
+import { signSponsor, cancelSponsor } from './engine/sponsor.js';
+import { annualOffer, multiOffer, releaseNego, faMarketOffer, fairSalary } from './engine/contracts.js';
+import { evaluateTrade, executeTrade } from './engine/trade.js';
+import { addMoodEvent } from './engine/mood.js';
+import { proceedToDraft } from './engine/season.js';
+import { settleFA } from './engine/market.js';
 import { resolveEvent, acceptMission } from './engine/events.js';
 import { signPlayer } from './engine/market.js';
 import { assignNumber, induct, passHof } from './engine/hof.js';
 import { upgradeSave } from './engine/migrate.js';
 import { computeSynergies, SYNERGIES } from './engine/synergy.js';
-import { FACILITIES } from './data/club.js';
+import { BUILDINGS, SUBS, STAFF_ROLES } from './data/club.js';
 import { autoLineup, autoPitching, autoAssignLevels, ensureLineupValid, canPromote, canDemote, teamOvr, battingOrder } from './engine/roster.js';
 import { calcOvr } from './engine/player.js';
 
@@ -45,7 +54,7 @@ function renderHud() {
       <div class="hud-name"><h1>${esc(t.name)}</h1><small>${state.season} ${PHASE_KO[state.phase] || ''}</small></div>
       <div class="led"><div><b>${t.w}</b><span>승</span></div><div><b>${t.l}</b><span>패</span></div><div><b>${rank}</b><span>위</span></div></div>
     </div>
-    <div class="hud-meta"><span>자금 <b>${formatMoney(t.cash)}</b></span><span>팬 <b>${formatFans(t.fans)}</b></span><span>전력 <b>${teamOvr(state, t)}</b></span><span class="grow"></span><button class="iconbtn" style="width:28px;height:28px;font-size:13px" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>
+    <div class="hud-meta"><span>자금 <b>${formatMoney(t.cash)}</b></span><span>팬 <b>${formatFans(t.fans)}</b></span><span>전력 <b>${teamOvr(state, t)}</b></span><span class="grow"></span><button class="iconbtn hud-badge" style="width:30px;height:28px;font-size:14px" data-act="tab" data-tab="mail" aria-label="메일함">✉️${unreadCount(state) ? `<em>${unreadCount(state)}</em>` : ''}</button><button class="iconbtn" style="width:28px;height:28px;font-size:13px" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>
     ${syn.length ? `<div class="hud-syn">${syn.map((k) => `<span>${SYNERGIES[k].icon} ${SYNERGIES[k].ko}</span>`).join('')}</div>` : ''}`;
 }
 
@@ -66,7 +75,7 @@ function render() {
     return;
   }
   $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === ui.tab));
-  const screens = { home: renderHome, roster: renderRoster, develop: renderDevelop, league: renderLeague, club: renderClub };
+  const screens = { home: renderHome, roster: renderRoster, develop: renderDevelop, league: renderLeague, club: renderClub, mail: renderMail };
   main.innerHTML = (screens[ui.tab] || renderHome)();
 }
 setRenderer(render);
@@ -153,27 +162,119 @@ registerActions({
   },
   synInfo: (d) => toast(`${SYNERGIES[d.k].icon} ${SYNERGIES[d.k].ko}: ${SYNERGIES[d.k].desc}`),
   clubView: (d) => { ui.clubView = d.v; render(); },
-  upgradeFac: (d) => {
+  upgradeBld: (d) => {
     const t = userTeam(state);
-    const next = t.facilities[d.k] && FACILITIES[d.k].levels[t.facilities[d.k].lv];
-    confirmBox(`${FACILITIES[d.k].ko}을(를) <b>${esc(next.title)}</b>(으)로 증축할까요?<br><span class="muted small">비용 ${formatMoney(next.cost)} · ${next.weeks}주 소요</span>`, '증축', () => {
-      const r = startUpgrade(state, t, d.k);
+    const next = bNext(t, d.k);
+    confirmBox(`${BUILDINGS[d.k].ko}을(를) <b>${esc(next.title)}</b>(으)로 증축할까요?<br><span class="muted small">비용 ${formatMoney(next.cost)} · ${next.weeks}주 · 부속시설 칸 ${next.slots}개</span>`, '착공', () => {
+      const r = upgradeBuilding(state, t, d.k);
       if (r.ok) sfx.coin();
       commit(r.msg, r.ok ? 'good' : 'bad');
     });
   },
-  hireStaff: (d) => {
-    const c = state.staffMarket.find((x) => x.id === d.id);
-    if (!c) return;
-    const r = hireStaff(state, userTeam(state), d.id);
-    if (r.ok) sfx.levelup();
+  slotSheet: (d) => openModal(slotSheetHtml(d.k)),
+  subSheet: (d) => openModal(subSheetHtml(d.k)),
+  buildSub: (d) => {
+    const r = buildSub(state, userTeam(state), d.k);
+    if (r.ok) { sfx.coin(); closeModal(); }
     commit(r.msg, r.ok ? 'good' : 'bad');
   },
-  fireStaff: (d) => confirmBox('이 코치와의 계약을 해지할까요? 해당 자리는 기본(D급)으로 돌아가요.', '해임', () => { fireStaff(userTeam(state), d.r); commit('계약 해지'); }, 'danger'),
+  staffMarket: (d) => openModal(staffMarketHtml(d.r)),
+  hireStaff: (d) => {
+    const r = hireStaff(state, userTeam(state), d.id);
+    if (r.ok) { sfx.levelup(); closeModal(); }
+    commit(r.msg, r.ok ? 'good' : 'bad');
+  },
+  signSponsor: (d) => { const r = signSponsor(state, d.id); if (r.ok) sfx.coin(); commit(r.msg, r.ok ? 'good' : 'bad'); },
+  cancelSponsor: (d) => confirmBox('계약을 해지하면 시즌 금액의 30%를 위약금으로 내야 해요. 해지할까요?', '해지', () => { const fee = cancelSponsor(state, d.s); commit(`계약 해지 (위약금 ${formatMoney(fee || 0)})`); }, 'danger'),
   signPlayer: (d) => {
     const r = signPlayer(state, userTeam(state), d.pid, assignNumber);
     if (r.ok) { sfx.coin(); closeModal(); }
     commit(r.msg, r.ok ? 'good' : 'bad');
+  },
+  faSheet: (d) => openModal(offerSheet(d.pid, 'fa')),
+  negoSheet: (d) => openModal(offerSheet(d.pid, 'nego')),
+  offerYears: (d) => { ui.offerYears = Number(d.v); openModal(offerSheet(d.pid, d.mode)); },
+  makeOffer: (d) => {
+    const p = state.players[d.pid];
+    const sal = Math.round(Number(d.s) / 100) * 100;
+    const yrs = ui.offerYears || 1;
+    const r = d.mode === 'fa' ? faMarketOffer(state, d.pid, sal, yrs) : multiOffer(state, d.pid, sal, yrs);
+    if (r.ok) {
+      sfx.levelup();
+      if (d.mode === 'fa') {
+        const t = userTeam(state);
+        state.faPool = state.faPool.filter((x) => x !== p.id);
+        p.team = t.id; p.market = null; p.level = 2; t.roster.push(p.id);
+        assignNumber(state, t, p);
+      }
+      closeModal();
+    } else if (r.gone) {
+      // 다른 구단행
+      const ai = state.teamOrder.filter((id) => id !== state.userTeamId);
+      const tid = ai[Math.floor(Math.random() * ai.length)];
+      state.faPool = state.faPool.filter((x) => x !== p.id);
+      p.team = tid; p.market = null; p.salary = p.askSalary || p.salary; p.contract = { years: p.askYears || 1, type: 'fa' };
+      state.teams[tid].roster.push(p.id);
+      assignNumber(state, state.teams[tid], p);
+      closeModal();
+      r.msg += ` → ${state.teams[tid].name}`;
+    } else if (r.left) closeModal();
+    else openModal(offerSheet(d.pid, d.mode, r.msg));
+    commit(r.msg, r.ok ? 'good' : 'bad');
+  },
+  nego: (d) => { const msg = annualOffer(state, d.pid, d.m); commit(msg); },
+  negoAll: (d) => {
+    let n = 0;
+    for (const it of state.nego.items) {
+      if (it.status !== 'pending') continue;
+      if (d.m === 'stay') { if (it.kind === 'stay' && multiOffer(state, it.pid, it.demand, it.years || 1).ok) n++; }
+      else if (it.kind === 'annual') { annualOffer(state, it.pid, d.m); n++; }
+    }
+    commit(`${n}명 연봉 계약 완료`, 'good');
+  },
+  negoRelease: (d) => confirmBox(`${esc(state.players[d.pid].name)}을(를) 놓아줄까요? FA 시장으로 나가요.`, '놓아주기', () => { releaseNego(state, d.pid); commit(); }),
+  proceedDraft: () => {
+    proceedToDraft(state);
+    const st = advanceDraftToUser(state);
+    if (st === 'done') finishDraft(state);
+    commit('FA 시장이 열리고 드래프트가 시작됐어요. FA 영입은 구단 > 영입에서!', 'big');
+  },
+  promotion: (d) => { state.pendingPromotion = d.v === '1' ? state.promotionOffer : null; commit(d.v === '1' ? '승격을 수락했어요. 캠프가 끝나면 새 리그에서 시작해요!' : '현재 리그에 남기로 했어요.', 'big'); },
+  toggleBlock: (d) => { const p = state.players[d.pid]; p.tradeBlock = !p.tradeBlock; save(); openModal(renderPlayer(p.id)); render(); toast(p.tradeBlock ? '트레이드 블록에 올렸어요' : '트레이드 블록에서 내렸어요'); },
+  makeCaptain: (d) => {
+    const t = userTeam(state);
+    const p = state.players[d.pid];
+    const prev = t.captain && state.players[t.captain];
+    if (prev && prev.id !== p.id) addMoodEvent(prev, '주장 교체', -6, 4);
+    t.captain = p.id; addMoodEvent(p, '주장 임명', 10, 5);
+    save(); openModal(renderPlayer(p.id)); render(); toast(`${p.name} 주장 임명`, 'good');
+  },
+  openMail: (d) => {
+    ui.mailOpen = d.id || null;
+    const m = (state.inbox || []).find((x) => x.id === d.id);
+    if (m) m.read = true;
+    save(); render(); window.scrollTo(0, 0);
+  },
+  answerMail: (d) => {
+    const msg = resolveMail(state, d.id, Number(d.i));
+    const m = state.inbox.find((x) => x.id === d.id);
+    if (m) m.result = msg;
+    sfx.click();
+    commit(msg || '답장을 보냈어요', 'good');
+  },
+  tradeTeam: (d) => { ui.trade = { otherId: d.id || null, give: [], get: [], cash: 0 }; render(); },
+  tradeGet: (d) => { const tr = ui.trade; tr.get = tr.get.includes(d.pid) ? tr.get.filter((x) => x !== d.pid) : [...tr.get, d.pid]; render(); },
+  tradeGive: (d) => { const tr = ui.trade; tr.give = tr.give.includes(d.pid) ? tr.give.filter((x) => x !== d.pid) : [...tr.give, d.pid]; render(); },
+  tradeCash: (d) => { const tr = ui.trade; tr.cash = Math.max(0, Math.min(userTeam(state).cash, tr.cash + Number(d.d))); render(); },
+  tradePropose: () => {
+    const tr = ui.trade;
+    const ev = evaluateTrade(state, tr.otherId, tr.give, tr.get, tr.cash);
+    if (!ev.ok) { toast(ev.msg, 'bad'); return; }
+    const names = tr.get.map((id) => state.players[id].name).join(', ');
+    executeTrade(state, tr.otherId, tr.give, tr.get, tr.cash);
+    ui.trade = { otherId: tr.otherId, give: [], get: [], cash: 0 };
+    sfx.levelup();
+    commit(`트레이드 성사! ${names} 영입`, 'big');
   },
   hofInduct: (d) => {
     const e = induct(state, d.id, d.n === '1');
@@ -193,9 +294,8 @@ registerActions({
   showBox: () => openModal(boxModal()),
   startOffseason: () => {
     runOffseasonStart(state);
-    const st = advanceDraftToUser(state);
-    if (st === 'done') finishDraft(state);
-    commit('오프시즌: 은퇴와 나이 반영 완료. 드래프트가 열렸어요', 'big');
+    window.scrollTo(0, 0);
+    commit('은퇴·노화 반영 완료. 연봉·FA 협상을 시작하세요', 'big');
   },
 
   // 드래프트
@@ -369,6 +469,28 @@ registerActions({
   },
   resetGame: () => confirmBox('지금까지의 진행이 모두 지워져요. 처음부터 다시 창단할까요?', '처음부터', () => { wipe(); ui.tab = 'home'; render(); }, 'danger'),
 });
+
+function offerSheet(pid, mode, note = '') {
+  const p = state.players[pid];
+  const it = mode === 'nego' ? state.nego.items.find((x) => x.pid === pid) : null;
+  const ask = mode === 'fa' ? (p.askSalary || fairSalary(state, p)) : it.demand;
+  const askYrs = mode === 'fa' ? (p.askYears || 1) : (it.years || 1);
+  if (!ui.offerYears || ui.offerPid !== pid) { ui.offerYears = askYrs; ui.offerPid = pid; }
+  const tries = mode === 'fa' ? (p.faTries || 0) : (it.tries || 0);
+  const maxTries = mode === 'fa' ? 4 : 3;
+  const yrs = ui.offerYears;
+  const pcts = [0.85, 0.95, 1, 1.1];
+  const fee = (s) => (mode === 'fa' || it?.kind === 'fa' ? Math.round(s * yrs * 0.2 / 100) * 100 : it?.kind === 'foreign' ? Math.round(s * 0.15 / 100) * 100 : 0);
+  return `<button class="sheet-close" data-act="closeModal">×</button>
+    <h2 class="disp" style="font-size:22px">${esc(p.name)} 계약 협상</h2>
+    <p class="small muted mt">${p.age}세 · OVR ${calcOvr(p)} · 요구 <b class="amber">연봉 ${formatMoney(ask)} · ${askYrs}년</b> · 남은 기회 ${maxTries - tries}번</p>
+    ${note ? `<div class="bar-note mt">${esc(note)}</div>` : ''}
+    <p class="small mt">계약 기간</p>
+    <div class="seg mt">${[1, 2, 3, 4].map((y) => `<button class="${yrs === y ? 'on' : ''}" data-act="offerYears" data-v="${y}" data-pid="${pid}" data-mode="${mode}">${y}년</button>`).join('')}</div>
+    <p class="small mt">연봉 제시 <span class="tiny faint">(계약금 별도)</span></p>
+    <div class="mt">${pcts.map((r) => { const sal = Math.round(ask * r / 100) * 100; return `<button class="choice" data-act="makeOffer" data-pid="${pid}" data-mode="${mode}" data-s="${sal}"><b>${formatMoney(sal)}</b> <span class="tiny muted" style="display:inline">요구의 ${Math.round(r * 100)}%</span>${fee(sal) ? `<span>계약금 ${formatMoney(fee(sal))}</span>` : ''}</button>`; }).join('')}</div>
+    <p class="tiny faint mt">기분이 좋고 충성도가 높을수록, 구단 브랜드 가치가 클수록 낮은 금액에도 사인해요.</p>`;
+}
 
 function doDraft(pid) {
   draftPick(state, pid);

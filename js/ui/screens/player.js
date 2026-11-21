@@ -7,6 +7,10 @@ import { canPromote, canDemote } from '../../engine/roster.js';
 import { fmtAvg, fmtEra, fmtIP, formatMoney } from '../../core/util.js';
 import { scoutLevel } from './draft.js';
 import { signingFee, canSign } from '../../engine/market.js';
+import { moodLabel, relsOf, relLabel } from '../../engine/mood.js';
+import { PERSONALITIES } from '../../data/club.js';
+import { FA_SERVICE, fairSalary } from '../../engine/contracts.js';
+import { scoutLevelOf } from '../../engine/club.js';
 
 function batRow(label, s) {
   const l = batLine(s);
@@ -23,7 +27,7 @@ export function renderPlayer(pid, opts = {}) {
   const team = state.teams[p.team];
   const color = team?.color || '#5f6f66';
   const isMine = p.team === state.userTeamId;
-  const lv = scoutLevel();
+  const lv = scoutLevelOf(state, p);
   const est = potentialEstimate(p, lv);
   const attrs = p.type === 'P' ? PIT_ATTRS : BAT_ATTRS;
   // 잠재 한계 추정: 실제 cap에 정확도에 따른 흐림
@@ -77,7 +81,9 @@ export function renderPlayer(pid, opts = {}) {
     <div><span>소속</span><b>${p.amateur ? '아마추어' : p.market === 'foreign' ? '외국인 시장' : p.market === 'fa' ? 'FA' : p.level === 1 ? '1군' : '2군'}</b></div>
     <div><span>연봉</span><b>${formatMoney(p.salary)}</b></div>
     <div><span>출신</span><b>${esc(p.origin)}</b></div>
-    ${p.team ? `<div><span>사기</span><b class="${(p.morale ?? 70) >= 75 ? 'good' : (p.morale ?? 70) < 55 ? 'bad' : ''}">${Math.round(p.morale ?? 70)}</b></div><div><span>컨디션</span><b>${Math.round(p.cond)}</b></div><div><span>잠재 OVR</span><b class="amber">${est.lo}~${est.hi}</b></div>` : ''}
+    ${p.team ? `<div><span>기분</span><b class="${moodLabel(p.morale).cls}">${moodLabel(p.morale).e} ${moodLabel(p.morale).ko} ${Math.round(p.morale ?? 70)}</b></div><div><span>컨디션</span><b>${Math.round(p.cond)}</b></div><div><span>잠재 OVR</span><b class="amber">${est.lo}~${est.hi}</b></div>
+    <div><span>성격</span><b>${PERSONALITIES[p.personality] ? `${PERSONALITIES[p.personality].icon} ${PERSONALITIES[p.personality].ko}` : '-'}</b></div><div><span>충성도</span><b>${Math.round(p.loyalty ?? 40)}</b></div><div><span>계약</span><b>${p.contract ? `${Math.max(0, p.contract.years)}년 남음` : '-'}</b></div>
+    <div><span>연차</span><b>${p.service ?? 0}년${(p.service ?? 0) >= FA_SERVICE ? ' (FA)' : ''}</b></div>` : ''}
   </div>
   ${p.injury ? `<div class="bar-note mt">🚑 ${esc(p.injury.name)} — 복귀까지 ${p.injury.weeks}주</div>` : ''}
   <div class="sec mt-l">
@@ -87,6 +93,7 @@ export function renderPlayer(pid, opts = {}) {
     <p class="tiny faint mt">${g.desc}. 스카우트 정확도 ${Math.round(est.acc * 100)}%</p>
   </div>
   ${p.traits.length ? `<div class="sec"><div class="sec-h"><h2>특성</h2></div>${traitChips(p)}</div>` : ''}
+  ${isMine && !draftMode ? moodSection(p) : ''}
   ${isMine && !draftMode ? `
   <div class="sec">
     <div class="sec-h"><h2>훈련 포인트</h2>${p.dev.length > 1 ? spark(p.dev.slice(-30)) : ''}</div>
@@ -106,6 +113,7 @@ export function renderPlayer(pid, opts = {}) {
       : `<button class="btn team grow" data-act="promote" data-pid="${p.id}" ${canPromote(state, team) && !p.injury ? '' : 'disabled'}>1군 등록</button>`}
     <button class="btn danger" data-act="release" data-pid="${p.id}">방출</button>
   </div>
+  <div class="row gap mt"><button class="btn sm grow" data-act="toggleBlock" data-pid="${p.id}">${p.tradeBlock ? '트레이드 블록 해제' : '트레이드 블록 등록'}</button>${state.teams[p.team].captain === p.id ? '<span class="chip" style="background:rgba(255,182,39,.12);color:var(--amber);border-color:var(--amber-dim)">© 주장</span>' : `<button class="btn sm ghost" data-act="makeCaptain" data-pid="${p.id}">주장 임명</button>`}</div>
   ${p.level === 2 && !canPromote(state, team) ? '<p class="tiny faint mt">1군 엔트리가 꽉 찼어요. 먼저 한 명을 내려야 해요.</p>' : ''}` : ''}
   ${p.market ? (() => { const err = canSign(state, userTeam(state), p); return `<button class="btn primary block" data-act="signPlayer" data-pid="${p.id}" ${err ? 'disabled' : ''}>계약금 ${formatMoney(signingFee(p))}로 영입</button>${err ? `<p class="tiny bad mt center">${err}</p>` : `<p class="tiny faint mt center">연봉 ${formatMoney(p.salary)}은 시즌 동안 나눠서 지급돼요.</p>`}`; })() : ''}
   ${onClockMine ? `<button class="btn primary block" data-act="draftThis" data-pid="${p.id}" ${userTeam(state).roster.length >= 65 ? 'disabled' : ''}>이 선수 지명</button>` : ''}`;
@@ -116,4 +124,15 @@ function addCur(tot, cur) {
   const o = { ...tot };
   for (const k in cur) o[k] = (o[k] || 0) + cur[k];
   return o;
+}
+
+function moodSection(p) {
+  const ml = moodLabel(p.morale);
+  const f = p.moodFactors || [];
+  const rels = relsOf(state, p.id).slice(0, 5);
+  return `<div class="sec">
+    <div class="sec-h"><h2>기분 ${ml.e}</h2><span class="sub">${ml.ko} · 경기력 ${((p.morale ?? 70) - 62) * 0.16 >= 0 ? '+' : ''}${(((p.morale ?? 70) - 62) * 0.16).toFixed(1)}%</span></div>
+    ${f.length ? `<div class="factors">${f.map((x) => `<span class="${x.v >= 0 ? 'good' : 'bad'}">${x.v >= 0 ? '▲' : '▼'} ${esc(x.t)}</span>`).join('')}</div>` : '<p class="small muted">첫 주가 지나면 기분 요인이 표시돼요.</p>'}
+    ${rels.length ? `<div class="sec-h mt"><h2 style="font-size:15px">관계</h2></div><div class="chips">${rels.map((r) => `<button class="chip ${r.v < 0 ? 'bad' : ''}" data-act="openPlayer" data-pid="${r.pid}">${r.v >= 0 ? '🤝' : '⚡'} ${esc(state.players[r.pid].name)} · ${relLabel(r.v)}</button>`).join('')}</div>` : ''}
+  </div>`;
 }

@@ -315,8 +315,14 @@ const SPONSORS = ['치킨왕', '한빛전자', '바다캐피탈', '스타음료'
 export function offerMissions(state) {
   if (state.phase !== 'regular') { state.missionOffers = []; return; }
   const pool = MISSIONS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
-  const fanMult = 1 + Math.min(1.5, (mine(state).fans - 12000) / 60000);
-  state.missionOffers = pool.map((m) => ({ ...m, sponsor: pick(SPONSORS), reward: Math.round(m.reward * fanMult / 100) * 100 }));
+  const t = mine(state);
+  const sp = Object.values(t.sponsors || {});
+  const tier = sp.length ? Math.max(...sp.map((x) => x.tier)) : 0;
+  const mult = (1 + Math.min(1.5, (t.fans - 12000) / 60000)) * (1 + tier * 0.6);
+  state.missionOffers = pool.map((m) => {
+    const s = sp.length ? pick(sp) : null;
+    return { ...m, sponsor: s ? s.name : pick(SPONSORS), reward: Math.round(m.reward * mult / 100) * 100 };
+  });
 }
 
 export function acceptMission(state, id) {

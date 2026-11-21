@@ -2,7 +2,9 @@
 globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 import { setSeed } from '../js/core/rng.js';
 import { createNewGame, standings } from '../js/engine/league.js';
-import { simDay, runOffseasonStart, advanceDraftToUser, draftPick, aiDraftChoice, finishDraft, runCampAndStartSeason, simPostDay } from '../js/engine/season.js';
+import { simDay, runOffseasonStart, advanceDraftToUser, draftPick, aiDraftChoice, finishDraft, runCampAndStartSeason, simPostDay, proceedToDraft } from '../js/engine/season.js';
+import { resolveMail } from '../js/engine/mail.js';
+import { annualOffer, multiOffer } from '../js/engine/contracts.js';
 import { calcOvr, potOvr, batLine, pitLine } from '../js/engine/player.js';
 import { teamOvr } from '../js/engine/roster.js';
 
@@ -15,7 +17,10 @@ console.log('players', Object.keys(s.players).length, 'teams', s.teamOrder.map(i
 const userTracked = s.teams.user.roster.map(id => s.players[id]).filter(p => p.age <= 21).slice(0, 6).map(p => [p.id, p.name, p.age, calcOvr(p), potOvr(p)]);
 
 for (let season = 0; season < seasons; season++) {
-  while (s.phase === 'regular') simDay(s);
+  while (s.phase === 'regular') {
+    simDay(s);
+    for (const m of (s.inbox || []).filter((m) => !m.resolved)) resolveMail(s, m.id, 0);
+  }
   // league totals
   const L = { pa:0, ab:0, h:0, d:0, t:0, hr:0, bb:0, so:0, hbp:0, sf:0, r:0, sb:0, cs:0 };
   let outs=0, er=0, runs=0;
@@ -29,7 +34,12 @@ for (let season = 0; season < seasons; season++) {
   console.log('champion', s.teams[s.post.champion].name, 'awards', s.history.at(-1).awards.map(a => a.award + ':' + a.name + '(' + a.team + ')').join(', '));
   const inj = Object.values(s.players).filter(p => p.injury).length;
   console.log('injured now', inj, 'news', s.news.length, 'cash', s.teams.user.cash, 'fans', s.teams.user.fans);
+  if (s.promotionOffer) s.pendingPromotion = s.promotionOffer;
   runOffseasonStart(s);
+  const nego = s.nego.items;
+  for (const it of nego) { if (it.kind === 'annual') annualOffer(s, it.pid, 'fair'); else multiOffer(s, it.pid, it.demand, it.years || 1); }
+  console.log('nego', nego.length, nego.map(i => i.kind + ':' + i.status).join(','));
+  proceedToDraft(s);
   let st;
   while ((st = advanceDraftToUser(s)) === 'user') draftPick(s, aiDraftChoice(s, 'user'));
   finishDraft(s);
@@ -41,6 +51,7 @@ console.log('time ms', Date.now() - t0, 'save KB', Math.round(JSON.stringify(s).
 // 신규 시스템 점검
 import('../js/engine/club.js').then(({ startUpgrade, facLv }) => {
   const u = s.teams.user;
-  console.log('cash', u.cash, 'fac', JSON.stringify(Object.fromEntries(Object.entries(u.facilities).map(([k, v]) => [k, v.lv]))), 'staff', Object.values(u.staff).filter(Boolean).length);
+  console.log('cash', u.cash, 'bld', JSON.stringify(u.buildings), 'staff', Object.values(u.staff).filter(Boolean).length);
+  console.log('league', s.league, 'inbox', (s.inbox||[]).length, 'rels', Object.keys(s.rels||{}).length, 'paper', (s.paper||[]).length, 'sponsors', Object.keys(u.sponsors||{}).length, 'offers', (s.sponsorOffers||[]).length);
   console.log('hof cand', (s.hofCandidates||[]).length, 'retired user', s.retired.filter(r=>r.wasUser).length, 'foreignPool', s.foreignPool.length, 'staffMarket', s.staffMarket.length, 'event', s.pendingEvent?.title, 'offers', (s.missionOffers||[]).map(m=>m.title).join('/'));
 });

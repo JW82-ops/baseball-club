@@ -158,7 +158,7 @@ export function createPlayer(opts) {
     level: 2,
     focus: 'balanced',
     salary: 3000,
-    contract: 1,
+    contract: null,
     origin: opts.origin || pick(chance(0.65) ? HIGH_SCHOOLS : UNIVERSITIES),
     draft: opts.draft || null,
     xp: 0,
@@ -245,4 +245,14 @@ export function ageCurveLabel(p) {
   if (p.age < g.peakStart) return '성장기';
   if (p.age <= g.peakEnd) return '전성기';
   return '하락기';
+}
+
+export function careerTotals(p) {
+  const bat = emptyBat(), pit = emptyPit();
+  for (const h of p.history || []) {
+    const hb = unpackBat(h), hp = unpackPit(h);
+    for (const k in bat) bat[k] += hb[k];
+    for (const k in pit) pit[k] += hp[k];
+  }
+  return { bat, pit, seasons: (p.history || []).length };
 }

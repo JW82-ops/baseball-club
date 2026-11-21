@@ -8,6 +8,10 @@ import { fmtEra, formatMoney } from '../../core/util.js';
 import { INTENSITY } from '../../data/constants.js';
 import { renderDraft } from './draft.js';
 import { computeSynergies, SYNERGIES } from '../../engine/synergy.js';
+import { LEAGUES } from '../../data/club.js';
+import { fairSalary } from '../../engine/contracts.js';
+import { moodLabel } from '../../engine/mood.js';
+import { calcOvr as ovrOf } from '../../engine/player.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -155,6 +159,7 @@ function regularView() {
   const remain = prog.total - prog.day;
   return `
   ${eventCard()}
+  ${mailCard()}
   <section class="sec">
     ${sg ? matchupCard(sg, `${state.season} 정규시즌 · ${prog.day + 1}/${prog.total}경기`) : '<div class="panel empty">오늘은 경기가 없어요.</div>'}
     <div class="simbar">
@@ -165,6 +170,7 @@ function regularView() {
   </section>
   ${missionCard()}
   ${lastGameCard()}
+  ${paperCard()}
   ${weekCard()}
   ${synergyCard()}
   ${miniStandings()}
@@ -184,6 +190,7 @@ function postView() {
   }).join('');
   return `
   ${eventCard()}
+  ${mailCard()}
   <section class="sec">
     <div class="sec-h"><h2>${state.season} 포스트시즌</h2><span class="sub">${r.name} ${r.need}선승</span></div>
     ${userIn ? matchupCard(sg, `${r.name} ${r.games.length + 1}차전`) : `<div class="panel"><p>${esc(state.teams[sg.away].short)} vs ${esc(state.teams[sg.home].short)} — ${r.name} ${r.games.length + 1}차전</p><div class="simbar" style="grid-template-columns:1fr 1fr"><button class="btn" data-act="simPost" data-all="0">다음 경기</button><button class="btn" data-act="simPost" data-all="1">끝까지 진행</button></div></div>`}
@@ -202,16 +209,23 @@ function offseasonView() {
     <div class="panel center" style="padding:22px 14px">
       ${emblem(champ, 64)}
       <h2 class="disp mt" style="font-size:24px">${h.season} 우승 ${esc(champ.name)}</h2>
-      <p class="muted mt">우리 구단 정규시즌 ${h.userRank}위${h.champion === user.id ? ' · 통합 우승!' : ''}</p>
+      <p class="muted mt">우리 구단 정규시즌 ${h.userRank}위${h.champion === user.id ? ' · 우승!' : ''}</p>
     </div>
   </section>
+  ${state.promotionOffer ? `<section class="sec"><div class="event-card levelup">
+    <span class="small amber">${LEAGUES[state.promotionOffer].flag} 리그 승격 제안</span>
+    <h3>${LEAGUES[state.promotionOffer].ko} 진출</h3>
+    <p>${LEAGUES[state.league || 'KBO'].ko}를 제패했어요! 다음 시즌부터 ${LEAGUES[state.promotionOffer].ko}에서 뛸 수 있어요. 상대 구단이 훨씬 강해지지만 관중·스폰서·상금 규모가 커져요. 우리 선수단과 시설은 그대로 가져가요.</p>
+    <button class="choice" data-act="promotion" data-v="1"><b>${state.pendingPromotion ? '✓ 승격 확정됨' : '승격을 수락한다'}</b><span>스프링캠프가 끝나면 새 리그에서 개막</span></button>
+    <button class="choice" data-act="promotion" data-v="0"><b>${!state.pendingPromotion ? '✓ ' : ''}현재 리그에 남는다</b><span>왕조를 더 다진 뒤에 도전</span></button>
+  </div></section>` : ''}
   <section class="sec">
     <div class="sec-h"><h2>시상</h2></div>
     <div class="panel"><table class="tbl">${h.awards.map((a) => `<tr class="${state.players[a.pid]?.team === user.id ? 'me' : ''}"><td>${esc(a.award)}</td><td>${esc(a.name || '')} <span class="muted">${esc(a.team || '')}</span></td></tr>`).join('')}</table></div>
   </section>
   <section class="sec">
     <div class="panel">
-      <p class="small muted">다음 단계: 시즌 기록을 정리하고, 베테랑 은퇴와 나이 반영 후 신인 드래프트(${DRAFT_ROUNDS}라운드)가 열려요. 드래프트 전에 선수단에서 방출할 선수를 정리할 수 있어요. 구단 정원은 65명이에요.</p>
+      <p class="small muted">다음 단계: 기록 정리 → 은퇴·노화 → <b>연봉·FA 협상</b> → FA 시장 개장과 신인 드래프트(${DRAFT_ROUNDS}라운드) → 스프링캠프. 구단 정원은 65명이에요.</p>
       <p class="small mt">현재 소속 <b>${user.roster.length}</b>명</p>
       <button class="btn primary block mt" data-act="startOffseason">오프시즌 시작</button>
     </div>
@@ -234,8 +248,59 @@ function campView() {
   ${newsCard()}`;
 }
 
+function contractsView() {
+  const items = state.nego?.items || [];
+  const pend = items.filter((x) => x.status === 'pending');
+  const label = { annual: '연봉 협상', fa: 'FA 선언', stay: 'FA 잔류 협상', foreign: '외국인 재계약' };
+  const row = (it) => {
+    const p = state.players[it.pid];
+    if (!p) return '';
+    const ml = moodLabel(p.morale);
+    const fair = fairSalary(state, p);
+    const done = it.status !== 'pending';
+    return `<div class="nego ${done ? 'done' : ''}">
+      <div class="row gap"><div class="grow"><b>${esc(p.name)}</b> <span class="tiny muted">${p.age}세 · OVR ${ovrOf(p)} · ${ml.e}</span>
+        <div class="tiny muted">${label[it.kind]} · 현재 ${formatMoney(p.salary)} → 요구 <b class="amber">${formatMoney(it.demand)}</b>${it.years ? ` · ${it.years}년` : ''} · 기준 ${formatMoney(fair)}</div></div>
+        ${done ? `<span class="small ${it.status === 'left' ? 'bad' : 'good'}">${it.status === 'left' ? '결렬' : formatMoney(it.final || p.salary)}</span>` : ''}</div>
+      ${done ? '' : it.kind === 'annual' ? `<div class="row gap mt"><button class="btn sm grow" data-act="nego" data-pid="${p.id}" data-m="accept">요구 수용</button><button class="btn sm grow" data-act="nego" data-pid="${p.id}" data-m="fair">기준액</button><button class="btn sm grow danger" data-act="nego" data-pid="${p.id}" data-m="cut">삭감</button></div>`
+        : `<div class="row gap mt"><button class="btn sm grow primary" data-act="negoSheet" data-pid="${p.id}">조건 제시</button><button class="btn sm ghost" data-act="negoRelease" data-pid="${p.id}">놓아준다</button></div>`}
+    </div>`;
+  };
+  const order = { fa: 0, stay: 1, foreign: 2, annual: 3 };
+  const sorted = items.slice().sort((a, b) => order[a.kind] - order[b.kind] || ovrOf(state.players[b.pid]) - ovrOf(state.players[a.pid]));
+  return `
+  <section class="sec">
+    <div class="sec-h"><h2>${state.season + 1} 연봉·FA 협상</h2><span class="sub">남은 협상 ${pend.length}</span></div>
+    <p class="small muted">요구를 들어주면 기분이 좋아지고, 깎으면 실망해요. 연봉 인상을 약속했던 선수는 기준액 이상을 줘야 약속을 지킨 걸로 돼요. FA 선언 선수는 협상이 결렬되면 FA 시장으로 나가요.</p>
+    <div class="row gap mt"><button class="btn sm grow" data-act="negoAll" data-m="accept">연봉협상 전원 수용</button><button class="btn sm grow" data-act="negoAll" data-m="fair">전원 기준액</button></div>
+    ${items.some((x) => x.kind === 'stay' && x.status === 'pending') ? '<button class="btn sm block mt" data-act="negoAll" data-m="stay">FA 잔류 희망자 요구 조건 전원 수용</button>' : ''}
+    <div class="mt">${sorted.map(row).join('') || '<div class="panel empty">이번 오프시즌엔 협상할 선수가 없어요.</div>'}</div>
+    <button class="btn primary block mt-l" data-act="proceedDraft">협상 마감 → FA 시장 · 드래프트</button>
+    <p class="tiny faint mt center">남은 연봉협상은 기준액으로, 남은 FA 선언자는 시장으로 나가요.</p>
+  </section>`;
+}
+
+function mailCard() {
+  const pend = (state.inbox || []).filter((m) => !m.resolved);
+  if (!pend.length) return '';
+  const m = pend[0];
+  return `<section class="sec"><button class="panel card-accent mailcard" data-act="tab" data-tab="mail">
+    <span class="tiny amber">✉️ 답장을 기다리는 메일 ${pend.length}통</span><br><b>${esc(m.fromName || '')}</b> <span class="small">${esc(m.subject)}</span></button></section>`;
+}
+
+function paperCard() {
+  const pp = (state.paper || [])[0];
+  if (!pp || pp.season !== state.season) return '';
+  return `<section class="sec"><div class="paper">
+    <div class="paper-h"><span>주간 베이스볼</span><span>${pp.season} 시즌 ${pp.week}주차</span></div>
+    <h3>${esc(pp.head)}</h3>
+    ${pp.lines.map((l) => `<p>· ${esc(l)}</p>`).join('')}
+  </div></section>`;
+}
+
 export function renderHome() {
   switch (state.phase) {
+    case 'contracts': return contractsView();
     case 'regular': return regularView();
     case 'post': return postView();
     case 'offseason': return offseasonView();
