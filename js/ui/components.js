@@ -7,6 +7,17 @@ import { state } from '../core/store.js';
 
 export const esc = escapeHtml;
 
+// ───────── 일러스트 (img/art, Higgsfield 생성) ─────────
+export const artUrl = (n) => `img/art/${n}.webp`;
+const FADE = 'linear-gradient(180deg,rgba(6,18,12,.1) 0%,rgba(10,28,19,.45) 42%,rgba(16,38,28,.97) 100%)';
+export function artBg(n, grad = FADE) { return `background-image:${grad},url(${artUrl(n)})`; }
+export function artHero(n, inner, cls = '') { return `<div class="art-hero ${cls}" style="${artBg(n)}">${inner}</div>`; }
+export function stadiumArt(team, isUser) {
+  const lv = team?.buildings?.stadium?.lv;
+  if (isUser && lv) return `stadium${Math.max(1, Math.min(5, lv))}`;
+  return (team?.strength || 70) >= 72 ? 'stadium4' : 'stadium3';
+}
+
 export function emblem(team, size = 28) {
   const path = EMBLEMS[team.emblem] || EMBLEMS.ball;
   return `<span class="emblem" style="--c1:${team.color};--c2:${team.color2 || '#000'};width:${size}px;height:${size}px">

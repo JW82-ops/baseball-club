@@ -1,6 +1,6 @@
 import { state } from '../../core/store.js';
 import { ui } from '../ui-state.js';
-import { esc, gradeTag, potTag, avatar, posShort } from '../components.js';
+import { artHero, esc, gradeTag, potTag, avatar, posShort } from '../components.js';
 import { draftOnClock, DRAFT_ROUNDS, userTeam } from '../../engine/season.js';
 import { calcOvr, potentialEstimate } from '../../engine/player.js';
 import { ROSTER } from '../../data/constants.js';
@@ -24,10 +24,7 @@ export function renderDraft() {
   pool.sort((a, b) => potentialEstimate(b, lv).hi + potentialEstimate(b, lv).lo - potentialEstimate(a, lv).hi - potentialEstimate(a, lv).lo);
   return `
   <section class="sec">
-    <div class="draft-clock">
-      <div><span class="small muted">${d.year} 신인 드래프트</span><br><b>${d.round}라운드 ${d.pickIdx + 1}순위</b></div>
-      <div class="right small" style="text-align:right">우리 차례<br><span class="muted">소속 ${user.roster.length}/${ROSTER.TOTAL_MAX}</span></div>
-    </div>
+    ${artHero('draft', `<span class="k">${d.year} 신인 드래프트 · 소속 ${user.roster.length}/${ROSTER.TOTAL_MAX}</span><h2 class="amber">${d.round}라운드 ${d.pickIdx + 1}순위</h2><p>우리 차례예요. 구단의 미래를 지명하세요.</p>`)}
     ${full ? `<div class="bar-note">정원이 꽉 찼어요. 선수단에서 방출하거나 이번 지명을 건너뛰세요.</div>` : ''}
     <div class="row gap mt">
       <div class="seg grow">${[['all', '전체'], ['B', '타자'], ['P', '투수']].map(([k, l]) => `<button class="${ui.draftType === k ? 'on' : ''}" data-act="draftType" data-v="${k}">${l}</button>`).join('')}</div>

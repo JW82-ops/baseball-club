@@ -13,7 +13,7 @@ export function renderTitle() {
   if (title.creating) return renderCreate();
   const PH = { regular: '정규시즌', post: '포스트시즌', offseason: '오프시즌', contracts: '계약 협상', draft: '드래프트', camp: '스프링캠프' };
   return `<div class="create">
-    <div class="create-hero title-hero">
+    <div class="title-hero" style="background-image:linear-gradient(180deg,rgba(5,12,9,.55) 0%,rgba(5,12,9,0) 34%,rgba(10,26,18,0) 62%,#0a1a12 100%),url(img/art/title.webp)">
       <h1>프로야구팀을<br>만들자</h1>
       <p>신생 구단을 창단해 유망주를 키우고, KBO를 넘어 NPB·MLB까지 정복하세요.</p>
     </div>

@@ -81,7 +81,10 @@ function render() {
   $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === ui.tab));
   const screens = { home: renderHome, roster: renderRoster, develop: renderDevelop, league: renderLeague, club: renderClub, mail: renderMail };
   main.innerHTML = (screens[ui.tab] || renderHome)();
+  if (ui.tab === 'home' && lastPhase !== state.phase) window.scrollTo(0, 0);
+  lastPhase = state.phase;
 }
+let lastPhase = null;
 setRenderer(render);
 
 function commit(msg, tone) {
@@ -342,6 +345,7 @@ registerActions({
     else t.uniform[d.k] = d.v;
     commit();
   },
+  natSeen: () => { if (state.natLast) state.natLast.seen = true; commit(); },
   toggleClutch: (d) => { state.settings.clutch = d.checked; commit(d.checked ? '승부처 알림 켜짐' : '승부처 알림 꺼짐'); },
   setDifficulty: (d) => { state.settings.difficulty = d.v; commit('난이도 변경'); },
   tradeTeam: (d) => { ui.trade = { otherId: d.id || null, give: [], get: [], cash: 0 }; render(); },

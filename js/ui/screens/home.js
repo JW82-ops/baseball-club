@@ -1,6 +1,6 @@
 import { state } from '../../core/store.js';
 import { ui } from '../ui-state.js';
-import { esc, emblem, gradeTag } from '../components.js';
+import { artBg, artHero, stadiumArt, esc, emblem, gradeTag } from '../components.js';
 import { standings, pct } from '../../engine/league.js';
 import { userTeam, userGameToday, currentPostGame, seasonProgress, draftOnClock, DRAFT_ROUNDS, CAMP_WEEKS } from '../../engine/season.js';
 import { calcOvr, pitLine } from '../../engine/player.js';
@@ -32,11 +32,12 @@ function spLine(p) {
 
 function recordStr(t) { return `${t.w}승 ${t.l}패${t.t ? ` ${t.t}무` : ''}`; }
 
-function matchupCard(sg, title) {
+function matchupCard(sg, title, art) {
   const home = state.teams[sg.home], away = state.teams[sg.away];
   const hp = probable(home), ap = probable(away);
+  const bg = art || stadiumArt(home, home.id === state.userTeamId);
   return `
-  <div class="matchup">
+  <div class="matchup has-art" style="${artBg(bg, 'linear-gradient(180deg,rgba(6,16,11,.62) 0%,rgba(6,16,11,.2) 34%,rgba(12,30,21,.88) 62%,rgba(16,38,28,.98) 100%)')}">
     <div class="mh"><span>${title}</span><span>${userTeam(state).rivalId && (sg.home === userTeam(state).rivalId || sg.away === userTeam(state).rivalId) ? '<b class="amber">⚔️ 라이벌전</b> · ' : ''}${esc(home.city || '')} 홈</span></div>
     <div class="teams">
       <div class="tm">${emblem(away, 46)}<b>${esc(away.short || away.name)}</b><small>${recordStr(away)}</small></div>
@@ -155,12 +156,22 @@ function synergyCard() {
     <p class="tiny faint mt">라인업과 투수진 조합에 따라 발동돼요. 눌러서 조건을 확인하세요.</p></div></section>`;
 }
 
+function natCard() {
+  const n = state.natLast;
+  if (!n || n.seen) return '';
+  return `<section class="sec">${artHero('national', `<span class="k">🇰🇷 국가대표</span><h2>${esc(n.ko)} ${esc(n.md)}</h2>
+    <p>${n.log.map((x) => `${esc(x.round)} ${x.win ? '승' : '패'} ${esc(x.score)}`).join(' · ')}</p>
+    ${n.mine.length ? `<p>우리 구단: <b>${n.mine.map(esc).join(', ')}</b></p>` : ''}
+    <button class="btn sm mt" data-act="natSeen">확인</button>`, 'tall')}</section>`;
+}
+
 function regularView() {
   const sg = userGameToday(state);
   const prog = seasonProgress(state);
   const remain = prog.total - prog.day;
   return `
   ${eventCard()}
+  ${natCard()}
   ${mailCard()}
   <section class="sec">
     ${sg ? matchupCard(sg, `${state.season} 정규시즌 · ${prog.day + 1}/${prog.total}경기`) : '<div class="panel empty">오늘은 경기가 없어요.</div>'}
@@ -196,7 +207,7 @@ function postView() {
   ${mailCard()}
   <section class="sec">
     <div class="sec-h"><h2>${state.season} 포스트시즌</h2><span class="sub">${r.name} ${r.need}선승</span></div>
-    ${userIn ? matchupCard(sg, `${r.name} ${r.games.length + 1}차전`) : `<div class="panel"><p>${esc(state.teams[sg.away].short)} vs ${esc(state.teams[sg.home].short)} — ${r.name} ${r.games.length + 1}차전</p><div class="simbar" style="grid-template-columns:1fr 1fr"><button class="btn" data-act="simPost" data-all="0">다음 경기</button><button class="btn" data-act="simPost" data-all="1">끝까지 진행</button></div></div>`}
+    ${userIn ? matchupCard(sg, `${r.name} ${r.games.length + 1}차전`, 'crowd') : `<div class="panel"><p>${esc(state.teams[sg.away].short)} vs ${esc(state.teams[sg.home].short)} — ${r.name} ${r.games.length + 1}차전</p><div class="simbar" style="grid-template-columns:1fr 1fr"><button class="btn" data-act="simPost" data-all="0">다음 경기</button><button class="btn" data-act="simPost" data-all="1">끝까지 진행</button></div></div>`}
     <div class="panel mt"><table class="tbl">${bracket}</table></div>
   </section>
   ${lastGameCard()}
@@ -209,12 +220,10 @@ function offseasonView() {
   const champ = state.teams[h.champion];
   return `
   <section class="sec">
-    <div class="panel center" style="padding:22px 14px">
-      ${emblem(champ, 64)}
-      <h2 class="disp mt" style="font-size:24px">${h.season} 우승 ${esc(champ.name)}</h2>
-      <p class="muted mt">우리 구단 정규시즌 ${h.userRank}위${h.champion === user.id ? ' · 우승!' : ''}</p>
-    </div>
+    ${artHero('champion', `<div class="row gap">${emblem(champ, 52)}<div><span class="k">${h.season} ${LEAGUES[state.league || 'KBO'].series || '시리즈'} 우승</span><h2>${esc(champ.name)}</h2></div></div>
+      <p>우리 구단 정규시즌 ${h.userRank}위${h.champion === user.id ? ' · 정상에 섰어요!' : ''}</p>`, 'tall')}
   </section>
+  ${natCard()}
   ${state.promotionOffer ? `<section class="sec"><div class="event-card levelup">
     <span class="small amber">${LEAGUES[state.promotionOffer].flag} 리그 승격 제안</span>
     <h3>${LEAGUES[state.promotionOffer].ko} 진출</h3>
@@ -240,7 +249,7 @@ function campView() {
   const user = userTeam(state);
   return `
   <section class="sec">
-    <div class="sec-h"><h2>${state.season + 1} 스프링캠프</h2><span class="sub">${CAMP_WEEKS}주</span></div>
+    ${artHero('camp', `<span class="k">${CAMP_WEEKS}주 합숙 훈련</span><h2>${state.season + 1} 스프링캠프</h2><p>새 시즌을 준비하는 시간이에요.</p>`)}
     <div class="panel">
       <p class="small muted">캠프 동안 모든 선수가 ${CAMP_WEEKS}주 훈련해요. 강도가 높을수록 성장은 빠르지만 부상 위험도 커져요. 개인별 훈련 포인트는 선수 카드에서 바꿀 수 있어요.</p>
       <div class="seg mt">${Object.entries(INTENSITY).map(([k, v]) => `<button class="${state.settings.intensity === k ? 'on' : ''}" data-act="setIntensity" data-v="${k}">${v.ko}</button>`).join('')}</div>
@@ -272,8 +281,9 @@ function contractsView() {
   const order = { fa: 0, stay: 1, foreign: 2, annual: 3 };
   const sorted = items.slice().sort((a, b) => order[a.kind] - order[b.kind] || ovrOf(state.players[b.pid]) - ovrOf(state.players[a.pid]));
   return `
+  ${natCard()}
   <section class="sec">
-    <div class="sec-h"><h2>${state.season + 1} 연봉·FA 협상</h2><span class="sub">남은 협상 ${pend.length}</span></div>
+    ${artHero('contract', `<span class="k">남은 협상 ${pend.length}건</span><h2>${state.season + 1} 연봉·FA 협상</h2>`)}
     <p class="small muted">요구를 들어주면 기분이 좋아지고, 깎으면 실망해요. 연봉 인상을 약속했던 선수는 기준액 이상을 줘야 약속을 지킨 걸로 돼요. FA 선언 선수는 협상이 결렬되면 FA 시장으로 나가요.</p>
     <div class="row gap mt"><button class="btn sm grow" data-act="negoAll" data-m="accept">연봉협상 전원 수용</button><button class="btn sm grow" data-act="negoAll" data-m="fair">전원 기준액</button></div>
     ${items.some((x) => x.kind === 'stay' && x.status === 'pending') ? '<button class="btn sm block mt" data-act="negoAll" data-m="stay">FA 잔류 희망자 요구 조건 전원 수용</button>' : ''}

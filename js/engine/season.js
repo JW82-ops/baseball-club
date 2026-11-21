@@ -272,6 +272,7 @@ function natNews(state, r) {
   addNews(state, `🇰🇷 ${state.season} ${E.ko} 대표팀 ${md}${r.mine.length ? ` — 우리 구단 ${r.mine.map((p) => p.name).join(', ')} 출전` : ''}`, r.medal === 'gold' ? 'big' : 'info');
   for (const n of r.notes) addNews(state, n, 'big');
   pushMail(state, { from: null, fromName: 'KBO 사무국', kind: 'note', subject: `${E.ko} 결과`, body: `${r.log.map((x) => `${x.round} vs ${x.opp} ${x.win ? '승' : '패'} ${x.score}`).join(' / ')}. 최종: ${md}.${r.mine.length ? ` 우리 구단 출전: ${r.mine.map((p) => p.name).join(', ')}` : ''}` });
+  state.natLast = { season: state.season, ko: E.ko, medal: r.medal || null, md, log: r.log, mine: r.mine.map((p) => p.name), seen: false };
   if (r.medal === 'gold') snsPost(state, `대한민국 ${E.short} 금메달!!! ${r.mine.length ? `${r.mine[0].name} 최고 👏` : ''} 🇰🇷`, 'pos', 2);
 }
 function midSeasonInternational(state) {

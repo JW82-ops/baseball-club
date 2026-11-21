@@ -1,6 +1,6 @@
 import { state } from '../../core/store.js';
 import { ui } from '../ui-state.js';
-import { esc, emblem, gradeTag, avatar, posShort, ratingBar } from '../components.js';
+import { esc, emblem, gradeTag, avatar, posShort, ratingBar, artBg, artHero } from '../components.js';
 import { userTeam } from '../../engine/season.js';
 import { teamPlayers } from '../../engine/roster.js';
 import { formatMoney, formatFans } from '../../core/util.js';
@@ -32,7 +32,9 @@ function buildingCard(t, k) {
   const built = subs.filter(([sk]) => subLv(t, sk) || t.subs[sk]?.build);
   const used = slotsUsed(t, k), total = slotsTotal(t, k);
   const eff = k === 'stadium' ? `${info.cap.toLocaleString()}석` : `성장 ×${info.growth.toFixed(2)}`;
+  const artN = k === 'stadium' ? `stadium${lv}` : k;
   return `<div class="bld">
+    <div class="bld-art" style="${artBg(artN, 'linear-gradient(180deg,rgba(6,16,11,0) 40%,rgba(22,50,34,.95) 100%)')}">${b ? `<span class="bld-tag">🏗️ Lv.${b.to} 증축 중</span>` : ''}</div>
     <div class="bld-h">
       <div class="ic">${B.icon}</div>
       <div class="grow"><div class="row between"><h3>${B.ko}</h3><span class="small amber">Lv.${lv}</span></div>
@@ -213,6 +215,7 @@ function hofView(t) {
     return e.type === 'P' ? `통산 ${q.w || 0}승 ${q.sv || 0}세이브 ${q.so || 0}탈삼진` : `통산 ${b.h || 0}안타 ${b.hr || 0}홈런 ${b.rbi || 0}타점`;
   };
   return `
+    ${artHero('hof', `<span class="k">헌액 ${hof.length}명 · 영구결번 ${nums.length}개</span><h2>명예의 전당</h2><p>구단의 역사를 만든 이름들</p>`)}
     ${cands.length ? `<div class="sec-h"><h2>헌액 후보</h2></div>${cands.map((e) => `
       <div class="event-card" style="margin-bottom:10px">
         <h3>${esc(e.name)} <span class="small muted">#${e.num ?? '-'}</span></h3>

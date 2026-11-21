@@ -474,7 +474,7 @@ export function gameMvp(g, sd) {
 export function liveShell() {
   return `
   <section class="live">
-    <div class="lv-score" id="lv-score"></div>
+    <div class="lv-score" id="lv-score" style="background-image:linear-gradient(180deg,rgba(4,12,8,.78),rgba(6,18,12,.93)),url(img/art/crowd.webp)"></div>
     <div class="lv-stage">
       <canvas id="lv-canvas" aria-label="경기장"></canvas>
       <div class="lv-pitch" id="lv-pitch"></div>
