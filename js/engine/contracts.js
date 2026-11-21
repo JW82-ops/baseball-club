@@ -5,6 +5,8 @@ import { teamPlayers, ensureLineupValid } from './roster.js';
 import { addMoodEvent } from './mood.js';
 import { brandValue } from './sponsor.js';
 import { LEAGUES } from '../data/club.js';
+import { regCount } from './roster.js';
+import { faGrade, compensateFA } from './kborules.js';
 
 export const FA_SERVICE = 8;
 
@@ -145,6 +147,7 @@ export function finishContractPhase(state) {
     }
     if (it.status === 'left') {
       user.roster = user.roster.filter((x) => x !== p.id);
+      p.prevSalary = p.salary; p.faGrade = faGrade(state, p);
       p.prevTeam = user.id; p.team = null; p.market = 'fa'; p.level = 2;
       p.askSalary = it.demand; p.askYears = it.years || 1;
       pool.push(p.id);
@@ -158,6 +161,7 @@ export function finishContractPhase(state) {
       if (!p.declareFA) continue;
       p.declareFA = false;
       t.roster = t.roster.filter((x) => x !== p.id);
+      p.prevSalary = p.salary; p.faGrade = faGrade(state, p);
       p.prevTeam = t.id; p.team = null; p.market = 'fa'; p.level = 2;
       p.askSalary = Math.round(fairSalary(state, p) * (1.15 + Math.random() * 0.2) / 100) * 100;
       p.askYears = p.age < 30 ? randInt(3, 4) : p.age < 33 ? randInt(2, 3) : 1;
@@ -174,7 +178,7 @@ export function faMarketOffer(state, pid, salary, years) {
   const p = state.players[pid];
   const t = state.teams[state.userTeamId];
   if (!p || p.market !== 'fa') return { ok: false, msg: '' };
-  if (t.roster.length >= 65) return { ok: false, msg: '구단 정원(65명)이 꽉 찼어요' };
+  if (regCount(state, t) >= 65) return { ok: false, msg: '구단 정원(65명)이 꽉 찼어요' };
   const ask = p.askSalary || fairSalary(state, p);
   const yrs = p.askYears || 1;
   const comp = 1 + ((p.faTries || 0) * 0.02); // 시간이 지날수록 경쟁 제안이 붙음
@@ -188,7 +192,14 @@ export function faMarketOffer(state, pid, salary, years) {
     t.cash -= fee; t.ledger.expense += fee; t.ledger.signing = (t.ledger.signing || 0) + fee;
     p.salary = Math.round(salary / 100) * 100;
     p.contract = { years, type: 'fa' };
-    return { ok: true, fee, msg: `${p.name} FA 계약 성공! ${years}년 · 연봉 ${p.salary.toLocaleString()}만 · 계약금 ${fee.toLocaleString()}만` };
+    let compMsg = '';
+    if (p.prevTeam && p.prevTeam !== t.id && state.teams[p.prevTeam]) {
+      p.team = t.id; // 보상 계산 시 우리 선수로 간주되지 않게 먼저 소속 표시
+      const c = compensateFA(state, p.prevTeam, t.id, p);
+      if (c) compMsg = ` · ${c.grade}등급 FA 보상: ${state.teams[p.prevTeam].short || state.teams[p.prevTeam].name}에 ${c.player ? `보상선수 ${c.player.name} + ` : ''}보상금 ${c.cash.toLocaleString()}만`;
+      p.team = null;
+    }
+    return { ok: true, fee, msg: `${p.name} FA 계약 성공! ${years}년 · 연봉 ${p.salary.toLocaleString()}만 · 계약금 ${fee.toLocaleString()}만${compMsg}` };
   }
   if (p.faTries >= 4) return { ok: false, gone: true, msg: `${p.name}: "다른 구단과 계약하기로 했어요."` };
   return { ok: false, msg: score >= 0.9 * comp ? `${p.name}: "조금만 더 올려주시면 사인할게요."` : `${p.name}: "다른 구단 제안이 더 좋네요."` };

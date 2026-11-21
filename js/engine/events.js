@@ -5,6 +5,7 @@ import { firstTeam, futures, teamPlayers, canPromote, ensureLineupValid } from '
 import { ROSTER, BAT_ATTRS } from '../data/constants.js';
 import { assignNumber } from './hof.js';
 import { leagueNat } from '../data/nations.js';
+import { regCount } from './roster.js';
 
 const P = (state, id) => state.players[id];
 const mine = (state) => state.teams[state.userTeamId];
@@ -252,7 +253,7 @@ const EVENTS = {
   hiddenGem: {
     w: 1.5,
     build(state, t) {
-      if (t.roster.length >= ROSTER.TOTAL_MAX) return null;
+      if (regCount(state, t) >= ROSTER.TOTAL_MAX) return null;
       return {
         title: '독립리그 숨은 진주',
         desc: '스카우트가 독립리그에서 눈에 띄는 선수를 발견했어요. 육성선수로 데려올까요? (계약금 2천만)',

@@ -726,3 +726,5 @@ select, input[type=text] {
 .goalrow span { font-size: 12px; padding: 4px 9px; border-radius: 99px; background: rgba(255, 255, 255, .07); }
 .goalrow b { color: var(--gold); margin-left: 5px; }
 select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid var(--line-2); border-radius: 10px; padding: 7px 8px; font: inherit; font-size: 13.5px; }
+.capbar.over i { background: linear-gradient(90deg, #ffc53d, #ff6f61); }
+.bar-note .linkish { font-size: 12px; }

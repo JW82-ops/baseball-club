@@ -16,6 +16,7 @@ import { clubEffects, bInfo } from './club.js';
 import { rng } from '../core/rng.js';
 import { NATS, nameFor, ethFor, pickImportNat, leagueNat } from '../data/nations.js';
 import { ensureFront } from './front.js';
+import { updateCapLimit } from './kborules.js';
 
 // ───────── 로스터 생성 ─────────
 let rosterLeague = 'KBO';
@@ -147,6 +148,7 @@ export function createNewGame(opts) {
   initRelations(state, user);
   genStaffMarket(state);
   ensureFront(state);
+  updateCapLimit(state);
   genForeignPool(state);
   state.weekStats = emptyWeekStats();
   state.mission = null;

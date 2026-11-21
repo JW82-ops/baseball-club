@@ -30,6 +30,8 @@ import { settleFA, genForeignPool } from './market.js';
 import { assignNumber, considerHof } from './hof.js';
 import { leagueNat } from '../data/nations.js';
 import { frontWeekly, REGIONS, evaluateBoard, startBoardSeason, satLabel, draftGemCount, decayScout, ensureFront } from './front.js';
+import { regCount } from './roster.js';
+import { settleCap, updateCapLimit, secondDraftYear, finishSecondDraft, waiverWeek, runAllStar, goldenGloves } from './kborules.js';
 
 export const CAMP_WEEKS = 6;
 export function weeksInSeason(state) { return Math.ceil(state.schedule.length / GAMES_PER_WEEK); }
@@ -168,7 +170,7 @@ export function fillUserFirstTeam(state) {
   const fl = firstTeam(state, team).filter((p) => !p.injury);
   const needB = Math.max(0, 10 - fl.filter((p) => p.type === 'B').length);
   const needP = Math.max(0, 10 - fl.filter((p) => p.type === 'P').length);
-  const fut = futures(state, team).filter((p) => !p.injury).sort((a, b) => calcOvr(b) - calcOvr(a));
+  const fut = futures(state, team).filter((p) => !p.injury && !p.devContract).sort((a, b) => calcOvr(b) - calcOvr(a));
   for (const [type, need] of [['B', needB], ['P', needP]]) {
     fut.filter((p) => p.type === type).slice(0, need).forEach((p) => {
       p.level = 1;
@@ -246,6 +248,11 @@ export function weeklyCycle(state, opts = {}) {
     for (const f of frontWeekly(state, sc)) {
       const R = REGIONS[f.r];
       addNews(state, `🔭 ${R.ko} 스카우트 리포트 ${f.th === 60 ? '1차' : f.th === 120 ? '2차' : '최종'} 완료 — ${R.kind === 'hs' || R.kind === 'college' ? '드래프트 유망주 정보가 정확해지고 숨은 진주를 찾을 확률이 올라가요' : R.kind === 'indie' ? '독립리그 선수 평가가 정확해져요' : '다음 외국인 시장에 이 지역 후보가 추가돼요'}`, 'info');
+    }
+    for (const n of waiverWeek(state)) addNews(state, n, 'info');
+    if (state.phase === 'regular' && state.day >= Math.floor(state.schedule.length * 0.5) && state.allStar?.season !== state.season) {
+      const as = runAllStar(state);
+      addNews(state, `⭐ ${state.season} 올스타전: ${as.sides[0].name} ${as.score[0]} : ${as.score[1]} ${as.sides[1].name} — MVP ${state.players[as.mvp]?.name || ''}${as.mine.length ? ` · 우리 구단 ${as.mine.length}명 출전` : ''}`, 'big');
     }
     userFinanceWeek(state);
     payWeeklySponsors(state, weeksInSeason(state));
@@ -494,6 +501,10 @@ function endSeason(state) {
   });
   const userRank = state.finalStandings.indexOf(user.id) + 1;
   {
+    const ct = settleCap(state);
+    if (ct) addNews(state, `💸 샐러리캡 초과(${ct.times}회째): 초과액 ${formatMoney(ct.excess)}의 ${ct.times > 1 ? 100 : 50}% = 제재금 ${formatMoney(ct.tax)} 납부`, 'bad');
+  }
+  {
     const bd = evaluateBoard(state, userRank, state.post.seeds.includes(user.id), champ === user.id);
     const sl = satLabel(bd.sat);
     pushMail(state, { from: null, fromName: '모기업 이사회', kind: 'note', subject: `${state.season} 시즌 구단 평가`, body: `${bd.goals.map((g) => `${g.done ? '✅' : '❌'} ${g.ko}`).join(' / ')}. 이사회 만족도 ${bd.sat}점(${sl[0]}). 다음 시즌 지원금은 ${formatMoney(bd.support)}으로 정했습니다.` });
@@ -532,6 +543,7 @@ export function computeAwards(state) {
   if (era) out.push({ award: `평균자책점왕 (${pitLine(era.cur.pit).era.toFixed(2)})`, pid: era.id });
   const sv = best(all.filter((p) => p.type === 'P'), (p) => p.cur.pit.sv);
   if (sv && sv.cur.pit.sv > 0) out.push({ award: `세이브왕 (${sv.cur.pit.sv}세이브)`, pid: sv.id });
+  for (const gg of goldenGloves(state)) { out.push(gg); const p = state.players[gg.pid]; if (p) p.morale = Math.min(100, (p.morale ?? 60) + 5); }
   return out;
 }
 
@@ -572,6 +584,10 @@ export function runOffseasonStart(state) {
 // 계약 협상 마감 → FA 시장 개장 + 드래프트
 export function proceedToDraft(state) {
   if (state.phase !== 'contracts') return;
+  if (secondDraftYear(state)) {
+    const sd = finishSecondDraft(state);
+    if (sd.picks.length || sd.lost.length) addNews(state, `🔀 2차 드래프트: 영입 ${sd.picks.length}명${sd.lost.length ? ` · 유출 ${sd.lost.map((x) => x.name).join(', ')}` : ''}`, 'info');
+  }
   finishContractPhase(state);
   if (state.faPool.length) addNews(state, `💼 FA 시장 개장: ${state.faPool.length}명이 시장에 나왔어요`, 'info');
   setupDraft(state);
@@ -681,7 +697,7 @@ export function draftPick(state, pid) {
 export function aiDraftChoice(state, tid) {
   const d = state.draft;
   const team = state.teams[tid];
-  if (team.roster.length >= ROSTER.TOTAL_MAX) return null;
+  if (regCount(state, team) >= ROSTER.TOTAL_MAX) return null;
   let best = null, bestV = -1;
   for (const pid of d.pool) {
     const p = state.players[pid];
@@ -705,8 +721,10 @@ export function advanceDraftToUser(state) {
 
 export function finishDraft(state) {
   const d = state.draft;
-  // 지명되지 않은 선수 정리
-  for (const pid of d.pool) delete state.players[pid];
+  // 지명되지 않은 선수: 잠재력 상위 20명은 육성선수 후보로 남기고 나머지 정리
+  const keepDev = d.pool.map((id) => state.players[id]).filter(Boolean).sort((a, b) => potOvr(b) - potOvr(a)).slice(0, 20).map((p) => p.id);
+  for (const pid of d.pool) if (!keepDev.includes(pid)) delete state.players[pid];
+  state.devPool = keepDev;
   d.pool = [];
   state.draftHistory = state.draftHistory || [];
   state.draftHistory.push({ year: d.year, picks: d.picks.filter((p) => p.team === state.userTeamId) });
@@ -754,6 +772,11 @@ export function runCampAndStartSeason(state) {
       fillUserFirstTeam(state);
     }
   }
+  updateCapLimit(state);
+  for (const n of state.faComp || []) addNews(state, `📑 FA 보상: ${n}`, 'info');
+  state.faComp = [];
+  for (const id of state.devPool || []) if (state.players[id]?.amateur) delete state.players[id];
+  state.devPool = [];
   {
     const sup = startBoardSeason(state);
     if (sup) addNews(state, `🏢 모기업 지원금 ${formatMoney(sup)} 입금. 올 시즌 이사회 목표: ${state.board.goals.map((g) => g.ko).join(', ')}`, 'big');

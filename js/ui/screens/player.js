@@ -18,6 +18,7 @@ import { PITCHES } from '../../data/constants.js';
 import { playerImg, bodyHtml } from '../portraits.js';
 import { advBat, advPit } from '../../engine/sabr.js';
 import { batterZones } from '../../engine/pitch.js';
+import { canConvertDev } from '../../engine/kborules.js';
 
 function batRow(label, s) {
   const l = batLine(s);
@@ -134,6 +135,7 @@ export function renderPlayer(pid, opts = {}) {
   <div class="row gap">
     ${p.level === 1
       ? `<button class="btn grow" data-act="demote" data-pid="${p.id}" ${canDemote(state, team, p) ? '' : 'disabled'}>2군으로 내리기</button>`
+      : p.devContract ? `<button class="btn primary grow" data-act="convertDev" data-pid="${p.id}" ${canConvertDev(state) ? '' : 'disabled'}>${canConvertDev(state) ? '정식 선수 전환' : '정식 전환은 5월부터'}</button>`
       : `<button class="btn team grow" data-act="promote" data-pid="${p.id}" ${canPromote(state, team) && !p.injury ? '' : 'disabled'}>1군 등록</button>`}
     <button class="btn danger" data-act="release" data-pid="${p.id}">방출</button>
   </div>

@@ -1,6 +1,6 @@
 import { state } from '../../core/store.js';
 import { ui } from '../ui-state.js';
-import { artBg, artHero, stadiumArt, esc, emblem, gradeTag } from '../components.js';
+import { artBg, artHero, stadiumArt, esc, emblem, gradeTag, avatar, posShort, potTag } from '../components.js';
 import { standings, pct } from '../../engine/league.js';
 import { userTeam, userGameToday, currentPostGame, seasonProgress, draftOnClock, DRAFT_ROUNDS, CAMP_WEEKS } from '../../engine/season.js';
 import { calcOvr, pitLine } from '../../engine/player.js';
@@ -16,6 +16,8 @@ import { sangmuChance, milLabel } from '../../engine/military.js';
 import { teamPlayers as tps } from '../../engine/roster.js';
 import { icon } from '../portraits.js';
 import { satLabel, goalProgress } from '../../engine/front.js';
+import { devCandidates, secondDraftYear, secondDraftPool, SECOND_FEES } from '../../engine/kborules.js';
+import { scoutLevelOf } from '../../engine/club.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -183,6 +185,7 @@ function regularView() {
   return `
   ${eventCard()}
   ${natCard()}
+  ${allStarCard()}
   ${mailCard()}
   <section class="sec">
     ${sg ? matchupCard(sg, `${state.season} 정규시즌 · ${prog.day + 1}/${prog.total}경기`) : '<div class="panel empty">오늘은 경기가 없어요.</div>'}
@@ -257,6 +260,33 @@ function offseasonView() {
   ${newsCard()}`;
 }
 
+function devSection() {
+  const c = devCandidates(state).slice(0, 12);
+  if (!c.length) return '';
+  const lv = scoutLevelOf(state);
+  const n = userTeam(state).roster.filter((id) => state.players[id]?.devContract).length;
+  return `<section class="sec"><div class="sec-h"><h2>🌱 육성선수 계약</h2><button class="linkish" data-act="learn" data-k="dev">육성선수란?</button></div>
+    <p class="tiny faint">드래프트에서 지명받지 못한 선수예요. 정원(65명)에 들어가지 않고, 5월부터 정식 선수로 전환할 수 있어요. 계약금 1,000만 · 연봉 3,000만 · 보유 ${n}/12</p>
+    <div class="panel plist mt">${c.map((p) => `<div class="prow">${avatar(p, '#5f6f66', 36)}<div class="grow"><button class="nm" data-act="openPlayer" data-pid="${p.id}" data-draft="1" style="text-align:left">${esc(p.name)}</button><div class="meta">${posShort(p)} · ${p.age}세 · ${esc(p.origin)}</div></div>${potTag(p, lv)}<button class="btn sm primary" data-act="signDev" data-pid="${p.id}">계약</button></div>`).join('')}</div></section>`;
+}
+function secondDraftSection() {
+  if (!secondDraftYear(state)) return '';
+  const sd = state.secondDraft?.season === state.season ? state.secondDraft : { picks: [], lost: [] };
+  const pool = secondDraftPool(state).slice(0, 12);
+  return `<section class="sec mt-l"><div class="sec-h"><h2>🔀 2차 드래프트</h2><button class="linkish" data-act="learn" data-k="second">2차 드래프트란?</button></div>
+    <p class="tiny faint">다른 구단의 보호 35인 밖 선수(3년차 이상)를 최대 3명 데려올 수 있어요. 양도금 4억·3억·2억. 협상을 마감하면 다른 구단도 우리 비보호 선수를 데려가요.</p>
+    ${sd.picks.length ? `<p class="small good mt">지명: ${sd.picks.map((x) => esc(state.players[x.pid]?.name || '')).join(', ')}</p>` : ''}
+    <div class="panel plist mt">${sd.picks.length >= 3 ? '<div class="empty">3명을 모두 지명했어요.</div>' : pool.map((p) => `<div class="prow">${avatar(p, state.teams[p.team]?.color || '#5f6f66', 36)}<div class="grow"><button class="nm" data-act="openPlayer" data-pid="${p.id}" style="text-align:left">${esc(p.name)}</button><div class="meta">${esc(state.teams[p.team]?.short || '')} · ${posShort(p)} · ${p.age}세 · OVR ${calcOvr(p)}</div></div><button class="btn sm primary" data-act="secondPick" data-pid="${p.id}">지명 ${formatMoney(SECOND_FEES[sd.picks.length])}</button></div>`).join('')}</div></section>`;
+}
+function allStarCard() {
+  const a = state.allStar;
+  if (!a || a.seen || a.season !== state.season) return '';
+  const nm = (pid) => esc(state.players[pid]?.name || '');
+  return `<section class="sec">${artHero('awards', `<span class="k">⭐ ${a.season} 올스타전</span><h2>${a.sides[0].name} ${a.score[0]} : ${a.score[1]} ${a.sides[1].name}</h2>
+    <p>MVP ${nm(a.mvp)}${a.mine.length ? ` · 우리 구단 출전: <b>${a.mine.map(nm).join(', ')}</b>` : ' · 우리 구단 출전 선수 없음'}</p>
+    <button class="btn sm mt" data-act="allStarSeen">확인</button>`, 'tall')}</section>`;
+}
+
 function campView() {
   const user = userTeam(state);
   return `
@@ -269,6 +299,7 @@ function campView() {
       <button class="btn primary block mt" data-act="runCamp">캠프 진행하고 개막</button>
     </div>
   </section>
+  ${devSection()}
   ${newsCard()}`;
 }
 
@@ -301,6 +332,7 @@ function contractsView() {
     ${items.some((x) => x.kind === 'stay' && x.status === 'pending') ? '<button class="btn sm block mt" data-act="negoAll" data-m="stay">FA 잔류 희망자 요구 조건 전원 수용</button>' : ''}
     <div class="mt">${sorted.map(row).join('') || '<div class="panel empty">이번 오프시즌엔 협상할 선수가 없어요.</div>'}</div>
     ${enlistSection()}
+    ${secondDraftSection()}
     <button class="btn primary block mt-l" data-act="proceedDraft">협상 마감 → FA 시장 · 드래프트</button>
     <p class="tiny faint mt center">남은 연봉협상은 기준액으로, 남은 FA 선언자는 시장으로 나가요.</p>
   </section>`;

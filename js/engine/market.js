@@ -7,6 +7,8 @@ import { relNewcomer } from './mood.js';
 import { rng } from '../core/rng.js';
 import { NATS, pickImportNat } from '../data/nations.js';
 import { regionImportBoost, decayScout } from './front.js';
+import { regCount } from './roster.js';
+import { compensateFA } from './kborules.js';
 
 const FOREIGN_FIRST = ['마이클', '데이비드', '라이언', '조시', '케빈', '타일러', '브랜든', '호세', '루이스', '카를로스', '라파엘', '미겔', '알렉스', '네이선', '코디', '저스틴', '에릭', '헥터', '안드레', '윌머', '다니엘', '오스틴', '케이시', '로니'];
 const FOREIGN_LAST = ['존슨', '스미스', '로드리게스', '마르티네스', '가르시아', '페레스', '윌리엄스', '브라운', '데이비스', '로페즈', '에르난데스', '앤더슨', '톰슨', '화이트', '클락', '레예스', '산체스', '라미레스', '페냐', '카브레라', '알칸타라', '스톤', '헤이즈', '메디나'];
@@ -56,7 +58,7 @@ export function signingFee(p) {
 }
 
 export function canSign(state, team, p) {
-  if (team.roster.length >= ROSTER.TOTAL_MAX) return '구단 정원(65명)이 꽉 찼어요';
+  if (regCount(state, team) >= ROSTER.TOTAL_MAX) return '구단 정원(65명)이 꽉 찼어요';
   if (p.foreign && foreignCount(state, team) >= foreignMax(state)) return `외국인 선수는 최대 ${foreignMax(state)}명이에요`;
   if (team.cash < signingFee(p)) return '계약금이 부족해요';
   return null;
@@ -117,6 +119,10 @@ export function settleFA(state, assignNumber) {
     if (p.askSalary) p.salary = p.askSalary;
     p.contract = { years: p.askYears || 1, type: 'fa' };
     t.roster.push(pid);
+    if (p.prevTeam === state.userTeamId) {
+      const c = compensateFA(state, state.userTeamId, tid, p);
+      if (c) (state.faComp = state.faComp || []).push(`${p.name}(${c.grade}등급) → ${t.short || t.name}: ${c.player ? `보상선수 ${c.player.name} + ` : ''}보상금 ${c.cash.toLocaleString()}만 받음`);
+    }
     assignNumber?.(state, t, p);
   }
   state.faPool = [];

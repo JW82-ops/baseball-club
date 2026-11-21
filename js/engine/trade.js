@@ -3,6 +3,7 @@ import { calcOvr, potOvr } from './player.js';
 import { teamPlayers, ensureLineupValid, autoAssignLevels } from './roster.js';
 import { ROSTER } from '../data/constants.js';
 import { assignNumber } from './hof.js';
+import { regCount } from './roster.js';
 
 // 선수 가치 (구단 성향 반영)
 export function playerValue(p, team) {
@@ -33,8 +34,8 @@ export function evaluateTrade(state, otherId, give, get, cash = 0) {
   const vGet = get.reduce((s, id) => s + playerValue(state.players[id], other), 0) + cashValue(Math.max(0, -cash));
   const ratio = vGet ? vGive / vGet : 9;
   if (!get.length && !give.length) return { ok: false, ratio: 0, msg: '선수를 골라주세요' };
-  if (user.roster.length - give.length + get.length > ROSTER.TOTAL_MAX) return { ok: false, ratio, msg: '우리 구단 정원(65명)을 넘어요' };
-  if (other.roster.length - get.length + give.length > ROSTER.TOTAL_MAX) return { ok: false, ratio, msg: '상대 구단 정원을 넘어요' };
+  if (regCount(state, user) - give.length + get.length > ROSTER.TOTAL_MAX) return { ok: false, ratio, msg: '우리 구단 정원(65명)을 넘어요' };
+  if (regCount(state, other) - get.length + give.length > ROSTER.TOTAL_MAX) return { ok: false, ratio, msg: '상대 구단 정원을 넘어요' };
   if (cash > user.cash) return { ok: false, ratio, msg: '자금이 부족해요' };
   // 상대 구단 핵심 선수(전력 상위 3명)는 더 비싸게
   const core = teamPlayers(state, other).sort((a, b) => calcOvr(b) - calcOvr(a)).slice(0, 3).map((p) => p.id);

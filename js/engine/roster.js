@@ -11,7 +11,8 @@ export function fieldAt(p, pos) {
   return p.r.fielding - 18;
 }
 
-export const available = (p) => !p.injury;
+export const available = (p) => !p.injury && !p.devContract;
+export const regCount = (state, team) => team.roster.filter((id) => !state.players[id]?.devContract).length;
 export const teamPlayers = (state, team) => team.roster.map((id) => state.players[id]).filter(Boolean);
 export const firstTeam = (state, team) => teamPlayers(state, team).filter((p) => p.level === 1);
 export const futures = (state, team) => teamPlayers(state, team).filter((p) => p.level === 2);

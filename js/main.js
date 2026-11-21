@@ -45,6 +45,7 @@ import { gameDate } from './engine/calendar.js';
 import { stadiumArt } from './ui/components.js';
 import { showLearn, shortWhy } from './ui/screens/learn.js';
 import { upgradeDept, assignScout, DEPTS, REGIONS } from './engine/front.js';
+import { waivePlayer, claimWaiver, signDev, convertDev, secondDraftPick, capInfo, faGrade } from './engine/kborules.js';
 
 // ───────── 렌더링 ─────────
 const PHASE_KO = { regular: '정규시즌', post: '포스트시즌', offseason: '오프시즌', contracts: '계약 협상', draft: '신인 드래프트', camp: '스프링캠프' };
@@ -411,6 +412,11 @@ registerActions({
     commit();
   },
   learn: (d) => showLearn(d.k),
+  claimWaiver: (d) => { const err = claimWaiver(state, d.pid); if (err) return toast(err, 'bad'); fillUserFirstTeam(state); commit(`${state.players[d.pid].name} 웨이버 클레임 성공!`, 'good'); },
+  signDev: (d) => { const err = signDev(state, d.pid); if (err) return toast(err, 'bad'); commit(`${state.players[d.pid].name} 육성선수 계약`, 'good'); },
+  convertDev: (d) => { const err = convertDev(state, d.pid); if (err) return toast(err, 'bad'); save(); openModal(renderPlayer(d.pid)); render(); toast(`${state.players[d.pid].name} 정식 선수 전환!`, 'good'); },
+  secondPick: (d) => { const err = secondDraftPick(state, d.pid); if (err) return toast(err, 'bad'); commit(`2차 드래프트: ${state.players[d.pid].name} 지명`, 'good'); },
+  allStarSeen: () => { if (state.allStar) state.allStar.seen = true; commit(); },
   upgradeDept: (d) => { const err = upgradeDept(state, d.k); if (err) return toast(err, 'bad'); sfx.coin?.(); commit(`${DEPTS[d.k].ko} Lv.${userTeam(state).front[d.k]} 확장!`, 'good'); },
   scoutAssign: (d) => { assignScout(state, Number(d.slot), d.value); commit(d.value ? `스카우트를 ${REGIONS[d.value].ko}에 보냈어요` : '스카우트 대기'); },
   learnClose: () => document.querySelector('.learnpop')?.remove(),
@@ -484,7 +490,7 @@ registerActions({
   promote: (d) => {
     const p = state.players[d.pid];
     const t = userTeam(state);
-    if (!canPromote(state, t) || p.injury) return;
+    if (!canPromote(state, t) || p.injury || p.devContract) return;
     p.level = 1;
     ensureLineupValid(state, t);
     save();
@@ -505,8 +511,8 @@ registerActions({
   },
   release: (d) => {
     const p = state.players[d.pid];
-    confirmBox(`<b>${esc(p.name)}</b>을(를) 방출할까요? 방출한 선수는 되돌릴 수 없어요.`, '방출', () => {
-      releasePlayer(state, p);
+    confirmBox(`<b>${esc(p.name)}</b>을(를) 웨이버 공시(방출)할까요? 7일 안에 다른 구단이 데려갈 수 있고, 아무도 안 데려가면 자유계약 선수가 돼요.`, '웨이버 공시', () => {
+      waivePlayer(state, p);
       fillUserFirstTeam(state);
       commit(`${p.name} 방출`);
     }, 'danger');
@@ -640,6 +646,8 @@ function offerSheet(pid, mode, note = '') {
   return `<button class="sheet-close" data-act="closeModal">×</button>
     <h2 class="disp" style="font-size:22px">${esc(p.name)} 계약 협상</h2>
     <p class="small muted mt">${p.age}세 · OVR ${calcOvr(p)} · 요구 <b class="amber">연봉 ${formatMoney(ask)} · ${askYrs}년</b> · 남은 기회 ${maxTries - tries}번</p>
+    ${mode === 'fa' && p.prevTeam && p.prevTeam !== state.userTeamId ? `<div class="bar-note mt">📑 ${p.faGrade || faGrade(state, p)}등급 FA — 영입하면 ${esc(state.teams[p.prevTeam]?.short || '')}에 ${(p.faGrade || faGrade(state, p)) === 'C' ? '보상금(전 연봉 150%)' : `보상선수(보호 ${(p.faGrade || faGrade(state, p)) === 'A' ? 20 : 25}인 외) + 보상금, 또는 보상금만`}을 줘야 해요. <button class="linkish" data-act="learn" data-k="FA">자세히</button></div>` : ''}
+    ${(() => { const ci = capInfo(state); const after = ci.used + ask; return `<p class="tiny ${after > ci.limit ? 'bad' : 'faint'} mt">샐러리캡(상위 40명): ${formatMoney(ci.used)} → 약 ${formatMoney(after)} / 상한 ${formatMoney(ci.limit)}${after > ci.limit ? ' · 초과하면 시즌 후 제재금' : ''}</p>`; })()}
     ${note ? `<div class="bar-note mt">${esc(note)}</div>` : ''}
     <p class="small mt">계약 기간</p>
     <div class="seg mt">${[1, 2, 3, 4].map((y) => `<button class="${yrs === y ? 'on' : ''}" data-act="offerYears" data-v="${y}" data-pid="${pid}" data-mode="${mode}">${y}년</button>`).join('')}</div>

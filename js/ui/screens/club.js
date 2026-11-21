@@ -20,6 +20,7 @@ import { slot as curSlot } from '../../core/store.js';
 import { staffImg, bodyHtml, icon, ownerImg } from '../portraits.js';
 import { ensureFront, frontLv, DEPTS, DEPT_COST, DEPT_UPKEEP, REGIONS, satLabel, goalProgress, boardSupportBase } from '../../engine/front.js';
 import { flagOf } from '../../data/nations.js';
+import { capInfo } from '../../engine/kborules.js';
 
 const TAB_ICO = { front: 'club', facility: 'build', staff: 'staff', sponsor: 'sponsor', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
 const TABS = [['front', '프런트'], ['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['achv', '업적'], ['finance', '재정·설정']];
@@ -215,7 +216,10 @@ function marketView(t) {
     ${fa.length ? `<p class="tiny faint">연봉과 계약 기간을 제시해 협상해요. 4번 거절당하면 다른 구단으로 가요. 캠프가 시작되면 남은 FA는 다른 구단과 계약해요.</p><div class="panel plist mt">${fa.sort((a, b) => calcOvr(b) - calcOvr(a)).map((p) => marketRow(p, t, true)).join('')}</div>` : '<div class="panel empty">시즌이 끝나고 계약 협상이 마감되면 FA 선수들이 시장에 나와요.</div>'}
     <div class="sec-h mt-l"><h2>외국인 선수</h2><span class="sub">보유 ${foreignCount(state, t)}/${foreignMax(state)}</span></div>
     <p class="tiny faint">즉시 전력감이지만 연봉이 비싸요. 금액은 계약금이고, 연봉은 매주 나눠 나가요.</p>
-    <div class="panel plist mt">${fp.map((p) => marketRow(p, t, false)).join('') || '<div class="empty">이번 시즌 시장이 닫혔어요.</div>'}</div>`;
+    <div class="panel plist mt">${fp.map((p) => marketRow(p, t, false)).join('') || '<div class="empty">이번 시즌 시장이 닫혔어요.</div>'}</div>
+    <div class="sec-h mt-l"><h2>📋 웨이버 공시</h2><button class="linkish" data-act="learn" data-k="waiver">웨이버란?</button></div>
+    <p class="tiny faint">다른 구단이 방출한 선수예요. 공시 후 7일 안에 클레임하면 잔여 연봉 일부를 내고 데려올 수 있어요.</p>
+    <div class="panel plist mt">${(state.waivers || []).filter((w) => w.from !== t.id && state.players[w.pid]).map((w) => { const p = state.players[w.pid]; return `<div class="prow">${avatar(p, '#5f6f66', 38)}<div class="grow"><div class="nm">${esc(p.name)} <span class="tiny muted">전 ${esc(state.teams[w.from]?.short || '')}</span></div><div class="meta">${posShort(p)} · ${p.age}세 · OVR ${calcOvr(p)} · D-${Math.max(0, 6 - (state.day - w.day))}</div></div><button class="btn sm primary" data-act="claimWaiver" data-pid="${p.id}">클레임 ${formatMoney(Math.round((p.salary || 3000) * 0.3 / 100) * 100)}</button></div>`; }).join('') || '<div class="empty">지금 공시된 선수가 없어요.</div>'}</div>`;
 }
 
 // ───────── 트레이드 ─────────
@@ -290,7 +294,10 @@ function financeView(t) {
         <div><span>연봉 지출</span><b>${formatMoney(L.salary)}</b></div>
         <div><span>스태프 비용</span><b>${formatMoney((L.staffPay || 0) + (L.staff || 0))}</b></div>
         <div><span>시설 투자</span><b>${formatMoney(L.facility || 0)}</b></div>
+        <div><span>프런트 운영</span><b>${formatMoney(L.front || 0)}</b></div>
+        <div><span>모기업 지원금</span><b>${formatMoney(L.support || 0)}</b></div>
       </div>
+      ${(() => { const ci = capInfo(state); const pct = Math.min(130, Math.round(ci.used / Math.max(1, ci.limit) * 100)); return `<div class="mt"><div class="row between"><span class="small">샐러리캡 (연봉 상위 40명) <button class="linkish" data-act="learn" data-k="cap">?</button></span><b class="small ${ci.used > ci.limit ? 'bad' : ''}">${formatMoney(ci.used)} / ${formatMoney(ci.limit)}</b></div><div class="satbar mt capbar ${ci.used > ci.limit ? 'over' : ''}"><i style="width:${Math.min(100, pct)}%"></i></div><p class="tiny faint mt">시즌이 끝날 때 상한을 넘으면 초과액의 50%(2년 연속이면 100%)를 제재금으로 내요.</p></div>`; })()}
       <p class="small muted mt">${LEAGUES[state.league || 'KBO'].flag} ${LEAGUES[state.league || 'KBO'].ko} · 구장 ${t.capacity.toLocaleString()}석${t.lastAttendance ? ` · 최근 홈 관중 ${t.lastAttendance.toLocaleString()}명` : ''}</p>
       <div class="row gap mt"><span class="small">티켓 가격</span><div class="grow"></div>
         <button class="btn sm" data-act="ticket" data-d="-0.1">−</button><b>${Math.round(t.ticket * 10000).toLocaleString()}원</b><button class="btn sm" data-act="ticket" data-d="0.1">＋</button></div>
