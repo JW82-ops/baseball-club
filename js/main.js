@@ -67,6 +67,7 @@ function render() {
   if (!state) {
     $('#hud').hidden = true;
     $('#tabs').hidden = true;
+    setScene(null);
     main.innerHTML = renderTitle();
     return;
   }
@@ -74,6 +75,7 @@ function render() {
   $('#tabs').hidden = !!ui.live;
   renderHud();
   if (ui.live) {
+    setScene(null);
     if (!$('#lv-canvas')) { main.innerHTML = liveShell(); mountLive(); }
     else updateLiveDom();
     return;
@@ -81,10 +83,39 @@ function render() {
   $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === ui.tab));
   const screens = { home: renderHome, roster: renderRoster, develop: renderDevelop, league: renderLeague, club: renderClub, mail: renderMail };
   main.innerHTML = (screens[ui.tab] || renderHome)();
+  setScene(sceneFor(ui.tab));
   if (ui.tab === 'home' && lastPhase !== state.phase) window.scrollTo(0, 0);
   lastPhase = state.phase;
 }
 let lastPhase = null;
+
+// 탭마다 장소 배경: 홈=우리 구장, 선수단=클럽하우스, 육성=2군 훈련장, 리그=관중석, 구단=구단주실, 메일=계약 책상
+function sceneFor(tab) {
+  const t = userTeam(state);
+  const ph = state.phase;
+  if (tab === 'home') {
+    if (ph === 'draft') return 'draft';
+    if (ph === 'camp') return 'camp';
+    if (ph === 'contracts') return 'contract';
+    if (ph === 'post') return 'crowd';
+    return `stadium${Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1))}`;
+  }
+  return { roster: 'clubhouse', develop: 'futures', league: 'crowd', club: 'office', mail: 'contract' }[tab] || 'stadium1';
+}
+let sceneCur = null, sceneFlip = 0;
+function setScene(name) {
+  const box = $('#scene');
+  if (!box) return;
+  if (!name) { box.classList.remove('on'); sceneCur = null; return; }
+  box.classList.add('on');
+  if (name === sceneCur) return;
+  sceneCur = name;
+  const layers = box.children;
+  const next = layers[sceneFlip ^ 1], prev = layers[sceneFlip];
+  next.style.backgroundImage = `url(img/art/${name}.webp)`;
+  next.classList.add('on'); prev.classList.remove('on');
+  sceneFlip ^= 1;
+}
 setRenderer(render);
 
 function commit(msg, tone) {
