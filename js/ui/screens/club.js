@@ -17,6 +17,7 @@ import { ACHV } from '../../engine/achievements.js';
 import { CLUB_COLORS } from '../../data/teams.js';
 import { avatar as av } from '../components.js';
 import { slot as curSlot } from '../../core/store.js';
+import { staffImg, bodyHtml } from '../portraits.js';
 
 const TABS = [['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['achv', '업적'], ['finance', '재정·설정']];
 
@@ -98,7 +99,7 @@ function staffCard(t, role) {
   const ovr = staffOvr(s);
   const g = s?.grade || 'D';
   return `<div class="staff-card">
-    <div class="row gap"><span class="sgrade sg-${g}">${g}</span>
+    <div class="row gap">${s ? bodyHtml(staffImg(s), t.color, 'staff') : ''}<span class="sgrade sg-${g}">${g}</span>
       <div class="grow"><b>${R.icon} ${R.ko}</b> <span class="small">${s ? esc(s.name) : '<span class="muted">대행 (기본 능력 40)</span>'}</span>
         <div class="tiny muted">${s ? `${s.age}세 · ${esc(s.bg)} · 계약 ${s.years}년 · 주급 ${formatMoney(staffWeeklyOf(s))}` : R.desc}</div></div>
       <button class="btn sm" data-act="staffMarket" data-r="${role}">${s ? '교체' : '선임'}</button></div>
@@ -122,7 +123,7 @@ export function staffMarketHtml(role) {
     ${list.map((c) => {
       const sign = staffSignOf(c);
       return `<div class="staff-card">
-        <div class="row gap"><span class="sgrade sg-${c.grade}">${c.grade}</span><div class="grow"><b>${esc(c.name)}</b> <span class="small muted">${c.age}세 · 종합 ${staffOvr(c)}</span><div class="tiny muted">${esc(c.bg)} · 주급 ${formatMoney(staffWeeklyOf(c))} · ${c.years}년</div></div></div>
+        <div class="row gap">${bodyHtml(staffImg(c), t.color, 'staff')}<span class="sgrade sg-${c.grade}">${c.grade}</span><div class="grow"><b>${esc(c.name)}</b> <span class="small muted">${c.age}세 · 종합 ${staffOvr(c)}</span><div class="tiny muted">${esc(c.bg)} · 주급 ${formatMoney(staffWeeklyOf(c))} · ${c.years}년</div></div></div>
         ${c.style ? `<p class="small mt">${MANAGER_STYLES[c.style].icon} <b>${MANAGER_STYLES[c.style].ko}</b> <span class="muted">${MANAGER_STYLES[c.style].desc}</span></p>` : ''}
         <div class="mt">${Object.entries(R.stats).map(([k, ko]) => ratingBar(ko, c.stats[k], null, null, cur ? `<span class="tiny ${c.stats[k] >= cur.stats[k] ? 'good' : 'bad'}">${c.stats[k] >= cur.stats[k] ? '▲' : '▼'}</span>` : '')).join('')}</div>
         <button class="btn block mt ${t.cash >= sign ? 'primary' : ''}" data-act="hireStaff" data-id="${c.id}" ${t.cash >= sign ? '' : 'disabled'}>계약금 ${formatMoney(sign)}로 선임</button>

@@ -539,6 +539,29 @@ select, input[type=text] {
 #scene.on { opacity: 1; }
 #scene i { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity .55s ease; }
 #scene i.on { opacity: 1; }
-#scene::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 22, 15, .55) 0%, rgba(10, 26, 18, .72) 38%, rgba(10, 26, 18, .9) 100%); }
+#scene::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 22, 15, .42) 0%, rgba(10, 26, 18, .62) 40%, rgba(10, 26, 18, .84) 100%); }
 #main { position: relative; z-index: 1; }
 @media (prefers-reduced-motion: reduce) { #scene, #scene i { transition: none; } }
+
+/* ───────── SD 캐릭터 ───────── */
+.sdface { position: relative; flex: none; display: inline-block; overflow: hidden; border-radius: 30%;
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--tc) 55%, #fff 20%), var(--tc) 70%);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .18), 0 1px 0 rgba(255, 255, 255, .08); }
+.sdface img { position: absolute; left: 50%; top: 6%; width: 165%; transform: translateX(-50%); pointer-events: none; }
+.sdbody { position: relative; flex: none; display: inline-flex; align-items: flex-end; justify-content: center; overflow: hidden;
+  width: 84px; height: 112px; border-radius: 16px;
+  background: radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--tc) 60%, #fff 25%), var(--tc) 75%);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .2); }
+.sdbody img { height: 96%; width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .25)); }
+.sdbody.pc { width: 104px; height: 138px; }
+.sdbody.staff { width: 58px; height: 76px; border-radius: 12px; margin-right: 2px; }
+.sdbody.mail { width: 66px; height: 88px; border-radius: 12px; }
+
+/* 카드가 배경 위에 떠 있도록 반투명 */
+#main .panel, #main .matchup:not(.has-art), #main .bld, #main .staff-card, #main .event-card, #main .nego, #main .seg, #main .slotcard {
+  background-color: rgba(18, 42, 29, .84);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+#main .sec-h h2 { text-shadow: 0 1px 8px rgba(0, 0, 0, .55); }
+#main { text-shadow: 0 1px 3px rgba(0, 0, 0, .45); }
+#main .btn, #main .btn *, #main .letter, #main .letter * { text-shadow: none; }

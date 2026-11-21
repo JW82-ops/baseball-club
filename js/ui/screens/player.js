@@ -15,6 +15,7 @@ import { formIcon } from '../../engine/form.js';
 import { milLabel } from '../../engine/military.js';
 import { CAMPS, learnablePitches, convertTargets } from '../../engine/training.js';
 import { PITCHES } from '../../data/constants.js';
+import { playerImg, bodyHtml } from '../portraits.js';
 
 function batRow(label, s) {
   const l = batLine(s);
@@ -73,7 +74,7 @@ export function renderPlayer(pid, opts = {}) {
   return `
   <button class="sheet-close" data-act="closeModal" aria-label="닫기">×</button>
   <div class="pcard-top">
-    ${avatar(p, color, 64)}
+    ${bodyHtml(playerImg(p), color, 'pc')}
     <div class="grow">
       <h2>${esc(p.name)}${formIcon(p)}${p.num != null && p.team ? ` <span class="num" style="font-size:16px">#${p.num}</span>` : ''}${p.foreign ? ' <span class="chip" style="font-size:11px">외국인</span>' : ''}</h2>
       <p class="small muted">${team ? esc(team.short) + ' · ' : ''}${p.type === 'P' ? (p.pos === 'SP' ? '선발투수' : '불펜투수') : POS_KO[p.pos]} · ${hand} · ${p.age}세 ${condDot(p)}</p>

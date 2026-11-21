@@ -2,6 +2,7 @@ import { state } from '../../core/store.js';
 import { ui } from '../ui-state.js';
 import { esc, avatar } from '../components.js';
 import { moodLabel } from '../../engine/mood.js';
+import { playerImg, npcImg, faceHtml, bodyHtml } from '../portraits.js';
 
 export function renderMail() {
   const box = state.inbox || [];
@@ -16,7 +17,7 @@ export function renderMail() {
       const p = m.from && state.players[m.from];
       const ml = p ? moodLabel(p.morale) : null;
       return `<button class="prow mailrow ${m.resolved ? 'done' : ''} ${m.read ? '' : 'unread'}" data-act="openMail" data-id="${m.id}">
-        ${p ? avatar(p, state.teams[p.team]?.color || '#5f6f66', 36) : `<span class="sysav">${m.kind === 'tradeOffer' ? '🤝' : '🏢'}</span>`}
+        ${p ? avatar(p, state.teams[p.team]?.color || '#5f6f66', 36) : faceHtml(npcImg(m), '#3d5a4b', 36)}
         <div class="grow"><div class="nm">${esc(m.fromName || '구단')} ${ml ? `<span title="${ml.ko}">${ml.e}</span>` : ''}</div><div class="meta">${esc(m.subject)}</div></div>
         <span class="tiny ${m.resolved ? 'faint' : 'amber'}">${m.resolved ? (m.auto ? '무응답' : '답장함') : '답장 필요'}</span>
       </button>`;
@@ -31,7 +32,7 @@ function mailDetail(m) {
   <section class="sec">
     <button class="btn sm ghost" data-act="openMail" data-id="">← 메일함</button>
     <div class="letter mt">
-      <div class="row gap">${p ? avatar(p, state.teams[p.team]?.color || '#5f6f66', 44) : '<span class="sysav big">🏢</span>'}
+      <div class="row gap">${bodyHtml(p ? playerImg(p) : npcImg(m), p ? state.teams[p.team]?.color || '#5f6f66' : '#3d5a4b', 'mail')}
         <div class="grow"><b>${esc(m.fromName || '구단')}</b>${p ? `<div class="tiny muted">${p.age}세 · 현재 기분 ${ml.e} ${ml.ko}</div>` : ''}</div>
         ${p ? `<button class="btn sm ghost" data-act="openPlayer" data-pid="${p.id}">프로필</button>` : ''}</div>
       <h3 class="mt">${esc(m.subject)}</h3>
