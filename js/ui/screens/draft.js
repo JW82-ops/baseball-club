@@ -5,7 +5,8 @@ import { draftOnClock, DRAFT_ROUNDS, userTeam } from '../../engine/season.js';
 import { calcOvr, potentialEstimate } from '../../engine/player.js';
 import { ROSTER } from '../../data/constants.js';
 
-export function scoutLevel() { return 2; } // M4에서 스카우트 스태프 레벨로 대체
+import { scoutLevelOf } from '../../engine/club.js';
+export function scoutLevel() { return scoutLevelOf(state); }
 
 export function renderDraft() {
   const d = state.draft;

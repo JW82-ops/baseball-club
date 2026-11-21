@@ -24,7 +24,7 @@ export function playerRow(p, color, opts = {}) {
   return `<button class="prow ${opts.sel ? 'sel' : ''}" data-act="${opts.act || 'openPlayer'}" data-pid="${p.id}">
     ${avatar(p, color, 40)}
     <div class="grow">
-      <div class="nm">${esc(p.name)} ${condDot(p)}</div>
+      <div class="nm">${esc(p.name)} <span class="num">${p.num != null ? '#' + p.num : ''}</span>${p.foreign ? ' 🌏' : ''} ${condDot(p)}</div>
       <div class="meta">${posShort(p)} · ${p.age}세${sn ? ` · ${sn}` : ''}${p.injury ? ` · <span class="bad">${esc(p.injury.name)} ${p.injury.weeks}주</span>` : ''}</div>
     </div>
     <div class="right">${gradeTag(calcOvr(p))}${opts.pot ? potTag(p, scoutLevel()) : ''}</div>

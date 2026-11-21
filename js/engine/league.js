@@ -4,6 +4,10 @@ import { KBO_TEAMS, CLUB_COLORS } from '../data/teams.js';
 import { PHILOSOPHIES, SAVE_VERSION } from '../data/constants.js';
 import { createPlayer, resetSeasonStats, calcOvr } from './player.js';
 import { autoAssignLevels } from './roster.js';
+import { ensureClub, facVal, genStaffMarket } from './club.js';
+import { assignNumber } from './hof.js';
+import { genForeignPool } from './market.js';
+import { offerMissions, emptyWeekStats } from './events.js';
 
 // ───────── 로스터 생성 ─────────
 function addP(state, team, opts) {
@@ -12,6 +16,7 @@ function addP(state, team, opts) {
   resetSeasonStats(p);
   state.players[p.id] = p;
   team.roster.push(p.id);
+  assignNumber(state, team, p);
   return p;
 }
 
@@ -91,7 +96,7 @@ export function createNewGame(opts) {
     color: color.primary, color2: color.secondary, emblem: opts.emblem || 'flame',
     philosophy: opts.philosophy || 'balanced', style: opts.philosophy || 'balanced',
     roster: [], w: 0, l: 0, t: 0, rs: 0, ra: 0, streak: 0, last10: [],
-    cash: phil.cash, fans: 12000, capacity: 15000, ticket: 1.5,
+    cash: phil.cash, fans: 12000, capacity: 12000, ticket: 1.5,
     ledger: { income: 0, expense: 0, ticket: 0, merch: 0, salary: 0, prize: 0 },
     autoRest: true, stealMode: 'normal',
   };
@@ -107,7 +112,17 @@ export function createNewGame(opts) {
     generateRoster(state, team, t.strength, t.style);
   }
   for (const id of state.teamOrder) autoAssignLevels(state, state.teams[id]);
+  ensureClub(user);
+  user.capacity = facVal(user, 'stadium');
+  genStaffMarket(state);
+  genForeignPool(state);
+  state.weekStats = emptyWeekStats();
+  state.mission = null;
+  state.pendingEvent = null;
+  state.hof = []; state.hofCandidates = [];
+  state.faPool = [];
   state.schedule = makeSchedule(state.teamOrder, state.settings.seasonLength);
+  offerMissions(state);
   addNews(state, `${user.name} 창단! ${state.season} 시즌 KBO 리그에 참가합니다.`, 'big');
   return state;
 }

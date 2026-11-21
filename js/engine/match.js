@@ -5,6 +5,9 @@ import { POS_DEF_WEIGHT } from '../data/constants.js';
 import { calcOvr } from './player.js';
 import { fieldAt, firstTeam, offenseValue } from './roster.js';
 import { injure } from './development.js';
+import { computeSynergies } from './synergy.js';
+import { staffBonus } from './club.js';
+import { velocityKmh } from './player.js';
 
 // 리그 평균 1군 능력치(≈65)를 기준점으로
 const z = (v) => (v - 65) / 20;
@@ -44,7 +47,11 @@ function pickStarter(state, team) {
 function side(state, team) {
   const lineup = gameLineup(state, team);
   const starter = pickStarter(state, team);
+  const syn = computeSynergies(state, team);
   return {
+    syn: syn.list,
+    alumni: syn.alumniSchool,
+    mgr: team.isUser ? staffBonus(team, 'manager') : 1,
     teamId: team.id,
     lineup,
     idx: 0,
@@ -73,6 +80,8 @@ export function createGame(state, home, away, opts = {}) {
     over: false,
     post: !!opts.postseason,
     maxInn: opts.postseason ? 15 : 12,
+    orders: {},           // 유저 작전 (다음 타석 1회성)
+    removed: [],          // 교체되어 나간 선수
     leadHistory: [],
     lastLeader: 0,
     halfEvents: [],
@@ -109,12 +118,19 @@ function addLog(g, type, text, extra = {}) {
 }
 
 // ───────── 능력치 산출 (컨디션·상황 보정) ─────────
-function condMult(p) { return 0.86 + 0.14 * clamp(p.cond, 0, 100) / 100; }
+function condMult(p) { return 0.86 + 0.14 * clamp(p.cond, 0, 100) / 100 + ((p.morale ?? 70) - 70) * 0.0012; }
 
-function batterEff(state, g, b, pit) {
+function batterEff(state, g, b, pit, slotIdx = 0) {
   const m = condMult(b);
   const risp = !!(g.bases[1] || g.bases[2]);
+  const o = off(g);
   let adj = 0;
+  let cAdj = 0, pAdj = 0, eAdj = 0;
+  if (o.syn.includes('alumni') && b.origin === o.alumni) { cAdj += 3; pAdj += 3; }
+  if (o.syn.includes('cleanup') && slotIdx >= 2 && slotIdx <= 4) pAdj += 4;
+  if (o.syn.includes('tableSetter') && slotIdx <= 1) eAdj += 3;
+  if (o.syn.includes('homegrown')) cAdj += 1;
+  if (risp) adj += (o.mgr - 1) * 0.6;
   if (risp && hasTrait(b, 'clutch')) adj += 6;
   if (risp && hasTrait(b, 'chokeBat')) adj -= 6;
   if (g.post && hasTrait(b, 'bigGame')) adj += 4;
@@ -124,9 +140,9 @@ function batterEff(state, g, b, pit) {
   else if (b.bats !== ph) adj += 3;
   else adj -= 3;
   return {
-    contact: b.r.contact * m + adj,
-    power: b.r.power * m + adj * 0.8,
-    eye: b.r.eye * m + adj * 0.4,
+    contact: b.r.contact * m + adj + cAdj,
+    power: b.r.power * m + adj * 0.8 + pAdj,
+    eye: b.r.eye * m + adj * 0.4 + eAdj,
     speed: b.r.speed * m,
   };
 }
@@ -144,6 +160,9 @@ function pitcherEff(state, g, p, sd) {
   if (risp && hasTrait(p, 'chokeArm')) adj -= 6;
   if (risp) adj += (p.r.composure - 55) * 0.08;
   if (g.post && hasTrait(p, 'bigGame')) adj += 4;
+  if (sd.syn.includes('battery')) adj += 2;
+  if (sd.syn.includes('bullpen') && sd.pitcher !== sd.starter && g.inning >= 7) adj += 3;
+  if (risp) adj += (sd.mgr - 1) * 0.6;
   return {
     stuff: (p.r.velo * 0.5 + p.r.breaking * 0.5) * m - tired + adj,
     control: p.r.control * m - tired * 0.8 + adj * 0.5,
@@ -159,7 +178,7 @@ function teamDefense(state, sd) {
     s += (fieldAt(p, l.pos) + (hasTrait(p, 'wizard') ? 7 : 0)) * wt;
     w += wt;
   }
-  return w ? s / w : 50;
+  return (w ? s / w : 50) + (sd.syn.includes('ironInfield') ? 4 : 0);
 }
 
 function catcherArm(state, sd) {
@@ -201,6 +220,8 @@ function maybeChangePitcher(state, g) {
   const late = g.inning >= 8;
   const pool = availableRelievers(state, g, sd);
   if (!pool.length) return;
+  // 감독이 직접 올린 투수는 크게 지치기 전까지 그대로 둔다
+  if (sd.manual === sd.pitcher && sd.pc < Math.round(18 + p.r.stamina * 0.35) + 12 && sd.pitcherRuns < 4) return;
 
   const closer = team.closer && pool.find((x) => x.id === team.closer);
   const setups = (team.setup || []).map((id) => pool.find((x) => x.id === id)).filter(Boolean);
@@ -318,6 +339,32 @@ function forceWalk(g, batter, earned = true) {
 }
 
 // ───────── 도루 ─────────
+function attemptSteal(state, g, forced = false) {
+  const b = g.bases;
+  // 2루 → 3루 도루 (강제 작전일 때만)
+  const from = b[0] && !b[1] ? 0 : forced && b[1] && !b[2] ? 1 : -1;
+  if (from < 0) return null;
+  const r = state.players[b[from].pid];
+  const o = off(g);
+  const arm = catcherArm(state, def(g));
+  let succ = 0.7 + (r.r.speed - 64) / 110 - (arm - 62) / 160 + (hasTrait(r, 'thief') ? 0.07 : 0) + (o.syn.includes('tableSetter') ? 0.05 : 0);
+  if (from === 1) succ -= 0.08;
+  succ = clamp(succ, 0.3, 0.95);
+  const pit = touchPit(g, def(g).pitcher);
+  def(g).pc += 1; pit.pc += 1;
+  const before = basesSnap(g);
+  const base = from === 0 ? '2루' : '3루';
+  if (chance(succ)) {
+    b[from + 1] = b[from]; b[from] = null;
+    touchBat(g, r.id).sb += 1;
+    return addLog(g, 'steal', `${r.name} ${base} 도루 성공!`, { before, runner: r.id, from });
+  }
+  b[from] = null;
+  touchBat(g, r.id).cs += 1;
+  recordOut(state, g);
+  return addLog(g, 'out', `${r.name} ${base} 도루 실패, 아웃`, { before, runner: r.id, from, cs: true });
+}
+
 function maybeSteal(state, g) {
   if (g.outs >= 2 && chance(0.6)) return null;
   const b = g.bases;
@@ -328,19 +375,7 @@ function maybeSteal(state, g) {
   if (hasTrait(r, 'thief')) att *= 1.9;
   att *= team.stealMode === 'aggressive' ? 1.8 : team.stealMode === 'passive' ? 0.35 : 1;
   if (!chance(Math.min(att, 0.35))) return null;
-  const arm = catcherArm(state, def(g));
-  const succ = clamp(0.7 + (r.r.speed - 64) / 110 - (arm - 62) / 160 + (hasTrait(r, 'thief') ? 0.07 : 0), 0.35, 0.95);
-  const pit = touchPit(g, def(g).pitcher);
-  def(g).pc += 1; pit.pc += 1;
-  if (chance(succ)) {
-    b[1] = b[0]; b[0] = null;
-    touchBat(g, r.id).sb += 1;
-    return addLog(g, 'steal', `${r.name} 2루 도루 성공!`);
-  }
-  b[0] = null;
-  touchBat(g, r.id).cs += 1;
-  recordOut(state, g);
-  return addLog(g, 'out', `${r.name} 2루 도루 실패, 아웃`);
+  return attemptSteal(state, g);
 }
 
 function recordOut(state, g, n = 1) {
@@ -350,34 +385,155 @@ function recordOut(state, g, n = 1) {
   touchPit(g, d.pitcher).outs += n;
 }
 
-const DIR_1B = ['좌전 안타', '중전 안타', '우전 안타', '3유간 빠지는 안타', '1-2루간 안타', '내야 안타', '좌중간 안타', '우중간 안타'];
-const DIR_2B = ['좌중간 2루타', '우중간 2루타', '좌익선상 2루타', '우익선상 2루타', '펜스 직격 2루타'];
-const DIR_3B = ['우중간 3루타', '좌중간 가르는 3루타', '우익선상 3루타'];
-const DIR_HR = ['좌측 담장을 넘기는', '중앙 담장을 넘기는', '우측 담장을 넘기는', '좌중간 담장을 넘기는', '우중간 장외로 날아가는'];
-const OUT_GB = ['유격수 땅볼', '2루수 땅볼', '3루수 땅볼', '1루수 땅볼', '투수 땅볼'];
-const OUT_FB = ['좌익수 플라이', '중견수 플라이', '우익수 플라이', '유격수 팝플라이', '2루수 라인드라이브', '좌익수 뜬공', '우익수 파울플라이'];
+const basesSnap = (g) => g.bases.map((x) => (x ? x.pid : null));
+
+// [문구, 각도(-45 좌 ~ 45 우), 거리(0~1.3)]
+const DIR_1B = [['좌전 안타', -30, 0.68], ['중전 안타', 0, 0.7], ['우전 안타', 30, 0.68], ['3유간 빠지는 안타', -20, 0.6], ['1-2루간 안타', 18, 0.6], ['내야 안타', -12, 0.32], ['좌중간 안타', -15, 0.72], ['우중간 안타', 15, 0.72]];
+const DIR_2B = [['좌중간 2루타', -18, 0.92], ['우중간 2루타', 18, 0.92], ['좌익선상 2루타', -42, 0.86], ['우익선상 2루타', 42, 0.86], ['펜스 직격 2루타', 0, 0.98]];
+const DIR_3B = [['우중간 3루타', 20, 1.0], ['좌중간 가르는 3루타', -20, 1.0], ['우익선상 3루타', 43, 0.96]];
+const DIR_HR = [['좌측 담장을 넘기는', -32, 1.25], ['중앙 담장을 넘기는', 0, 1.3], ['우측 담장을 넘기는', 32, 1.25], ['좌중간 담장을 넘기는', -16, 1.28], ['우중간 장외로 날아가는', 16, 1.4]];
+const OUT_GB = [['유격수 땅볼', -18, 0.42], ['2루수 땅볼', 14, 0.42], ['3루수 땅볼', -34, 0.38], ['1루수 땅볼', 36, 0.38], ['투수 땅볼', 0, 0.2]];
+const OUT_FB = [['좌익수 플라이', -30, 0.78], ['중견수 플라이', 0, 0.85], ['우익수 플라이', 30, 0.78], ['유격수 팝플라이', -14, 0.42], ['2루수 라인드라이브', 12, 0.45], ['좌익수 뜬공', -26, 0.74], ['우익수 파울플라이', 47, 0.6]];
+const dir = ([label, angle, dist], kind) => ({ label, angle: angle + (rng() - 0.5) * 6, dist, kind });
+
+// 투구 시퀀스 (연출용): 결과에 맞는 볼카운트 흐름
+const PITCH_SPEED_GAP = { FB: 0, SI: -3, CT: -6, SL: -12, FK: -14, CH: -17, CB: -25 };
+function pitchSeq(pitcher, sd, n, outcome) {
+  const ars = pitcher.pitches || [{ t: 'FB', d: 0 }];
+  const top = velocityKmh(pitcher.r.velo) - Math.round(Math.max(0, sd.pc - 70) / 15);
+  const one = () => {
+    const pt = rng() < 0.48 ? ars[0] : ars[1 + Math.floor(rng() * Math.max(1, ars.length - 1))] || ars[0];
+    return { t: pt.t, kmh: top + (PITCH_SPEED_GAP[pt.t] ?? -10) - randInt(0, 3) };
+  };
+  const seq = [];
+  let b = 0, s = 0;
+  const finalCall = { so: 'K', bb: 'B4', hbp: 'HBP', play: 'X' }[outcome];
+  const needB = outcome === 'bb' ? 4 : 0, needS = outcome === 'so' ? 3 : 0;
+  n = Math.max(n, needB + (needS ? needS : 1));
+  for (let i = 0; i < n - 1; i++) {
+    const left = n - 1 - i;
+    let call;
+    const mustB = outcome === 'bb' ? 3 - b : 0;
+    const mustS = outcome === 'so' ? 2 - s : 0;
+    if (mustB >= left && b < 3) call = 'B';
+    else if (mustS >= left && s < 2) call = 'S';
+    else if (s === 2) call = rng() < 0.5 && b < 3 ? 'B' : 'F';
+    else if (b === 3) call = 'S';
+    else call = rng() < 0.45 ? 'B' : rng() < 0.6 ? 'S' : 'F';
+    if (call === 'B') b++;
+    else if (call === 'S' || (call === 'F' && s < 2)) s++;
+    seq.push({ ...one(), call, b, s });
+  }
+  seq.push({ ...one(), call: finalCall, b: outcome === 'bb' ? 4 : b, s: outcome === 'so' ? 3 : s });
+  return seq;
+}
+
+// ───────── 유저 작전 ─────────
+export function setOrder(g, key, val = true) { g.orders = { ...(g.orders || {}), [key]: val }; }
+
+export function pinchHit(state, g, slotIdx, pid) {
+  const o = g.homeId === state.userTeamId ? g.home : g.away;
+  const old = o.lineup[slotIdx];
+  if (!old || g.removed.includes(pid) || o.lineup.some((l) => l.pid === pid)) return null;
+  g.removed.push(old.pid);
+  o.lineup[slotIdx] = { pid, pos: old.pos === 'DH' ? 'DH' : old.pos };
+  touchBat(g, pid).g = 1;
+  return addLog(g, 'change', `대타: ${state.players[old.pid].name} → ${state.players[pid].name}`);
+}
+
+export function manualPitchChange(state, g, pid) {
+  const sd = g.homeId === state.userTeamId ? g.home : g.away;
+  if (sd.used.includes(pid)) return null;
+  changePitcher(state, g, sd, pid, '감독 교체');
+  sd.manual = pid;
+  return g.log[g.log.length - 1];
+}
+
+export function userSide(state, g) { return g.homeId === state.userTeamId ? g.home : g.away; }
+export function userBatting(state, g) { return off(g).teamId === state.userTeamId; }
+export function currentBatter(state, g) { const o = off(g); return state.players[o.lineup[o.idx % o.lineup.length].pid]; }
+export function currentPitcher(state, g) { return state.players[def(g).pitcher]; }
+export function currentSlot(g) { const o = off(g); return o.idx % o.lineup.length; }
+
+function buntPA(state, g, batter, pitcher, bs, ps) {
+  const before = basesSnap(g);
+  const ctx = { batter: batter.id, pitcher: pitcher.id, before };
+  const succ = clamp(0.74 + (batter.r.contact - 60) / 160, 0.5, 0.92);
+  const hitCh = clamp(0.05 + (batter.r.speed - 60) / 300, 0.02, 0.14);
+  const r = rng();
+  if (!g.bases.some(Boolean) || r < hitCh) {
+    // 기습 번트 안타 시도
+    bs.ab += 1;
+    if (r < hitCh * 2.2) {
+      bs.h += 1; ps.h += 1; off(g).hits += 1;
+      const sc = advanceOnHit(state, g, batter, 1);
+      sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
+      return addLog(g, 'hit', `${batter.name} 기습 번트 안타!`, { ...ctx, runs: sc.length, hit: 1, dir: { label: '번트', angle: 20, dist: 0.18, kind: 'gb' } });
+    }
+    recordOut(state, g);
+    return addLog(g, 'out', `${batter.name} 번트 아웃`, { ...ctx, dir: { label: '번트', angle: 10, dist: 0.15, kind: 'gb' } });
+  }
+  if (chance(succ)) {
+    bs.sf += 0; // 희생번트는 타수 제외
+    const sc = [];
+    if (g.bases[2]) { sc.push(g.bases[2]); g.bases[2] = null; }
+    if (g.bases[1]) { g.bases[2] = g.bases[1]; g.bases[1] = null; }
+    if (g.bases[0]) { g.bases[1] = g.bases[0]; g.bases[0] = null; }
+    recordOut(state, g);
+    sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
+    return addLog(g, 'out', `${batter.name} 희생번트 성공 — 주자 진루${sc.length ? ', 1점!' : ''}`, { ...ctx, runs: sc.length, dir: { label: '번트', angle: -8, dist: 0.16, kind: 'gb' } });
+  }
+  // 실패: 선행 주자 아웃, 타자 1루
+  bs.ab += 1;
+  const lead = g.bases[2] ? 2 : g.bases[1] ? 1 : 0;
+  g.bases[lead] = null;
+  if (lead === 2 && g.bases[1]) { g.bases[2] = g.bases[1]; g.bases[1] = null; }
+  if (lead >= 1 && g.bases[0]) { g.bases[1] = g.bases[0]; g.bases[0] = null; }
+  g.bases[0] = { pid: batter.id, resp: def(g).pitcher, earned: true };
+  recordOut(state, g);
+  return addLog(g, 'out', `${batter.name} 번트 실패 — 선행 주자 아웃`, { ...ctx, dir: { label: '번트', angle: 0, dist: 0.14, kind: 'gb' } });
+}
 
 // ───────── 한 타석 ─────────
 export function stepPA(state, g) {
   if (g.over) return null;
   g.halfEvents = [];
+  const orders = g.orders || {};
+  g.orders = {};
   maybeChangePitcher(state, g);
-  const stealEv = maybeSteal(state, g);
+  const userOff = off(g).teamId === state.userTeamId;
+  const stealEv = userOff && orders.steal ? attemptSteal(state, g, true) : maybeSteal(state, g);
   if (g.outs >= 3) { endHalf(state, g); return stealEv; }
 
   const o = off(g);
   const d = def(g);
-  const slot = o.lineup[o.idx % o.lineup.length];
+  const slotIdx = o.idx % o.lineup.length;
+  const slot = o.lineup[slotIdx];
   const batter = state.players[slot.pid];
   const pitcher = state.players[d.pitcher];
-  const B = batterEff(state, g, batter, pitcher);
+  const B = batterEff(state, g, batter, pitcher, slotIdx);
+  if (userOff && orders.power) { B.power += 6; B.contact -= 5; }
   const P = pitcherEff(state, g, pitcher, d);
   const defense = teamDefense(state, d);
   const bs = touchBat(g, batter.id);
   const ps = touchPit(g, pitcher.id);
   bs.pa += 1; ps.bf += 1;
   o.idx += 1;
+  const before = basesSnap(g);
 
+  let ev;
+  let pitches;
+  let outcome = 'play';
+  if (userOff && orders.bunt) {
+    pitches = randInt(1, 3);
+    ev = buntPA(state, g, batter, pitcher, bs, ps);
+  } else if (!userOff && orders.ibb) {
+    pitches = 4; outcome = 'bb';
+    bs.bb += 1; ps.bb += 1;
+    const sc = forceWalk(g, batter);
+    sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
+    ev = addLog(g, 'bb', `${batter.name} 고의사구`, { batter: batter.id, pitcher: pitcher.id, before, runs: sc.length });
+  } else {
   const stuffZ = z(P.stuff);
   let pK = 0.195 * Math.exp(0.55 * stuffZ - 0.5 * z(B.contact) - 0.15 * z(B.eye));
   if (hasTrait(pitcher, 'strikeout')) pK *= 1.15;
@@ -393,24 +549,21 @@ export function stepPA(state, g) {
   pBB = clamp(pBB, 0.02, 0.22);
 
   const r = rng();
-  let pitches;
-  const label = halfLabel(g);
-  let ev;
-  const ctx = { batter: batter.id, pitcher: pitcher.id };
+  const ctx = { batter: batter.id, pitcher: pitcher.id, before };
 
   if (r < pK) {
-    pitches = randInt(3, 7);
+    pitches = randInt(3, 7); outcome = 'so';
     bs.ab += 1; bs.so += 1; ps.so += 1;
     recordOut(state, g);
     ev = addLog(g, 'so', `${batter.name} ${pick(['헛스윙 삼진', '루킹 삼진', '삼진 아웃'])}`, ctx);
   } else if (r < pK + pBB) {
-    pitches = randInt(4, 8);
+    pitches = randInt(4, 8); outcome = 'bb';
     bs.bb += 1; ps.bb += 1;
     const sc = forceWalk(g, batter);
     sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
     ev = addLog(g, 'bb', `${batter.name} 볼넷 출루${sc.length ? ' — 밀어내기 득점' : ''}`, { ...ctx, runs: sc.length });
   } else if (r < pK + pBB + pHBP) {
-    pitches = randInt(1, 5);
+    pitches = randInt(1, 5); outcome = 'hbp';
     bs.hbp += 1;
     const sc = forceWalk(g, batter);
     sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
@@ -434,7 +587,8 @@ export function stepPA(state, g) {
       const sc = advanceOnHit(state, g, batter, 4);
       sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
       const kind = ['솔로', '투런', '쓰리런', '만루'][onBase];
-      ev = addLog(g, 'hr', `${batter.name} ${pick(DIR_HR)} ${kind} 홈런!!`, { ...ctx, runs: sc.length, hit: 4 });
+      const dd = dir(pick(DIR_HR), 'hr');
+      ev = addLog(g, 'hr', `${batter.name} ${dd.label} ${kind} 홈런!!`, { ...ctx, runs: sc.length, hit: 4, dir: dd });
     } else if (rng() < babip) {
       const dShare = 0.17 + 0.04 * z(B.power);
       const tShare = clamp(0.018 + 0.015 * z(B.speed), 0.004, 0.05);
@@ -445,56 +599,59 @@ export function stepPA(state, g) {
       if (ht === 3) bs.t += 1;
       const sc = advanceOnHit(state, g, batter, ht, B.speed);
       sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
-      const dir = ht === 3 ? pick(DIR_3B) : ht === 2 ? pick(DIR_2B) : pick(DIR_1B);
+      const dd = dir(pick(ht === 3 ? DIR_3B : ht === 2 ? DIR_2B : DIR_1B), ht === 1 ? 'ld' : 'fb');
       const runs = sc.length;
-      ev = addLog(g, 'hit', `${batter.name} ${dir}${runs ? ` — ${runs}점 득점!` : ''}`, { ...ctx, runs, hit: ht });
+      ev = addLog(g, 'hit', `${batter.name} ${dd.label}${runs ? ` — ${runs}점 득점!` : ''}`, { ...ctx, runs, hit: ht, dir: dd });
     } else {
       // 범타 or 실책
       const errP = 0.014 * (1 - z(defense) * 0.5);
       if (chance(errP)) {
         d.errors += 1;
         const sc = forceWalk(g, batter, false);
-        // 실책 출루: 주자 한 베이스 추가 진루 가능
         sc.forEach((rn) => scoreRunner(state, g, { ...rn, earned: false }, null, false));
-        ev = addLog(g, 'err', `${batter.name} 타구에 수비 실책! 출루`, ctx);
+        ev = addLog(g, 'err', `${batter.name} 타구에 수비 실책! 출루`, { ...ctx, dir: dir(pick(OUT_GB), 'gb') });
       } else {
-        let gbShare = 0.46 + (hasTrait(pitcher, 'groundball') ? 0.1 : 0) - z(B.power) * 0.05;
+        const gbShare = 0.46 + (hasTrait(pitcher, 'groundball') ? 0.1 : 0) - z(B.power) * 0.05;
         const isGB = chance(gbShare);
         if (isGB && g.bases[0] && g.outs < 2 && chance(clamp(0.42 - z(B.speed) * 0.1 + (hasTrait(pitcher, 'groundball') ? 0.1 : 0), 0.15, 0.7))) {
-          // 병살
-          const lead = g.bases[0];
           g.bases[0] = null;
-          // 3루 주자는 득점 가능 (2아웃 전환 전)
           const sc = [];
           if (g.bases[2] && g.outs === 0) { sc.push(g.bases[2]); g.bases[2] = null; }
           if (g.bases[1]) { g.bases[2] = g.bases[1]; g.bases[1] = null; }
           recordOut(state, g, 2);
           sc.forEach((rn) => scoreRunner(state, g, rn, null, false));
-          ev = addLog(g, 'out', `${batter.name} ${pick(OUT_GB)} — 병살타`, ctx);
-          void lead;
+          const dd = dir(pick(OUT_GB), 'gb');
+          ev = addLog(g, 'out', `${batter.name} ${dd.label} — 병살타`, { ...ctx, dir: dd, dp: true });
         } else if (!isGB && g.bases[2] && g.outs < 2 && chance(0.62)) {
-          // 희생플라이
           bs.ab -= 1; bs.sf += 1;
           const rn = g.bases[2]; g.bases[2] = null;
           recordOut(state, g);
           scoreRunner(state, g, rn, batter.id);
-          ev = addLog(g, 'out', `${batter.name} ${pick(OUT_FB.slice(0, 3))} — 희생플라이로 1점`, { ...ctx, runs: 1 });
+          const dd = dir(pick(OUT_FB.slice(0, 3)), 'fb');
+          ev = addLog(g, 'out', `${batter.name} ${dd.label} — 희생플라이로 1점`, { ...ctx, runs: 1, dir: dd });
         } else {
           recordOut(state, g);
-          // 땅볼 진루타
-          let sc = [];
+          const sc = [];
           if (isGB && g.outs < 3) {
-            if (g.bases[2] && g.outs <= 2 && chance(0.45)) { sc.push(g.bases[2]); g.bases[2] = null; }
+            if (g.bases[2] && chance(0.45)) { sc.push(g.bases[2]); g.bases[2] = null; }
             if (g.bases[1] && !g.bases[2] && chance(0.55)) { g.bases[2] = g.bases[1]; g.bases[1] = null; }
           }
           if (g.outs < 3) sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
-          ev = addLog(g, 'out', `${batter.name} ${isGB ? pick(OUT_GB) : pick(OUT_FB)}${sc.length ? ' — 3루 주자 득점' : ''}`, ctx);
+          const dd = dir(pick(isGB ? OUT_GB : OUT_FB), isGB ? 'gb' : 'fb');
+          ev = addLog(g, 'out', `${batter.name} ${dd.label}${sc.length ? ' — 3루 주자 득점' : ''}`, { ...ctx, dir: dd });
         }
       }
     }
   }
+  }
   d.pc += pitches;
   ps.pc += pitches;
+  if (ev) {
+    ev.seq = pitchSeq(pitcher, d, pitches, outcome);
+    ev.after = basesSnap(g);
+    ev.outsAfter = g.outs;
+    ev.half = g.top ? 'top' : 'bot';
+  }
 
   // 끝내기 체크
   if (!g.top && g.inning >= 9 && g.home.runs > g.away.runs) {

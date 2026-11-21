@@ -7,6 +7,7 @@ import { calcOvr, pitLine } from '../../engine/player.js';
 import { fmtEra, formatMoney } from '../../core/util.js';
 import { INTENSITY } from '../../data/constants.js';
 import { renderDraft } from './draft.js';
+import { computeSynergies, SYNERGIES } from '../../engine/synergy.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -113,11 +114,47 @@ function miniStandings() {
   </section>`;
 }
 
+export function eventCard() {
+  const ev = state.pendingEvent;
+  if (!ev) return '';
+  return `<section class="sec"><div class="event-card levelup">
+    <span class="small amber">📢 이번 주 이슈</span>
+    <h3>${esc(ev.title)}</h3>
+    <p>${esc(ev.desc)}</p>
+    ${ev.choices.map((c, i) => `<button class="choice" data-act="resolveEvent" data-i="${i}"><b>${esc(c.label)}</b>${c.sub ? `<span>${esc(c.sub)}</span>` : ''}</button>`).join('')}
+  </div></section>`;
+}
+
+function missionCard() {
+  const m = state.mission;
+  if (m) {
+    const pctv = Math.min(100, Math.round((m.progress / m.target) * 100));
+    return `<section class="sec"><div class="panel card-accent">
+      <div class="mission"><div class="grow"><span class="tiny amber">🎯 ${esc(m.sponsor)} 스폰서 미션</span><br><b>${esc(m.title)}</b>
+      <div class="bar"><i style="width:${pctv}%"></i></div></div><div class="center"><b class="disp amber" style="font-size:20px">${m.progress}/${m.target}</b><br><span class="tiny muted">보상 ${formatMoney(m.reward)}</span></div></div>
+    </div></section>`;
+  }
+  const offers = state.missionOffers || [];
+  if (!offers.length) return '';
+  return `<section class="sec"><div class="sec-h"><h2>이번 주 스폰서 미션</h2><span class="sub">하나만 고를 수 있어요</span></div>
+    <div class="panel">${offers.map((o) => `<div class="offer"><div class="grow"><span class="tiny muted">${esc(o.sponsor)}</span><br><b>${esc(o.title)}</b></div><span class="small amber">${formatMoney(o.reward)}</span><button class="btn sm" data-act="acceptMission" data-id="${o.id}">수락</button></div>`).join('')}</div></section>`;
+}
+
+function synergyCard() {
+  const t = userTeam(state);
+  const syn = computeSynergies(state, t).list;
+  const all = Object.keys(SYNERGIES);
+  return `<section class="sec"><div class="sec-h"><h2>팀 시너지</h2><span class="sub">${syn.length}/${all.length} 발동</span></div>
+    <div class="panel"><div class="chips">${all.map((k) => `<button class="chip ${syn.includes(k) ? '' : 'off'}" data-act="synInfo" data-k="${k}" style="${syn.includes(k) ? 'background:rgba(255,182,39,.14);color:var(--amber);border-color:var(--amber-dim)' : 'background:transparent;color:var(--faint);border-color:var(--line-2)'}">${SYNERGIES[k].icon} ${SYNERGIES[k].ko}</button>`).join('')}</div>
+    <p class="tiny faint mt">라인업과 투수진 조합에 따라 발동돼요. 눌러서 조건을 확인하세요.</p></div></section>`;
+}
+
 function regularView() {
   const sg = userGameToday(state);
   const prog = seasonProgress(state);
   const remain = prog.total - prog.day;
   return `
+  ${eventCard()}
   <section class="sec">
     ${sg ? matchupCard(sg, `${state.season} 정규시즌 · ${prog.day + 1}/${prog.total}경기`) : '<div class="panel empty">오늘은 경기가 없어요.</div>'}
     <div class="simbar">
@@ -126,8 +163,10 @@ function regularView() {
       <button class="btn sm" data-act="simDays" data-n="${remain}">시즌 끝까지</button>
     </div>
   </section>
+  ${missionCard()}
   ${lastGameCard()}
   ${weekCard()}
+  ${synergyCard()}
   ${miniStandings()}
   ${newsCard()}`;
 }
@@ -144,6 +183,7 @@ function postView() {
     return `<tr class="${(rd.high === user.id || rd.low === user.id) ? 'me' : ''}"><td>${rd.name}</td><td class="tn" style="justify-content:flex-end">${esc(hi.short)} ${rd.hw}${lo ? ` : ${rd.lw} ${esc(lo.short)}` : ' : ? '}</td><td>${status}</td></tr>`;
   }).join('');
   return `
+  ${eventCard()}
   <section class="sec">
     <div class="sec-h"><h2>${state.season} 포스트시즌</h2><span class="sub">${r.name} ${r.need}선승</span></div>
     ${userIn ? matchupCard(sg, `${r.name} ${r.games.length + 1}차전`) : `<div class="panel"><p>${esc(state.teams[sg.away].short)} vs ${esc(state.teams[sg.home].short)} — ${r.name} ${r.games.length + 1}차전</p><div class="simbar" style="grid-template-columns:1fr 1fr"><button class="btn" data-act="simPost" data-all="0">다음 경기</button><button class="btn" data-act="simPost" data-all="1">끝까지 진행</button></div></div>`}

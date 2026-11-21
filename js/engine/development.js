@@ -101,6 +101,7 @@ export function developWeek(p, ctx = {}) {
     if (hasTrait(p, 'glass')) inj *= 2;
     if (hasTrait(p, 'iron')) inj *= 0.5;
     if (p.cond < 40) inj *= 2.2;
+    inj *= ctx.injuryMult ?? 1;
     if (!p.injury && chance(inj)) {
       injure(p, 'training');
       events.push({ type: 'injury', pid: p.id, text: `${p.name} 훈련 중 부상: ${p.injury.name} (${p.injury.weeks}주)` });
@@ -139,9 +140,9 @@ export function injure(p, cause = 'game') {
 }
 
 // 주간 부상 회복
-export function healWeek(p, medicalMult = 1) {
+export function healWeek(p, healBonus = 1) {
   if (!p.injury) return false;
-  p.injury.weeks -= medicalMult >= 1.3 && chance(0.3) ? 2 : 1;
+  p.injury.weeks -= 1 + (chance(Math.max(0, healBonus - 1)) ? 1 : 0);
   if (p.injury.weeks <= 0) {
     p.injury = null;
     p.cond = Math.max(p.cond, 70);

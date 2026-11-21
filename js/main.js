@@ -10,13 +10,21 @@ import { renderPlayer } from './ui/screens/player.js';
 import { renderDevelop } from './ui/screens/develop.js';
 import { renderLeague } from './ui/screens/league.js';
 import { renderClub } from './ui/screens/club.js';
-import { renderLive, liveHud } from './ui/screens/live.js';
+import { liveShell, mountLive, unmountLive, updateLiveDom } from './ui/screens/live.js';
+import { sfx, toggleSound, soundOn } from './ui/sound.js';
 import { createNewGame, standings } from './engine/league.js';
 import {
   userTeam, simDay, prepareUserLiveGame, runOffseasonStart, advanceDraftToUser, draftPick, aiDraftChoice,
   finishDraft, runCampAndStartSeason, releasePlayer, fillUserFirstTeam,
 } from './engine/season.js';
-import { stepPA, simToEnd } from './engine/match.js';
+import { simToEnd } from './engine/match.js';
+import { startUpgrade, hireStaff, fireStaff } from './engine/club.js';
+import { resolveEvent, acceptMission } from './engine/events.js';
+import { signPlayer } from './engine/market.js';
+import { assignNumber, induct, passHof } from './engine/hof.js';
+import { upgradeSave } from './engine/migrate.js';
+import { computeSynergies, SYNERGIES } from './engine/synergy.js';
+import { FACILITIES } from './data/club.js';
 import { autoLineup, autoPitching, autoAssignLevels, ensureLineupValid, canPromote, canDemote, teamOvr, battingOrder } from './engine/roster.js';
 import { calcOvr } from './engine/player.js';
 
@@ -25,8 +33,9 @@ const PHASE_KO = { regular: '정규시즌', post: '포스트시즌', offseason: 
 
 function renderHud() {
   const hud = $('#hud');
-  if (ui.live) { hud.innerHTML = liveHud(); return; }
+  if (ui.live) { hud.innerHTML = `<div class="hud-top"><button class="iconbtn" data-act="leaveLive" aria-label="나가기">←</button><div class="hud-name"><h1>LIVE 중계</h1><small>${esc(state.teams[ui.live.awayId].name)} vs ${esc(state.teams[ui.live.homeId].name)}</small></div><button class="iconbtn" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>`; return; }
   const t = userTeam(state);
+  const syn = computeSynergies(state, t).list;
   const rank = standings(state).findIndex((s) => s.team.id === t.id) + 1;
   document.documentElement.style.setProperty('--team', t.color);
   document.documentElement.style.setProperty('--team-2', t.color2);
@@ -36,7 +45,8 @@ function renderHud() {
       <div class="hud-name"><h1>${esc(t.name)}</h1><small>${state.season} ${PHASE_KO[state.phase] || ''}</small></div>
       <div class="led"><div><b>${t.w}</b><span>승</span></div><div><b>${t.l}</b><span>패</span></div><div><b>${rank}</b><span>위</span></div></div>
     </div>
-    <div class="hud-meta"><span>자금 <b>${formatMoney(t.cash)}</b></span><span>팬 <b>${formatFans(t.fans)}</b></span><span>전력 <b>${teamOvr(state, t)}</b></span></div>`;
+    <div class="hud-meta"><span>자금 <b>${formatMoney(t.cash)}</b></span><span>팬 <b>${formatFans(t.fans)}</b></span><span>전력 <b>${teamOvr(state, t)}</b></span><span class="grow"></span><button class="iconbtn" style="width:28px;height:28px;font-size:13px" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>
+    ${syn.length ? `<div class="hud-syn">${syn.map((k) => `<span>${SYNERGIES[k].icon} ${SYNERGIES[k].ko}</span>`).join('')}</div>` : ''}`;
 }
 
 function render() {
@@ -50,7 +60,11 @@ function render() {
   $('#hud').hidden = false;
   $('#tabs').hidden = !!ui.live;
   renderHud();
-  if (ui.live) { main.innerHTML = renderLive(); return; }
+  if (ui.live) {
+    if (!$('#lv-canvas')) { main.innerHTML = liveShell(); mountLive(); }
+    else updateLiveDom();
+    return;
+  }
   $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === ui.tab));
   const screens = { home: renderHome, roster: renderRoster, develop: renderDevelop, league: renderLeague, club: renderClub };
   main.innerHTML = (screens[ui.tab] || renderHome)();
@@ -77,6 +91,7 @@ function simDays(n) {
   let last = null;
   let wins = 0, losses = 0;
   for (let i = 0; i < n && state.phase === 'regular'; i++) {
+    if (i > 0 && state.pendingEvent) break;
     const r = simDay(state);
     if (r) {
       last = r;
@@ -89,32 +104,16 @@ function simDays(n) {
   save();
   render();
   window.scrollTo(0, 0);
-  if (n > 1) toast(`${n}경기 진행: ${wins}승 ${losses}패`, wins >= losses ? 'good' : 'bad');
+  if (n > 1) toast(`${wins + losses}경기 진행: ${wins}승 ${losses}패${state.pendingEvent ? ' — 확인할 이슈가 있어요' : ''}`, wins >= losses ? 'good' : 'bad');
   else userResultToast(last);
   if (state.phase === 'post') toast('정규시즌 종료! 포스트시즌이 시작됐어요', 'big');
 }
 
-function stopAuto() {
-  if (ui.liveAuto) { clearInterval(ui.liveAuto); ui.liveAuto = null; }
-}
-
-function liveStep(mode) {
-  const g = ui.live;
-  if (!g || g.over) return;
-  if (mode === 'pa') stepPA(state, g);
-  else if (mode === 'half') {
-    const inn = g.inning, top = g.top;
-    let guard = 0;
-    while (!g.over && g.inning === inn && g.top === top && guard++ < 60) stepPA(state, g);
-  } else simToEnd(state, g);
-  if (g.over) stopAuto();
-  render();
-}
-
 function finishLive() {
   const g = ui.live;
-  stopAuto();
+  unmountLive();
   ui.live = null;
+  if (!g.over) simToEnd(state, g);
   const res = simDay(state, { liveGame: g });
   save();
   ui.tab = 'home';
@@ -127,7 +126,7 @@ function finishLive() {
 registerActions({
   closeModal: () => closeModal(),
   tab: (d) => { ui.tab = d.tab; ui.lineupSel = null; render(); window.scrollTo(0, 0); },
-  continueGame: () => { load(); fillUserFirstTeam(state); render(); },
+  continueGame: () => { load(); upgradeSave(state); fillUserFirstTeam(state); save(); render(); },
 
   // 홈
   simGame: () => simDays(1),
@@ -136,20 +135,51 @@ registerActions({
     const g = prepareUserLiveGame(state);
     if (!g) return;
     ui.live = g;
+    sfx.click();
     render();
     window.scrollTo(0, 0);
   },
-  liveStep: (d) => liveStep(d.n),
-  liveAuto: () => {
-    if (ui.liveAuto) { stopAuto(); render(); return; }
-    ui.liveAuto = setInterval(() => {
-      if (!ui.live || ui.live.over) { stopAuto(); render(); return; }
-      stepPA(state, ui.live);
-      render();
-    }, 900);
-    render();
-  },
   liveFinish: () => finishLive(),
+  leaveLive: () => confirmBox('중계를 끝내고 이 경기를 끝까지 자동으로 진행할까요?', '자동 진행', () => finishLive()),
+  toggleSound: () => { toggleSound(); sfx.click(); renderHud(); },
+  resolveEvent: (d) => {
+    const msg = resolveEvent(state, Number(d.i));
+    sfx.click();
+    commit(msg, 'big');
+  },
+  acceptMission: (d) => {
+    const m = acceptMission(state, d.id);
+    if (m) { sfx.coin(); commit(`미션 수락: ${m.title}`, 'good'); }
+  },
+  synInfo: (d) => toast(`${SYNERGIES[d.k].icon} ${SYNERGIES[d.k].ko}: ${SYNERGIES[d.k].desc}`),
+  clubView: (d) => { ui.clubView = d.v; render(); },
+  upgradeFac: (d) => {
+    const t = userTeam(state);
+    const next = t.facilities[d.k] && FACILITIES[d.k].levels[t.facilities[d.k].lv];
+    confirmBox(`${FACILITIES[d.k].ko}을(를) <b>${esc(next.title)}</b>(으)로 증축할까요?<br><span class="muted small">비용 ${formatMoney(next.cost)} · ${next.weeks}주 소요</span>`, '증축', () => {
+      const r = startUpgrade(state, t, d.k);
+      if (r.ok) sfx.coin();
+      commit(r.msg, r.ok ? 'good' : 'bad');
+    });
+  },
+  hireStaff: (d) => {
+    const c = state.staffMarket.find((x) => x.id === d.id);
+    if (!c) return;
+    const r = hireStaff(state, userTeam(state), d.id);
+    if (r.ok) sfx.levelup();
+    commit(r.msg, r.ok ? 'good' : 'bad');
+  },
+  fireStaff: (d) => confirmBox('이 코치와의 계약을 해지할까요? 해당 자리는 기본(D급)으로 돌아가요.', '해임', () => { fireStaff(userTeam(state), d.r); commit('계약 해지'); }, 'danger'),
+  signPlayer: (d) => {
+    const r = signPlayer(state, userTeam(state), d.pid, assignNumber);
+    if (r.ok) { sfx.coin(); closeModal(); }
+    commit(r.msg, r.ok ? 'good' : 'bad');
+  },
+  hofInduct: (d) => {
+    const e = induct(state, d.id, d.n === '1');
+    if (e) { sfx.homerun(); commit(`🏛️ ${e.name} 명예의 전당 헌액!${d.n === '1' ? ` 등번호 ${e.num} 영구결번` : ''}`, 'big'); }
+  },
+  hofPass: (d) => { passHof(state, d.id); commit(); },
   simPost: (d) => {
     if (d.all === '1') {
       let guard = 0;
@@ -330,6 +360,8 @@ registerActions({
   doImport: () => {
     try {
       importSave($('#loadText').value);
+      upgradeSave(state);
+      save();
       closeModal();
       ui.tab = 'home';
       commit('세이브를 불러왔어요', 'good');

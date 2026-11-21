@@ -38,3 +38,9 @@ for (let season = 0; season < seasons; season++) {
   console.log('teams', s.teamOrder.map(id => s.teams[id].short + ':' + teamOvr(s, s.teams[id]) + '(' + s.teams[id].roster.length + ')').join(' '));
 }
 console.log('time ms', Date.now() - t0, 'save KB', Math.round(JSON.stringify(s).length / 1024));
+// 신규 시스템 점검
+import('../js/engine/club.js').then(({ startUpgrade, facLv }) => {
+  const u = s.teams.user;
+  console.log('cash', u.cash, 'fac', JSON.stringify(Object.fromEntries(Object.entries(u.facilities).map(([k, v]) => [k, v.lv]))), 'staff', Object.values(u.staff).filter(Boolean).length);
+  console.log('hof cand', (s.hofCandidates||[]).length, 'retired user', s.retired.filter(r=>r.wasUser).length, 'foreignPool', s.foreignPool.length, 'staffMarket', s.staffMarket.length, 'event', s.pendingEvent?.title, 'offers', (s.missionOffers||[]).map(m=>m.title).join('/'));
+});

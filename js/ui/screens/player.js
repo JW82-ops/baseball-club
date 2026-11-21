@@ -6,6 +6,7 @@ import { careerTotals, userTeam, draftOnClock } from '../../engine/season.js';
 import { canPromote, canDemote } from '../../engine/roster.js';
 import { fmtAvg, fmtEra, fmtIP, formatMoney } from '../../core/util.js';
 import { scoutLevel } from './draft.js';
+import { signingFee, canSign } from '../../engine/market.js';
 
 function batRow(label, s) {
   const l = batLine(s);
@@ -37,7 +38,7 @@ export function renderPlayer(pid, opts = {}) {
     return ratingBar(a.ko, p.r[a.key], Math.min(99, lo), Math.min(100, hi));
   }).join('');
   const g = GROWTH_TYPES[p.growth];
-  const draftMode = opts.draft || p.amateur;
+  const draftMode = opts.draft || p.amateur || !!p.market;
   const focusKeys = Object.keys(TRAINING_FOCUS).filter((k) => {
     const f = TRAINING_FOCUS[k];
     return (!f.bat && !f.pit) || (p.type === 'P' ? f.pit : f.bat);
@@ -64,7 +65,7 @@ export function renderPlayer(pid, opts = {}) {
   <div class="pcard-top">
     ${avatar(p, color, 64)}
     <div class="grow">
-      <h2>${esc(p.name)}</h2>
+      <h2>${esc(p.name)}${p.num != null && p.team ? ` <span class="num" style="font-size:16px">#${p.num}</span>` : ''}${p.foreign ? ' <span class="chip" style="font-size:11px">외국인</span>' : ''}</h2>
       <p class="small muted">${team ? esc(team.short) + ' · ' : ''}${p.type === 'P' ? (p.pos === 'SP' ? '선발투수' : '불펜투수') : POS_KO[p.pos]} · ${hand} · ${p.age}세 ${condDot(p)}</p>
       <div class="row gap mt" style="margin-top:6px">${gradeTag(calcOvr(p), { big: true })}<span class="pot">잠재 ${est.loG === est.hiG ? est.loG : `${est.loG}~${est.hiG}`}</span></div>
     </div>
@@ -73,9 +74,10 @@ export function renderPlayer(pid, opts = {}) {
     <div><span>성장 타입</span><b>${g.ko}</b></div>
     <div><span>시기</span><b>${ageCurveLabel(p)}</b></div>
     <div><span>스타일</span><b>${esc(p.archKo)}</b></div>
-    <div><span>소속</span><b>${p.amateur ? '아마추어' : p.level === 1 ? '1군' : '2군'}</b></div>
+    <div><span>소속</span><b>${p.amateur ? '아마추어' : p.market === 'foreign' ? '외국인 시장' : p.market === 'fa' ? 'FA' : p.level === 1 ? '1군' : '2군'}</b></div>
     <div><span>연봉</span><b>${formatMoney(p.salary)}</b></div>
     <div><span>출신</span><b>${esc(p.origin)}</b></div>
+    ${p.team ? `<div><span>사기</span><b class="${(p.morale ?? 70) >= 75 ? 'good' : (p.morale ?? 70) < 55 ? 'bad' : ''}">${Math.round(p.morale ?? 70)}</b></div><div><span>컨디션</span><b>${Math.round(p.cond)}</b></div><div><span>잠재 OVR</span><b class="amber">${est.lo}~${est.hi}</b></div>` : ''}
   </div>
   ${p.injury ? `<div class="bar-note mt">🚑 ${esc(p.injury.name)} — 복귀까지 ${p.injury.weeks}주</div>` : ''}
   <div class="sec mt-l">
@@ -91,7 +93,7 @@ export function renderPlayer(pid, opts = {}) {
     <div class="chips">${focusKeys.map((k) => `<button class="chip ${p.focus === k ? '' : 'off'}" style="${p.focus === k ? 'background:var(--amber);color:#1a1200;border-color:transparent' : 'background:transparent;color:var(--muted);border-color:var(--line-2)'}" data-act="setFocus" data-pid="${p.id}" data-v="${k}">${TRAINING_FOCUS[k].icon} ${TRAINING_FOCUS[k].ko}</button>`).join('')}</div>
     <p class="tiny faint mt">집중한 능력은 2배 이상 빠르게, 나머지는 조금 느리게 자라요. 휴식은 성장 대신 컨디션을 회복해요.</p>
   </div>` : ''}
-  <div class="sec">
+  <div class="sec" ${!showCur && !p.history.length ? 'hidden' : ''}>
     <div class="sec-h"><h2>기록</h2></div>
     <div class="scroll-x">${statTable}</div>
     ${p.awards?.length ? `<div class="chips mt">${p.awards.map((a) => `<span class="chip" style="background:rgba(255,182,39,.12);color:var(--amber);border-color:var(--amber-dim)">${a.season} ${esc(a.award)}</span>`).join('')}</div>` : ''}
@@ -105,6 +107,7 @@ export function renderPlayer(pid, opts = {}) {
     <button class="btn danger" data-act="release" data-pid="${p.id}">방출</button>
   </div>
   ${p.level === 2 && !canPromote(state, team) ? '<p class="tiny faint mt">1군 엔트리가 꽉 찼어요. 먼저 한 명을 내려야 해요.</p>' : ''}` : ''}
+  ${p.market ? (() => { const err = canSign(state, userTeam(state), p); return `<button class="btn primary block" data-act="signPlayer" data-pid="${p.id}" ${err ? 'disabled' : ''}>계약금 ${formatMoney(signingFee(p))}로 영입</button>${err ? `<p class="tiny bad mt center">${err}</p>` : `<p class="tiny faint mt center">연봉 ${formatMoney(p.salary)}은 시즌 동안 나눠서 지급돼요.</p>`}`; })() : ''}
   ${onClockMine ? `<button class="btn primary block" data-act="draftThis" data-pid="${p.id}" ${userTeam(state).roster.length >= 65 ? 'disabled' : ''}>이 선수 지명</button>` : ''}`;
 }
 

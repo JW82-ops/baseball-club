@@ -7,6 +7,12 @@ import { developWeek, healWeek, ageUp, retireChance } from './development.js';
 import { autoAssignLevels, ensureLineupValid, firstTeam, teamPlayers, futures, teamOvr } from './roster.js';
 import { createGame, simToEnd, applyGame, boxSummary } from './match.js';
 import { makeSchedule, standings, addNews, pct } from './league.js';
+import { ensureClub, facVal, staffWeekly, tickConstruction, devCtxFor, healBonusFor, recoveryBonus, weeklyMorale, genStaffMarket } from './club.js';
+import { FACILITIES } from '../data/club.js';
+import { computeSynergies } from './synergy.js';
+import { rollWeeklyEvent, offerMissions, trackUserGame, settleMission, emptyWeekStats } from './events.js';
+import { genFAPool, settleFA, genForeignPool } from './market.js';
+import { assignNumber, considerHof } from './hof.js';
 
 export const CAMP_WEEKS = 6;
 export function weeksInSeason(state) { return Math.ceil(state.schedule.length / GAMES_PER_WEEK); }
@@ -46,6 +52,7 @@ export function simDay(state, opts = {}) {
     recordResult(state, sg, g);
     if (isUser) {
       userResult = { sg, g };
+      trackUserGame(state, g, sg);
       state.lastBox = { day: state.day, season: state.season, ...boxSummary(state, g), homeId: sg.home, awayId: sg.away };
       userFinanceGame(state, sg);
       handleGameInjuries(state, g);
@@ -129,10 +136,11 @@ export function fillUserFirstTeam(state) {
 }
 
 function dailyRecovery(state) {
+  const bonus = recoveryBonus(userTeam(state));
   for (const id in state.players) {
     const p = state.players[id];
     if (p.injury) continue;
-    const rec = p.type === 'P' ? 13 : 9;
+    const rec = (p.type === 'P' ? 13 : 9) + (p.team === state.userTeamId ? bonus : 0);
     p.cond = clamp(p.cond + rec, 0, 100);
   }
 }
@@ -141,20 +149,26 @@ function dailyRecovery(state) {
 export function weeklyCycle(state, opts = {}) {
   const ts = tickScale(state);
   const report = { week: Math.ceil(state.day / GAMES_PER_WEEK), risers: [], events: [], season: state.season, camp: !!opts.camp };
+  const ws = state.weekStats || emptyWeekStats();
   for (const tid of state.teamOrder) {
     const team = state.teams[tid];
     const isUser = !!team.isUser;
     const phil = PHILOSOPHIES[team.philosophy || team.style] || PHILOSOPHIES.balanced;
+    const syn = isUser ? computeSynergies(state, team).list : [];
+    if (isUser) weeklyMorale(state, team, opts.camp ? 0 : ws.w, opts.camp ? 0 : ws.l, syn);
+    const healB = healBonusFor(team);
     for (const p of teamPlayers(state, team)) {
       if (!isUser) p.focus = aiFocus(p);
       // 2군 주전급은 퓨처스 경기 출전 경험
       if (p.level === 2 && !p.injury) p.xp = (p.xp || 0) + 2;
+      const dc = devCtxFor(state, team, p, syn);
       const res = developWeek(p, {
         intensity: isUser ? state.settings.intensity : 'normal',
         philosophyBonus: phil.growthBonus,
         tickScale: ts * (opts.camp ? 1.1 : 1),
+        ...dc,
       });
-      const healed = healWeek(p);
+      const healed = healWeek(p, healB);
       if (isUser) {
         if (res.after !== res.before) report.risers.push({ pid: p.id, name: p.name, before: res.before, after: res.after });
         res.events.forEach((e) => { report.events.push(e); addNews(state, e.type === 'injury' ? `🚑 ${e.text}` : `✨ ${e.text}`, e.type === 'injury' ? 'bad' : 'big'); });
@@ -164,7 +178,24 @@ export function weeklyCycle(state, opts = {}) {
     }
     if (!isUser) autoAssignLevels(state, team);
   }
-  if (!opts.camp) userFinanceWeek(state);
+  const user = userTeam(state);
+  for (const k of tickConstruction(user)) {
+    addNews(state, `🏗️ ${FACILITIES[k].ko} 증축 완공! ${FACILITIES[k].levels[user.facilities[k].lv - 1].title} (Lv.${user.facilities[k].lv})`, 'big');
+    report.events.push({ type: 'build', text: `${FACILITIES[k].ko} 완공` });
+  }
+  if (!opts.camp) {
+    userFinanceWeek(state);
+    const m = settleMission(state);
+    if (m) {
+      addNews(state, m.done ? `🎯 스폰서 미션 성공: ${m.title} (+${formatMoney(m.reward)})` : `🎯 스폰서 미션 실패: ${m.title} (${m.final}/${m.target})`, m.done ? 'good' : 'bad');
+      report.mission = m;
+    }
+    state.weekStats = emptyWeekStats();
+    if (state.day < state.schedule.length) {
+      offerMissions(state);
+      rollWeeklyEvent(state);
+    } else state.missionOffers = [];
+  }
   fillUserFirstTeam(state);
   report.risers.sort((a, b) => (b.after - b.before) - (a.after - a.before));
   state.weekLog = report;
@@ -191,7 +222,7 @@ function userFinanceGame(state, sg) {
   const demand = (4000 + team.fans * 0.11) * winF * (0.85 + Math.random() * 0.3);
   const att = Math.round(Math.min(team.capacity, demand));
   const ticket = Math.round(att * team.ticket);
-  const merch = Math.round(att * 0.35);
+  const merch = Math.round(att * 0.35 * facVal(team, 'shop'));
   team.cash += ticket + merch;
   team.ledger.ticket += ticket;
   team.ledger.merch += merch;
@@ -204,10 +235,12 @@ function userFinanceWeek(state) {
   const payroll = teamPlayers(state, team).reduce((s, p) => s + p.salary, 0);
   const weeks = weeksInSeason(state) + CAMP_WEEKS + 4;
   const salary = Math.round(payroll / weeks);
+  const staff = staffWeekly(team);
   const sponsor = Math.round(1800 + team.fans * 0.03);
-  team.cash += sponsor - salary;
+  team.cash += sponsor - salary - staff;
   team.ledger.salary += salary;
-  team.ledger.expense += salary;
+  team.ledger.staffPay = (team.ledger.staffPay || 0) + staff;
+  team.ledger.expense += salary + staff;
   team.ledger.income += sponsor;
   // 팬 변화
   const recent = team.last10.slice(-GAMES_PER_WEEK);
@@ -363,6 +396,7 @@ export function runOffseasonStart(state) {
   const retiredUser = [];
   for (const id of Object.keys(state.players)) {
     const p = state.players[id];
+    if (!p.team || p.amateur) continue; // 시장·아마추어 선수 제외
     p.history.push(packHistory(p, state.season, state.teams[p.team]?.short, p.team));
     if (chance(retireChance(p))) {
       if (p.team === user.id) retiredUser.push(p.name);
@@ -378,6 +412,8 @@ export function runOffseasonStart(state) {
     if (t.isUser) continue;
     trimRoster(state, t, 52);
   }
+  genFAPool(state);
+  if (state.faPool.length) addNews(state, `💼 FA 시장 개장: ${state.faPool.length}명이 시장에 나왔어요`, 'info');
   setupDraft(state);
   state.phase = 'draft';
 }
@@ -386,7 +422,9 @@ function retirePlayer(state, p) {
   const team = state.teams[p.team];
   if (team) team.roster = team.roster.filter((x) => x !== p.id);
   const car = careerTotals(p);
-  state.retired.push({ id: p.id, name: p.name, type: p.type, pos: p.pos, lastTeam: team?.name, age: p.age, peak: Math.max(...p.dev, calcOvr(p)), awards: p.awards, car, wasUser: p.team === state.userTeamId });
+  const entry = { id: p.id, name: p.name, type: p.type, pos: p.pos, num: p.num, lastTeam: team?.name, age: p.age, peak: Math.max(...p.dev, calcOvr(p)), awards: p.awards, car, wasUser: p.team === state.userTeamId, userSeasons: p.history.filter((h) => h.t === state.userTeamId).length, origin: p.origin, draft: p.draft };
+  state.retired.push(entry);
+  considerHof(state, entry);
   if (state.retired.length > 400) state.retired.shift();
   delete state.players[p.id];
 }
@@ -462,10 +500,11 @@ export function draftPick(state, pid) {
     p.team = tid;
     p.level = 2;
     p.amateur = false;
-    p.draft = { year: d.year, round: d.round, pick: d.pickIdx + 1 };
+    p.draft = { year: d.year, round: d.round, pick: d.pickIdx + 1, team: tid };
     p.salary = 3000;
     resetSeasonStats(p);
     team.roster.push(pid);
+    assignNumber(state, team, p);
     d.picks.push({ round: d.round, pick: d.pickIdx + 1, team: tid, pid, name: p.name });
     if (team.isUser) addNews(state, `📝 ${d.round}라운드 ${d.pickIdx + 1}순위로 ${p.name}(${p.age}세, ${p.origin}) 지명!`, 'good');
   } else {
@@ -513,6 +552,7 @@ export function finishDraft(state) {
 
 // ───────── 스프링캠프 → 새 시즌 ─────────
 export function runCampAndStartSeason(state) {
+  settleFA(state, assignNumber);
   state.season += 1;
   for (let w = 0; w < CAMP_WEEKS; w++) {
     const rep = weeklyCycle(state, { camp: true });
@@ -537,6 +577,7 @@ export function runCampAndStartSeason(state) {
         const p = createPlayer({ type, age: randInt(24, 31), ovr: t.strength - 14 + Math.round(gauss(0, 4)) });
         p.team = t.id; resetSeasonStats(p);
         state.players[p.id] = p; t.roster.push(p.id);
+        assignNumber(state, t, p);
       }
       // AI 전력 드리프트: 약팀은 투자, 강팀은 유지
       autoAssignLevels(state, t);
@@ -551,6 +592,12 @@ export function runCampAndStartSeason(state) {
   state.post = null;
   state.phase = 'regular';
   state.lastBox = null;
+  state.weekStats = emptyWeekStats();
+  state.mission = null;
+  state.pendingEvent = null;
+  genForeignPool(state);
+  genStaffMarket(state);
+  offerMissions(state);
   addNews(state, `⚾ ${state.season} 시즌 개막! 스프링캠프를 마치고 새 시즌을 시작합니다.`, 'big');
 }
 
