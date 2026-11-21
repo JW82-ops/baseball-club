@@ -16,6 +16,8 @@ import { milLabel } from '../../engine/military.js';
 import { CAMPS, learnablePitches, convertTargets } from '../../engine/training.js';
 import { PITCHES } from '../../data/constants.js';
 import { playerImg, bodyHtml } from '../portraits.js';
+import { advBat, advPit } from '../../engine/sabr.js';
+import { batterZones } from '../../engine/pitch.js';
 
 function batRow(label, s) {
   const l = batLine(s);
@@ -68,6 +70,20 @@ export function renderPlayer(pid, opts = {}) {
        ${hist.map((h) => pitRow(`${h.s} <span class="faint">${esc(h.ts || '')}</span>`, unpackPit(h))).join('')}
        ${p.history.length ? pitRow('<b>통산</b>', addCur(career.pit, showCur ? p.cur.pit : null)) : ''}</table>`;
 
+  // 세부 지표 (탭하면 야구 교실 설명)
+  const chip = (k, label, val) => `<button class="advchip" data-act="learn" data-k="${k}"><span>${label}</span><b>${val}</b></button>`;
+  let adv = '';
+  if (showCur && p.type === 'B' && p.cur.bat.pa >= 10) {
+    const a = advBat(state, p, p.cur.bat), l = batLine(p.cur.bat);
+    adv = [chip('WAR', 'WAR', a.war.toFixed(1)), chip('wRC', 'wRC+', a.wrc), chip('OPS', 'OPS', l.ops.toFixed(3)), chip('wOBA', 'wOBA', a.woba.toFixed(3).replace(/^0/, '')), chip('ISO', 'ISO', a.iso.toFixed(3).replace(/^0/, '')), chip('BABIP', 'BABIP', a.babip.toFixed(3).replace(/^0/, '')), chip('KP', 'K%', (a.k * 100).toFixed(1)), chip('KP', 'BB%', (a.bb * 100).toFixed(1))].join('');
+  } else if (showCur && p.type === 'P' && p.cur.pit.outs >= 9) {
+    const a = advPit(state, p.cur.pit);
+    adv = [chip('WAR', 'WAR', a.war.toFixed(1)), chip('FIP', 'FIP', a.fip.toFixed(2)), chip('WHIP', 'WHIP', a.whip.toFixed(2)), chip('K9', 'K/9', a.k9.toFixed(1)), chip('K9', 'BB/9', a.bb9.toFixed(1)), chip('K9', 'HR/9', a.hr9.toFixed(1)), chip('PC', '이닝당 투구', a.pcPerIp.toFixed(1))].join('');
+  }
+  const zoneMap = p.type === 'B' ? (() => {
+    const zs = batterZones(p);
+    return `<button class="zonemini" data-act="learn" data-k="hotzone" aria-label="핫존 설명">${zs.map((v) => `<i style="background:${v >= 0 ? `rgba(255,${Math.round(120 - v * 60)},90,${0.15 + v * 0.6})` : `rgba(90,150,255,${0.15 - v * 0.55})`}"></i>`).join('')}</button>`;
+  })() : '';
   const hand = p.type === 'P' ? `${p.throws === 'L' ? '좌투' : '우투'}` : `${p.throws === 'L' ? '좌투' : '우투'}${p.bats === 'L' ? '좌타' : p.bats === 'S' ? '양타' : '우타'}`;
   const onClockMine = draftMode && draftOnClock(state) === state.userTeamId;
 
@@ -110,7 +126,7 @@ export function renderPlayer(pid, opts = {}) {
   </div>` : ''}
   <div class="sec" ${!showCur && !p.history.length ? 'hidden' : ''}>
     <div class="sec-h"><h2>기록</h2></div>
-    <div class="scroll-x">${statTable}</div>
+    <div class="scroll-x">${statTable}${adv ? `<div class="advrow mt">${adv}</div><p class="tiny faint">지표를 누르면 뜻을 알려드려요.</p>` : ''}${zoneMap ? `<div class="row gap mt" style="align-items:center">${zoneMap}<p class="tiny muted grow">타격 핫존 (투수 시점). 빨강은 강한 코스, 파랑은 약한 코스예요. 눌러서 설명 보기</p></div>` : ''}</div>
     ${p.awards?.length ? `<div class="chips mt">${p.awards.map((a) => `<span class="chip" style="background:rgba(255,182,39,.12);color:var(--amber);border-color:var(--amber-dim)">${a.season} ${esc(a.award)}</span>`).join('')}</div>` : ''}
     ${p.draft ? `<p class="tiny faint mt">${p.draft.year} 드래프트 ${p.draft.round}라운드 ${p.draft.pick}순위</p>` : ''}
   </div>

@@ -13,8 +13,10 @@ export const artUrl = (n) => `img/art/${n}.webp`;
 const FADE = 'linear-gradient(180deg,rgba(6,18,12,.1) 0%,rgba(10,28,19,.45) 42%,rgba(16,38,28,.97) 100%)';
 export function artBg(n, grad = FADE) { return `background-image:${grad},url(${artUrl(n)})`; }
 export function artHero(n, inner, cls = '') { return `<div class="art-hero ${cls}" style="${artBg(n)}">${inner}</div>`; }
+const AWAY_ST = new Set(['lg', 'kia', 'samsung', 'doosan', 'ssg', 'hanwha', 'kt', 'lotte', 'nc', 'hawks', 'tigers', 'giants', 'buffaloes', 'swallows', 'baystars', 'carp', 'fighters', 'marines', 'dodgers', 'yankees', 'braves', 'phillies', 'astros', 'padres', 'orioles', 'rangers', 'cubs']);
 export function stadiumArt(team, isUser) {
   const lv = team?.buildings?.stadium?.lv;
+  if (!isUser && team?.id && AWAY_ST.has(team.id)) return `st_${team.id}`;
   if (isUser && lv) return `stadium${Math.max(1, Math.min(5, lv))}`;
   return (team?.strength || 70) >= 72 ? 'stadium4' : 'stadium3';
 }

@@ -1,3 +1,4 @@
+import { simPitches } from './pitch.js';
 import { rng, chance, pick, randInt } from '../core/rng.js';
 import { clamp } from '../core/util.js';
 import { hasTrait } from '../data/traits.js';
@@ -541,6 +542,7 @@ export function stepPA(state, g) {
   let ev;
   let pitches;
   let outcome = 'play';
+  let seqOut = null;
   if (userOff && orders.bunt) {
     pitches = randInt(1, 3);
     ev = buntPA(state, g, batter, pitcher, bs, ps);
@@ -552,41 +554,29 @@ export function stepPA(state, g) {
     ev = addLog(g, 'bb', `${batter.name} 고의사구`, { batter: batter.id, pitcher: pitcher.id, before, runs: sc.length });
   } else {
   const stuffZ = z(P.stuff);
-  let pK = 0.195 * Math.exp(0.55 * stuffZ - 0.5 * z(B.contact) - 0.15 * z(B.eye));
-  if (hasTrait(pitcher, 'strikeout')) pK *= 1.15;
-  if (hasTrait(batter, 'freeSwinger')) pK *= 1.22;
-  if (hasTrait(batter, 'patient')) pK *= 0.9;
-  let pBB = 0.086 * Math.exp(0.5 * z(B.eye) - 0.6 * z(P.control));
-  if (hasTrait(pitcher, 'artist')) pBB *= 0.8;
-  if (hasTrait(pitcher, 'wild')) pBB *= 1.3;
-  if (hasTrait(batter, 'patient')) pBB *= 1.15;
-  if (hasTrait(batter, 'freeSwinger')) pBB *= 0.85;
-  const pHBP = 0.011;
-  pK = clamp(pK, 0.04, 0.45);
-  pBB = clamp(pBB, 0.02, 0.22);
-
-  const r = rng();
+  const top = velocityKmh(pitcher.r.velo) - Math.round(Math.max(0, d.pc - 70) / 15);
+  const PR = simPitches({ B, P, batter, pitcher, top, swingAdj: userOff && orders.power ? 0.05 : 0 });
+  seqOut = PR.seq;
+  pitches = PR.seq.length;
+  outcome = PR.outcome;
   const ctx = { batter: batter.id, pitcher: pitcher.id, before };
 
-  if (r < pK) {
-    pitches = randInt(3, 7); outcome = 'so';
+  if (outcome === 'so') {
     bs.ab += 1; bs.so += 1; ps.so += 1;
     recordOut(state, g);
-    ev = addLog(g, 'so', `${batter.name} ${pick(['헛스윙 삼진', '루킹 삼진', '삼진 아웃'])}`, ctx);
-  } else if (r < pK + pBB) {
-    pitches = randInt(4, 8); outcome = 'bb';
+    ev = addLog(g, 'so', `${batter.name} ${PR.looking ? '루킹 삼진' : pick(['헛스윙 삼진', '헛스윙 삼진', '삼진 아웃'])}`, { ...ctx, look: !!PR.looking });
+  } else if (outcome === 'bb') {
     bs.bb += 1; ps.bb += 1;
     const sc = forceWalk(g, batter);
     sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
     ev = addLog(g, 'bb', `${batter.name} 볼넷 출루${sc.length ? ' — 밀어내기 득점' : ''}`, { ...ctx, runs: sc.length });
-  } else if (r < pK + pBB + pHBP) {
-    pitches = randInt(1, 5); outcome = 'hbp';
+  } else if (outcome === 'hbp') {
     bs.hbp += 1;
     const sc = forceWalk(g, batter);
     sc.forEach((rn) => scoreRunner(state, g, rn, batter.id));
     ev = addLog(g, 'bb', `${batter.name} 몸에 맞는 공`, { ...ctx, runs: sc.length });
   } else {
-    pitches = randInt(1, 5);
+    B.power += PR.powAdj; B.contact += PR.conAdj;
     bs.ab += 1;
     let pHR = 0.027 * Math.exp(0.75 * z(B.power) - 0.42 * stuffZ);
     if (hasTrait(batter, 'slugger')) pHR *= 1.2;
@@ -664,7 +654,8 @@ export function stepPA(state, g) {
   d.pc += pitches;
   ps.pc += pitches;
   if (ev) {
-    ev.seq = pitchSeq(pitcher, d, pitches, outcome);
+    ev.seq = seqOut || pitchSeq(pitcher, d, pitches, outcome);
+    ev.count = ev.seq.length ? { b: ev.seq.at(-1).b, s: ev.seq.at(-1).s } : null;
     ev.after = basesSnap(g);
     ev.outsAfter = g.outs;
     ev.half = g.top ? 'top' : 'bot';

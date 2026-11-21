@@ -14,6 +14,7 @@ import { fmtAvg, fmtEra, clamp } from '../../core/util.js';
 import { isClutch } from '../../engine/clutch.js';
 import { formIcon } from '../../engine/form.js';
 import { pick } from '../../core/rng.js';
+import { batterZones } from '../../engine/pitch.js';
 
 // 캐스터 멘트
 function casterLine(ev) {
@@ -235,25 +236,46 @@ async function runAlong(obj, from, to, dur) {
   for (const p of pathPoints(from, to)) await tween(obj, { x: p.x, y: p.y }, dur, { linear: true });
 }
 
+// 스트라이크존: 타자 핫/콜드 존 + 이번 타석 투구 위치
+const CALL_COLOR = { B: '#7fb2ff', B4: '#7fb2ff', S: '#ff6f61', K: '#ff6f61', F: '#ffd166', X: '#63d48f', HBP: '#c084fc' };
+function zoneHtml(batter, pts) {
+  const zs = batter ? batterZones(batter) : null;
+  const W = 92, H = 108, cx = W / 2, cy = 56, zw = 21, zh = 23; // 존 한 칸
+  const X = (x) => cx + x * zw * 1.5, Y = (y) => cy + y * zh * 1.5;
+  let cells = '';
+  for (let i = 0; i < 9; i++) {
+    const v = zs ? zs[i] : 0;
+    const col = v >= 0 ? `rgba(255,${Math.round(120 - v * 60)},90,${0.12 + v * 0.45})` : `rgba(90,150,255,${0.12 - v * 0.4})`;
+    cells += `<rect x="${cx - zw * 1.5 + (i % 3) * zw}" y="${cy - zh * 1.5 + Math.floor(i / 3) * zh}" width="${zw}" height="${zh}" fill="${col}" stroke="rgba(242,239,230,.35)" stroke-width=".6"/>`;
+  }
+  const dots = pts.map((p, i) => `<g><circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="6" fill="${CALL_COLOR[p.call] || '#fff'}" stroke="#06120c" stroke-width="1"/><text x="${X(p.x).toFixed(1)}" y="${(Y(p.y) + 3).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="800" fill="#06120c">${i + 1}</text></g>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="스트라이크존"><rect x="${cx - zw * 1.5}" y="${cy - zh * 1.5}" width="${zw * 3}" height="${zh * 3}" fill="none" stroke="#f2efe6" stroke-width="1.4" rx="1"/>${cells}${dots}<path d="M${cx - 12} ${H - 6}h24l-4 4h-16z" fill="#f2efe6" opacity=".7"/></svg>`;
+}
+const CALL_LABEL = (p) => p.call === 'S' ? (p.sw ? '헛스윙' : '루킹 스트라이크') : p.call === 'K' ? (p.look ? '루킹 삼진' : '헛스윙 삼진') : { B: '볼', F: '파울', B4: '볼넷', HBP: '몸에 맞는 공', X: '타격!' }[p.call] || '';
+
 async function animatePA(ev, outsBefore) {
   const sc = anim.scene;
   const seq = ev.seq || [];
   const fast = speed() >= 4;
+  const batter = state.players[ev.batter];
+  const shown = [];
+  setOverlay('#lv-zone', zoneHtml(batter, shown));
   for (let i = 0; i < seq.length; i++) {
     const p = seq[i];
     const last = i === seq.length - 1;
+    if (p.x != null) shown.push(p);
     if (fast && !last) continue;
     setOverlay('#lv-pitch', `<b>${PITCHES[p.t] || p.t}</b> ${p.kmh}km/h`);
     setOverlay('#lv-call', '');
     sc.ball.x = MOUND.x; sc.ball.y = MOUND.y - 4; sc.ball.h = 6; sc.ball.v = 1;
     sfx.pitch();
     await tween(sc.ball, { x: HOME.x, y: HOME.y - 6, h: 2 }, 380);
+    if (p.x != null) setOverlay('#lv-zone', zoneHtml(batter, shown));
     if (last && p.call === 'X') break;
     if (p.call === 'B' || p.call === 'B4') sfx.ball();
     else if (p.call === 'F') sfx.foul();
     else sfx.mitt();
-    const label = { S: '스트라이크', B: '볼', F: '파울', K: '삼진', B4: '볼넷', HBP: '몸에 맞는 공' }[p.call];
-    setOverlay('#lv-call', label || '');
+    setOverlay('#lv-call', CALL_LABEL(p));
     setBSO(Math.min(3, p.b), Math.min(2, p.s), outsBefore);
     sc.ball.v = 0;
     await wait(last ? 200 : 320);
@@ -480,6 +502,7 @@ export function liveShell() {
       <div class="lv-pitch" id="lv-pitch"></div>
       <div class="lv-call" id="lv-call"></div>
       <div class="lv-bso" id="lv-bso"></div>
+      <div class="lv-zone" id="lv-zone"></div>
       <div class="lv-banner" id="lv-banner"></div>
       <div class="lv-end" id="lv-end" hidden></div>
     </div>

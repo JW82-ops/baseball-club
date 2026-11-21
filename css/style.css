@@ -654,3 +654,52 @@ select, input[type=text] {
 .clubhead { align-items: center; }
 .ownerav { width: 58px; height: 74px; flex: none; display: flex; align-items: flex-end; justify-content: center; border-radius: 12px; overflow: hidden; background: radial-gradient(ellipse at 50% 35%, rgba(255, 197, 61, .35), rgba(255, 197, 61, .05)); }
 .ownerav img { height: 100%; object-fit: contain; }
+.lv-zone { position: absolute; right: 8px; bottom: 8px; background: rgba(6, 18, 12, .78); border: 1px solid #23402f; border-radius: 10px; padding: 3px; line-height: 0; }
+.lv-zone:empty { display: none; }
+
+/* ───────── 사계절 ───────── */
+#scene i { transition: opacity .55s ease, filter 1.2s ease; }
+#scene.season-spring i { filter: saturate(1.08) brightness(1.03) hue-rotate(-5deg); }
+#scene.season-summer i { filter: saturate(1.22) brightness(1.07) contrast(1.04); }
+#scene.season-autumn i { filter: sepia(.28) saturate(1.2) hue-rotate(-14deg); }
+#scene.season-winter i { filter: saturate(.62) brightness(1.1) hue-rotate(10deg); }
+#scene.season-winter::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(200, 225, 255, .18), rgba(160, 190, 230, .08)); }
+#scene::after { z-index: 2; }
+#seasonfx { position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 520px; height: 100vh; height: 100dvh; z-index: 0; pointer-events: none; overflow: hidden; }
+#seasonfx i { position: absolute; top: -6vh; display: block; animation-name: fx-fall; animation-timing-function: linear; animation-iteration-count: infinite; opacity: .85; }
+.fx-spring i { width: calc(11px * var(--s)); height: calc(8px * var(--s)); border-radius: 80% 0 80% 0; background: linear-gradient(135deg, #ffd6e4, #ff9ec0); box-shadow: 0 0 4px rgba(255, 170, 200, .5); }
+.fx-autumn i { width: calc(13px * var(--s)); height: calc(10px * var(--s)); border-radius: 0 90% 0 90%; background: linear-gradient(135deg, #ffb347, #d9541e); }
+.fx-autumn i:nth-child(3n) { background: linear-gradient(135deg, #ffe066, #e0a100); }
+.fx-winter i { width: calc(7px * var(--s)); height: calc(7px * var(--s)); border-radius: 50%; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, .8); opacity: .9; }
+.fx-summer i { top: auto; bottom: -4vh; width: calc(6px * var(--s)); height: calc(6px * var(--s)); border-radius: 50%; background: radial-gradient(circle, #fff7c2, rgba(255, 214, 90, 0) 70%); animation-name: fx-rise; opacity: .8; }
+@keyframes fx-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  25% { transform: translate3d(18px, 28vh, 0) rotate(90deg); }
+  50% { transform: translate3d(-12px, 56vh, 0) rotate(200deg); }
+  75% { transform: translate3d(16px, 84vh, 0) rotate(290deg); }
+  100% { transform: translate3d(-6px, 112vh, 0) rotate(380deg); }
+}
+@keyframes fx-rise {
+  0% { transform: translate3d(0, 0, 0) scale(.6); opacity: 0; }
+  20% { opacity: .9; }
+  100% { transform: translate3d(14px, -90vh, 0) scale(1.3); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { #seasonfx { display: none; } }
+
+/* ───────── 야구 교실 · 세부 지표 ───────── */
+.advrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.advchip { display: flex; flex-direction: column; align-items: center; padding: 7px 2px; border-radius: 11px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .1); box-shadow: 0 2px 0 rgba(0, 0, 0, .3); }
+.advchip span { font-size: 10.5px; color: var(--muted); text-decoration: underline dotted rgba(255, 255, 255, .35); }
+.advchip b { font-size: 15px; color: var(--gold); }
+.zonemini { flex: none; display: grid; grid-template-columns: repeat(3, 18px); grid-template-rows: repeat(3, 20px); gap: 2px; padding: 3px; border-radius: 6px; border: 1.5px solid var(--chalk); background: rgba(0, 0, 0, .3); }
+.zonemini i { display: block; border-radius: 2px; }
+.learngrid { display: flex; flex-wrap: wrap; gap: 6px; }
+.learnitem { padding: 7px 12px; border-radius: 99px; font-size: 13px; font-weight: 600; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 2px 0 rgba(0, 0, 0, .3); }
+.learnitem.sm { font-size: 12px; padding: 5px 10px; }
+.learnitem:active { transform: translateY(2px); box-shadow: none; }
+.learntip { background: rgba(255, 197, 61, .1); border: 1px solid rgba(255, 197, 61, .3); border-radius: 12px; padding: 10px 12px; font-size: 13.5px; }
+.learnpop { position: relative; margin: 0 0 14px; padding: 14px 14px 12px; border-radius: 16px; background: linear-gradient(180deg, #24513c, #183a2a); border: 1px solid rgba(255, 197, 61, .45); box-shadow: 0 8px 24px rgba(0, 0, 0, .35); }
+.learnpop-x { position: absolute; right: 8px; top: 6px; width: 30px; height: 30px; border-radius: 50%; font-size: 18px; color: var(--muted); }
+.choice .why { color: #ffe08a !important; font-size: 12px !important; margin-top: 4px !important; }
+.linkish { color: var(--gold); text-decoration: underline; font-size: inherit; }
+.learnhead b { font-family: var(--display); font-weight: 400; font-size: 18px; }

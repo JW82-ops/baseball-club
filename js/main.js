@@ -27,7 +27,7 @@ import { signSponsor, cancelSponsor } from './engine/sponsor.js';
 import { annualOffer, multiOffer, releaseNego, faMarketOffer, fairSalary } from './engine/contracts.js';
 import { evaluateTrade, executeTrade } from './engine/trade.js';
 import { addMoodEvent } from './engine/mood.js';
-import { proceedToDraft } from './engine/season.js';
+import { proceedToDraft, userGameToday, currentPostGame } from './engine/season.js';
 import { settleFA } from './engine/market.js';
 import { applyEnlist } from './engine/military.js';
 import { startLearnPitch, startConvert, sendCamp } from './engine/training.js';
@@ -41,9 +41,12 @@ import { BUILDINGS, SUBS, STAFF_ROLES } from './data/club.js';
 import { autoLineup, autoPitching, autoAssignLevels, ensureLineupValid, canPromote, canDemote, teamOvr, battingOrder } from './engine/roster.js';
 import { calcOvr } from './engine/player.js';
 import { icon } from './ui/portraits.js';
+import { gameDate } from './engine/calendar.js';
+import { stadiumArt } from './ui/components.js';
+import { showLearn, shortWhy } from './ui/screens/learn.js';
 
 // ───────── 렌더링 ─────────
-const PHASE_KO = { regular: '정규시즌', post: '포스트시즌', offseason: '오프시즌', draft: '신인 드래프트', camp: '스프링캠프' };
+const PHASE_KO = { regular: '정규시즌', post: '포스트시즌', offseason: '오프시즌', contracts: '계약 협상', draft: '신인 드래프트', camp: '스프링캠프' };
 
 function renderHud() {
   const hud = $('#hud');
@@ -56,7 +59,7 @@ function renderHud() {
   hud.innerHTML = `
     <div class="hud-top">
       ${emblem(t, 38)}
-      <div class="hud-name"><h1>${esc(t.name)}</h1><small>${state.season} ${PHASE_KO[state.phase] || ''}</small></div>
+      <div class="hud-name"><h1>${esc(t.name)}</h1><small>${state.season} ${PHASE_KO[state.phase] || ''} · ${gameDate(state).label} ${gameDate(state).icon}</small></div>
       <div class="led"><div><b>${t.w}</b><span>승</span></div><div><b>${t.l}</b><span>패</span></div><div><b>${rank}</b><span>위</span></div></div>
     </div>
     <div class="hud-meta"><span class="hm">${icon('money', 18)}<b>${formatMoney(t.cash)}</b></span><span class="hm">${icon('fans', 18)}<b>${formatFans(t.fans)}</b></span><span class="hm">⚾<b>${teamOvr(state, t)}</b></span><span class="grow"></span><button class="iconbtn hud-badge mailbtn" data-act="tab" data-tab="mail" aria-label="메일함">${icon('mail', 26)}${unreadCount(state) ? `<em>${unreadCount(state)}</em>` : ''}</button><button class="iconbtn" style="width:28px;height:28px;font-size:13px" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>
@@ -69,6 +72,7 @@ function render() {
     $('#hud').hidden = true;
     $('#tabs').hidden = true;
     setScene(null);
+    setSeason(null);
     main.innerHTML = renderTitle();
     return;
   }
@@ -77,6 +81,7 @@ function render() {
   renderHud();
   if (ui.live) {
     setScene(null);
+    setSeason(null);
     if (!$('#lv-canvas')) { main.innerHTML = liveShell(); mountLive(); }
     else updateLiveDom();
     return;
@@ -85,6 +90,7 @@ function render() {
   const screens = { home: renderHome, roster: renderRoster, develop: renderDevelop, league: renderLeague, club: renderClub, mail: renderMail };
   main.innerHTML = (screens[ui.tab] || renderHome)();
   setScene(sceneFor(ui.tab));
+  setSeason(gameDate(state).season);
   if (ui.tab === 'home' && lastPhase !== state.phase) window.scrollTo(0, 0);
   lastPhase = state.phase;
 }
@@ -95,16 +101,39 @@ function sceneFor(tab) {
   const t = userTeam(state);
   const ph = state.phase;
   if (tab === 'home') {
+    if (ph === 'regular' || ph === 'post') {
+      const sg = ph === 'regular' ? userGameToday(state) : currentPostGame(state);
+      if (sg && sg.home !== t.id) return stadiumArt(state.teams[sg.home], false);
+    }
     if (ph === 'draft') return 'draft';
     if (ph === 'camp') return 'camp';
     if (ph === 'contracts') return 'contract';
     if (ph === 'offseason') return 'awards';
+    if (gameDate(state).season === 'winter') return 'winter';
     if (ph === 'post') return 'crowd';
     return `stadium${Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1))}`;
   }
   if (tab === 'club') return { facility: 'office', staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'facility'] || 'office';
   if (tab === 'roster' && ui.rosterView === 'futures') return 'futures';
   return { roster: 'clubhouse', develop: 'gym', league: 'crowd', mail: 'contract' }[tab] || 'stadium1';
+}
+// 계절 효과: 배경 색감 + 날리는 입자(벚꽃잎·햇살·낙엽·눈)
+let seasonCur = null;
+function setSeason(season) {
+  const fx = $('#seasonfx'), box = $('#scene');
+  if (!fx || season === seasonCur) return;
+  seasonCur = season;
+  if (box) box.className = box.className.replace(/\bseason-\w+/g, '').trim() + (season ? ` season-${season}` : '');
+  fx.className = season ? `fx-${season}` : '';
+  if (!season || matchMedia('(prefers-reduced-motion: reduce)').matches) { fx.innerHTML = ''; return; }
+  const n = season === 'summer' ? 10 : 16;
+  let h = '';
+  for (let i = 0; i < n; i++) {
+    const left = Math.round(Math.random() * 100), dur = (season === 'winter' ? 9 : season === 'summer' ? 7 : 11) + Math.random() * 6;
+    const delay = -Math.random() * dur, size = 0.6 + Math.random() * 0.8;
+    h += `<i style="left:${left}%;animation-duration:${dur.toFixed(1)}s;animation-delay:${delay.toFixed(1)}s;--s:${size.toFixed(2)}"></i>`;
+  }
+  fx.innerHTML = h;
 }
 let sceneCur = null, sceneFlip = 0;
 function setScene(name) {
@@ -198,7 +227,7 @@ export function showClutch(g, cb) {
     <p class="small">${esc(clutchSituation(state, g))}</p>
     ${recent ? `<ul class="news mt small">${recent}</ul>` : ''}
     <p class="small muted mt">감독님, 어떻게 할까요?</p>
-    ${opts.map((o, i) => `<button class="choice" data-act="clutchPick" data-i="${i}"><b>${esc(o.label)}</b>${o.sub ? `<span>${esc(o.sub)}</span>` : ''}</button>`).join('')}
+    ${opts.map((o, i) => `<button class="choice" data-act="clutchPick" data-i="${i}"><b>${esc(o.label)}</b>${o.sub ? `<span>${esc(o.sub)}</span>` : ''}${o.learn ? `<span class="why">💡 ${esc(shortWhy(o.learn))}</span>` : ''}</button>`).join('')}
     <button class="btn sm ghost block mt" data-act="clutchOff">이 경기는 그만 묻기</button>
   </div>`, { sheet: false, onClose: () => { const c = ui.clutchCb; ui.clutchCb = null; if (c) setTimeout(c, 60); } });
 }
@@ -380,6 +409,8 @@ registerActions({
     else t.uniform[d.k] = d.v;
     commit();
   },
+  learn: (d) => showLearn(d.k),
+  learnClose: () => document.querySelector('.learnpop')?.remove(),
   natSeen: () => { if (state.natLast) state.natLast.seen = true; commit(); },
   toggleClutch: (d) => { state.settings.clutch = d.checked; commit(d.checked ? '승부처 알림 켜짐' : '승부처 알림 꺼짐'); },
   setDifficulty: (d) => { state.settings.difficulty = d.v; commit('난이도 변경'); },

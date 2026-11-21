@@ -8,6 +8,8 @@ import { teamOvr } from '../../engine/roster.js';
 import { fmtAvg, fmtEra } from '../../core/util.js';
 import { SEASON_KEYS, careerLeaders } from '../../engine/records.js';
 import { LEAGUES } from '../../data/club.js';
+import { batWar, pitWar, wrcPlus, fip } from '../../engine/sabr.js';
+import { GLOSSARY, LEARN_CATS, learnKeysOf } from '../../data/glossary.js';
 
 function standingsView() {
   const user = userTeam(state);
@@ -39,15 +41,24 @@ function leadersView() {
       board('홈런', ps, (p) => p.cur.bat.hr, (v) => v),
       board('타점', ps, (p) => p.cur.bat.rbi, (v) => v),
       board('OPS', qualB, (p) => batLine(p.cur.bat).ops, (v) => v.toFixed(3)),
+      board('WAR (타자)', ps.filter((p) => p.type === 'B'), (p) => batWar(state, p, p.cur.bat), (v) => v.toFixed(1)),
+      board('wRC+', qualB, (p) => wrcPlus(state, p.cur.bat), (v) => v),
       board('도루', ps, (p) => p.cur.bat.sb, (v) => v),
     ].join('') : [
       board('평균자책점', qualP, (p) => pitLine(p.cur.pit).era, fmtEra, true),
+      board('WAR (투수)', ps.filter((p) => p.type === 'P'), (p) => pitWar(state, p.cur.pit), (v) => v.toFixed(1)),
+      board('FIP', qualP, (p) => fip(state, p.cur.pit), (v) => v.toFixed(2), true),
       board('승리', ps, (p) => p.cur.pit.w, (v) => v),
       board('탈삼진', ps, (p) => p.cur.pit.so, (v) => v),
       board('세이브', ps, (p) => p.cur.pit.sv, (v) => v),
       board('홀드', ps, (p) => p.cur.pit.hld, (v) => v),
     ].join('')}</div>
-    <p class="tiny faint mt">규정: 타자 경기당 3.1타석, 투수 경기당 1이닝</p>`;
+    <p class="tiny faint mt">규정: 타자 경기당 3.1타석, 투수 경기당 1이닝 · <button class="linkish" data-act="learn" data-k="WAR">WAR란?</button> <button class="linkish" data-act="learn" data-k="FIP">FIP란?</button> <button class="linkish" data-act="learn" data-k="wRC">wRC+란?</button></p>`;
+}
+
+function learnView() {
+  return `<div class="learnhead panel"><b>⚾ 야구 교실</b><p class="small muted mt">게임 속 용어와 규칙, 지표, 작전을 짧게 정리했어요. 경기 중 승부처 작전이나 선수 카드의 지표를 눌러도 바로 볼 수 있어요.</p></div>
+    ${LEARN_CATS.map(([c, ic, ko]) => `<div class="sec mt"><div class="sec-h"><h2>${ic} ${ko}</h2></div><div class="learngrid">${learnKeysOf(c).map((k) => `<button class="learnitem" data-act="learn" data-k="${k}">${GLOSSARY[k].t}</button>`).join('')}</div></div>`).join('')}`;
 }
 
 function scheduleView() {
@@ -106,7 +117,7 @@ function paperView() {
 export function renderLeague() {
   return `
   <section class="sec">
-    <div class="seg scrollseg">${[['standings', '순위'], ['leaders', '개인기록'], ['schedule', '일정'], ['paper', '신문'], ['records', '기록실'], ['history', '역대']].map(([k, l]) => `<button class="${ui.leagueView === k ? 'on' : ''}" data-act="leagueView" data-v="${k}">${l}</button>`).join('')}</div>
-    <div class="mt">${{ standings: standingsView, leaders: leadersView, schedule: scheduleView, history: historyView, paper: paperView, records: recordsView }[ui.leagueView]()}</div>
+    <div class="seg scrollseg">${[['standings', '순위'], ['leaders', '개인기록'], ['learn', '야구 교실'], ['schedule', '일정'], ['paper', '신문'], ['records', '기록실'], ['history', '역대']].map(([k, l]) => `<button class="${ui.leagueView === k ? 'on' : ''}" data-act="leagueView" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="mt">${{ standings: standingsView, leaders: leadersView, learn: learnView, schedule: scheduleView, history: historyView, paper: paperView, records: recordsView }[ui.leagueView]()}</div>
   </section>`;
 }
