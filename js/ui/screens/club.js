@@ -17,8 +17,9 @@ import { ACHV } from '../../engine/achievements.js';
 import { CLUB_COLORS } from '../../data/teams.js';
 import { avatar as av } from '../components.js';
 import { slot as curSlot } from '../../core/store.js';
-import { staffImg, bodyHtml } from '../portraits.js';
+import { staffImg, bodyHtml, icon, ownerImg } from '../portraits.js';
 
+const TAB_ICO = { facility: 'build', staff: 'staff', sponsor: 'sponsor', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
 const TABS = [['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['achv', '업적'], ['finance', '재정·설정']];
 
 // ───────── 시설 ─────────
@@ -294,10 +295,10 @@ export function renderClub() {
   const body = { facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
   return `
   <section class="sec">
-    <div class="panel row gap card-accent">${emblem(t, 50)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>
+    <div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>
   </section>
   <section class="sec">
-    <div class="seg scrollseg">${TABS.map(([k, l]) => `<button class="${view === k ? 'on' : ''}" data-act="clubView" data-v="${k}">${l}${k === 'hof' && (state.hofCandidates || []).length ? ' •' : ''}</button>`).join('')}</div>
+    <div class="seg scrollseg icoseg">${TABS.map(([k, l]) => `<button class="${view === k ? 'on' : ''}" data-act="clubView" data-v="${k}">${icon(TAB_ICO[k], 22)}${l}${k === 'hof' && (state.hofCandidates || []).length ? ' •' : ''}</button>`).join('')}</div>
     <div class="mt">${body}</div>
   </section>`;
 }

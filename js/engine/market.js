@@ -4,6 +4,8 @@ import { teamPlayers, ensureLineupValid, autoAssignLevels } from './roster.js';
 import { ROSTER } from '../data/constants.js';
 import { LEAGUES } from '../data/club.js';
 import { relNewcomer } from './mood.js';
+import { rng } from '../core/rng.js';
+import { NATS, pickImportNat } from '../data/nations.js';
 
 const FOREIGN_FIRST = ['마이클', '데이비드', '라이언', '조시', '케빈', '타일러', '브랜든', '호세', '루이스', '카를로스', '라파엘', '미겔', '알렉스', '네이선', '코디', '저스틴', '에릭', '헥터', '안드레', '윌머', '다니엘', '오스틴', '케이시', '로니'];
 const FOREIGN_LAST = ['존슨', '스미스', '로드리게스', '마르티네스', '가르시아', '페레스', '윌리엄스', '브라운', '데이비스', '로페즈', '에르난데스', '앤더슨', '톰슨', '화이트', '클락', '레예스', '산체스', '라미레스', '페냐', '카브레라', '알칸타라', '스톤', '헤이즈', '메디나'];
@@ -21,9 +23,9 @@ export function genForeignPool(state) {
   for (let i = 0; i < 8; i++) {
     const type = i < 4 ? 'P' : 'B';
     const ovr = Math.round(70 + Math.abs(gauss(0, 5)) + (i % 4 === 0 ? 4 : 0));
-    const p = createPlayer({ type, age: randInt(26, 33), ovr: Math.min(88, ovr), pot: ovr + randInt(0, 3), pos: type === 'P' ? (chance(0.75) ? 'SP' : 'RP') : undefined });
-    p.name = `${pick(FOREIGN_FIRST)} ${pick(FOREIGN_LAST)}`;
-    p.origin = pick(FOREIGN_FROM);
+    const nat = pickImportNat(rng);
+    const p = createPlayer({ type, nat, age: randInt(26, 33), ovr: Math.min(88, ovr), pot: ovr + randInt(0, 3), pos: type === 'P' ? (chance(0.75) ? 'SP' : 'RP') : undefined });
+    p.origin = NATS[nat].ko;
     p.foreign = true;
     p.market = 'foreign';
     p.salary = foreignSalary(p);

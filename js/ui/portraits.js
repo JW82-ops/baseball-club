@@ -1,42 +1,65 @@
-// SD 캐릭터 초상 (img/sd, Higgsfield 생성). 선수는 나이대·투타·외국인별 풀에서 id 해시로 고정 배정.
+// SD 캐릭터 초상 (img/sd, Higgsfield 생성).
+// 선수: 국적·인종·투타·나이대별 풀에서 id 해시로 고정 배정 → 나이가 들면 같은 선수가 신인→전성기→베테랑 얼굴로.
 import { STAFF_BACKGROUNDS } from '../data/club.js';
+import { portraitGroup, natOf } from '../data/nations.js';
 
-const POOL = { p_ky: 11, p_kp: 10, p_kv: 8, b_ky: 10, b_kp: 11, b_kv: 8, p_f: 8, b_f: 9, mgr: 11, hit: 4, pit: 4, fld: 3, fut: 2, trn: 3, sct: 2, npc: 10 };
+const POOL = {
+  p_ky: 25, p_kp: 25, p_kv: 18, b_ky: 25, b_kp: 25, b_kv: 18,
+  lat_p: 8, lat_b: 9, w_p: 7, w_b: 4, blk_p: 4, blk_b: 3, jp_p: 12, jp_b: 14,
+  mgr: 13, mgr_f: 6, hit: 5, hit_f: 1, pit: 5, pit_f: 2, fld: 4, fld_f: 1, fut: 3, trn: 4, trn_f: 1, sct: 3, sct_f: 1,
+  npc: 10, owner: 8,
+};
 const url = (cat, i) => `img/sd/${cat}_${i}.webp`;
 
-function hash(s) {
+export function hash(s) {
   let h = 2166136261;
   for (const ch of String(s || 'x')) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
   return h;
 }
 
-// 나이가 들면 같은 선수가 신인 → 전성기 → 베테랑 얼굴로 넘어가요.
 export function playerCat(p) {
-  const pit = p.type === 'P';
-  if (p.foreign) return pit ? 'p_f' : 'b_f';
-  const age = p.age || 25;
-  const stage = age <= 23 ? 'ky' : age <= 31 ? 'kp' : 'kv';
-  return `${pit ? 'p' : 'b'}_${stage}`;
+  const pit = p.type === 'P' ? 'p' : 'b';
+  const g = portraitGroup(p);
+  if (g === 'k') {
+    const age = p.age || 25;
+    return `${pit}_${age <= 23 ? 'ky' : age <= 31 ? 'kp' : 'kv'}`;
+  }
+  return `${g}_${pit}`;
 }
 export function playerImg(p) {
   const cat = playerCat(p);
   return url(cat, hash(p.id || p.name) % POOL[cat]);
 }
 
-// 스태프: 경력(배경)마다 어울리는 얼굴, 남는 건 해시
+// 스태프: 한국인은 경력(배경)별 얼굴, 외국인은 국적에 맞는 얼굴
 const BG_MAP = {
   manager: ['mgr', [0, 1, 2, 3, 4, 5, 6, 7]],
-  hitCoach: ['hit', [0, 1, 2, 3]],
-  pitchCoach: ['pit', [0, 1, 2, 3]],
-  fieldCoach: ['fld', [0, 1, 0, 2]],
-  futuresMgr: ['fut', [0, 1, 0, 1]],
-  trainer: ['trn', [0, 1, 0, 2]],
-  headScout: ['sct', [0, 0, 1, 0, 0]],
+  hitCoach: ['hit', [0, 1, 2, 3, 4]],
+  pitchCoach: ['pit', [0, 1, 2, 3, 4]],
+  fieldCoach: ['fld', [0, 1, 3, 2]],
+  futuresMgr: ['fut', [0, 1, 0, 2]],
+  trainer: ['trn', [0, 1, 3, 2]],
+  headScout: ['sct', [2, 0, 1, 0, 0]],
 };
+const MGR_F = { US: [0, 1], CA: [0], DO: [2], PR: [2], VE: [2, 4], MX: [2], CU: [4], JP: [3], TW: [3], AU: [5], NL: [5] };
+const ROLE_F = { hitCoach: 'hit_f', pitchCoach: 'pit_f', fieldCoach: 'fld_f', trainer: 'trn_f', headScout: 'sct_f' };
 export function staffImg(s) {
+  const nat = s.nat || 'KR';
   const [cat, map] = BG_MAP[s.role] || ['mgr', []];
+  if (nat !== 'KR') {
+    if (s.role === 'manager') {
+      let opts = MGR_F[nat] || [0];
+      if (nat === 'US') opts = s.eth === 'b' ? [1] : [0];
+      return url('mgr_f', opts[hash(s.id) % opts.length]);
+    }
+    if (nat === 'JP' && s.role === 'pitchCoach') return url('pit_f', 1);
+    if (nat === 'JP') return url('mgr_f', 3);
+    const fc = ROLE_F[s.role];
+    if (fc) return url(fc, hash(s.id) % POOL[fc]);
+  }
   const bi = (STAFF_BACKGROUNDS[s.role] || []).indexOf(s.bg);
-  const i = bi >= 0 && map[bi] != null ? map[bi] : hash(s.id) % POOL[cat];
+  const extra = POOL[cat] > map.length ? hash(s.id) % 3 === 0 : false; // 가끔 추가 얼굴
+  const i = !extra && bi >= 0 && map[bi] != null ? map[bi] : hash(s.id) % POOL[cat];
   return url(cat, i);
 }
 
@@ -54,6 +77,12 @@ export function npcImg(m) {
   else if (m.kind === 'sponsor' || /스폰서|그룹|전자|은행|건설|제약|식품|통신|캐피탈|치킨|모터스/.test(n)) k = hash(n) % 2 ? 'sponsorF' : 'sponsorM';
   return url('npc', NPC[k]);
 }
+
+export const OWNER_COUNT = 8;
+export const ownerImg = (i) => url('owner', ((i ?? 0) % OWNER_COUNT + OWNER_COUNT) % OWNER_COUNT);
+export const iconImg = (n) => `img/ui/${n}.webp`;
+export const icon = (n, size = 22, cls = '') => `<img class="ico ${cls}" src="img/ui/${n}.webp" width="${size}" height="${size}" alt="" decoding="async">`;
+export { natOf };
 
 // 얼굴만 보이는 작은 아바타 (목록용)
 export function faceHtml(src, color, size, cls = '') {

@@ -40,6 +40,7 @@ import { computeSynergies, SYNERGIES } from './engine/synergy.js';
 import { BUILDINGS, SUBS, STAFF_ROLES } from './data/club.js';
 import { autoLineup, autoPitching, autoAssignLevels, ensureLineupValid, canPromote, canDemote, teamOvr, battingOrder } from './engine/roster.js';
 import { calcOvr } from './engine/player.js';
+import { icon } from './ui/portraits.js';
 
 // ───────── 렌더링 ─────────
 const PHASE_KO = { regular: '정규시즌', post: '포스트시즌', offseason: '오프시즌', draft: '신인 드래프트', camp: '스프링캠프' };
@@ -58,7 +59,7 @@ function renderHud() {
       <div class="hud-name"><h1>${esc(t.name)}</h1><small>${state.season} ${PHASE_KO[state.phase] || ''}</small></div>
       <div class="led"><div><b>${t.w}</b><span>승</span></div><div><b>${t.l}</b><span>패</span></div><div><b>${rank}</b><span>위</span></div></div>
     </div>
-    <div class="hud-meta"><span>자금 <b>${formatMoney(t.cash)}</b></span><span>팬 <b>${formatFans(t.fans)}</b></span><span>전력 <b>${teamOvr(state, t)}</b></span><span class="grow"></span><button class="iconbtn hud-badge" style="width:30px;height:28px;font-size:14px" data-act="tab" data-tab="mail" aria-label="메일함">✉️${unreadCount(state) ? `<em>${unreadCount(state)}</em>` : ''}</button><button class="iconbtn" style="width:28px;height:28px;font-size:13px" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>
+    <div class="hud-meta"><span class="hm">${icon('money', 18)}<b>${formatMoney(t.cash)}</b></span><span class="hm">${icon('fans', 18)}<b>${formatFans(t.fans)}</b></span><span class="hm">⚾<b>${teamOvr(state, t)}</b></span><span class="grow"></span><button class="iconbtn hud-badge mailbtn" data-act="tab" data-tab="mail" aria-label="메일함">${icon('mail', 26)}${unreadCount(state) ? `<em>${unreadCount(state)}</em>` : ''}</button><button class="iconbtn" style="width:28px;height:28px;font-size:13px" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>
     ${syn.length ? `<div class="hud-syn">${syn.map((k) => `<span>${SYNERGIES[k].icon} ${SYNERGIES[k].ko}</span>`).join('')}</div>` : ''}`;
 }
 
@@ -97,10 +98,13 @@ function sceneFor(tab) {
     if (ph === 'draft') return 'draft';
     if (ph === 'camp') return 'camp';
     if (ph === 'contracts') return 'contract';
+    if (ph === 'offseason') return 'awards';
     if (ph === 'post') return 'crowd';
     return `stadium${Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1))}`;
   }
-  return { roster: 'clubhouse', develop: 'futures', league: 'crowd', club: 'office', mail: 'contract' }[tab] || 'stadium1';
+  if (tab === 'club') return { facility: 'office', staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'facility'] || 'office';
+  if (tab === 'roster' && ui.rosterView === 'futures') return 'futures';
+  return { roster: 'clubhouse', develop: 'gym', league: 'crowd', mail: 'contract' }[tab] || 'stadium1';
 }
 let sceneCur = null, sceneFlip = 0;
 function setScene(name) {

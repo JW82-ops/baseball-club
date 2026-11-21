@@ -14,6 +14,7 @@ import { moodLabel } from '../../engine/mood.js';
 import { calcOvr as ovrOf } from '../../engine/player.js';
 import { sangmuChance, milLabel } from '../../engine/military.js';
 import { teamPlayers as tps } from '../../engine/roster.js';
+import { icon } from '../portraits.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -46,8 +47,8 @@ function matchupCard(sg, title, art) {
     </div>
     <div class="sp"><div><span class="faint tiny">선발</span><br>${spLine(ap)}</div><div><span class="faint tiny">선발</span><br>${spLine(hp)}</div></div>
     <div class="acts">
-      <button class="btn team" data-act="watchGame">경기 보기</button>
-      <button class="btn" data-act="simGame">결과만 보기</button>
+      <button class="btn team big" data-act="watchGame">${icon('play', 26)}경기 보기</button>
+      <button class="btn big" data-act="simGame">${icon('quick', 26)}결과만 보기</button>
     </div>
   </div>`;
 }
@@ -176,7 +177,7 @@ function regularView() {
   <section class="sec">
     ${sg ? matchupCard(sg, `${state.season} 정규시즌 · ${prog.day + 1}/${prog.total}경기`) : '<div class="panel empty">오늘은 경기가 없어요.</div>'}
     <div class="simbar">
-      <button class="btn sm" data-act="simDays" data-n="6">1주 진행</button>
+      <button class="btn sm" data-act="simDays" data-n="6">${icon('week', 20)}1주 진행</button>
       <button class="btn sm" data-act="simDays" data-n="${Math.min(remain, 18)}">3주 진행</button>
       <button class="btn sm" data-act="simDays" data-n="${remain}">시즌 끝까지</button>
     </div>

@@ -31,7 +31,7 @@ export function promote(state, to) {
     const team = { ...t, roster: [], w: 0, l: 0, t: 0, rs: 0, ra: 0, streak: 0, last10: [], fans: 80000, autoRest: true, cash: 0 };
     state.teams[t.id] = team;
     state.teamOrder.push(t.id);
-    generateRoster(state, team, t.strength + add, t.style);
+    generateRoster(state, team, t.strength + add, t.style, to);
     autoAssignLevels(state, team);
   }
   const ratio = LEAGUES[to].fanMult / LEAGUES[from].fanMult;

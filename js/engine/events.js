@@ -1,9 +1,10 @@
-import { randInt, pick, chance, weightedPick, gauss } from '../core/rng.js';
+import { randInt, pick, chance, weightedPick, gauss, rng } from '../core/rng.js';
 import { clamp, formatMoney } from '../core/util.js';
 import { calcOvr, potOvr, batLine, createPlayer, resetSeasonStats } from './player.js';
 import { firstTeam, futures, teamPlayers, canPromote, ensureLineupValid } from './roster.js';
 import { ROSTER, BAT_ATTRS } from '../data/constants.js';
 import { assignNumber } from './hof.js';
+import { leagueNat } from '../data/nations.js';
 
 const P = (state, id) => state.players[id];
 const mine = (state) => state.teams[state.userTeamId];
@@ -263,7 +264,7 @@ const EVENTS = {
       t.cash -= 2000; t.ledger.expense += 2000;
       const type = chance(0.5) ? 'P' : 'B';
       const ovr = randInt(44, 54);
-      const p = createPlayer({ type, age: randInt(20, 24), ovr, pot: ovr + randInt(14, 30), pos: type === 'P' ? (chance(0.5) ? 'SP' : 'RP') : undefined, origin: '독립리그' });
+      const p = createPlayer({ type, age: randInt(20, 24), nat: leagueNat(state.league, rng), ovr, pot: ovr + randInt(14, 30), pos: type === 'P' ? (chance(0.5) ? 'SP' : 'RP') : undefined, origin: '독립리그' });
       p.team = t.id; p.level = 2; p.salary = 3000;
       resetSeasonStats(p);
       state.players[p.id] = p; t.roster.push(p.id);

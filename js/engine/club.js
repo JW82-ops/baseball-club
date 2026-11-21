@@ -2,6 +2,7 @@ import { randInt, pick, weightedPick, gauss, rng } from '../core/rng.js';
 import { clamp, uid } from '../core/util.js';
 import { BUILDINGS, SUBS, MAX_CONCURRENT_BUILDS, STAFF_ROLES, MANAGER_STYLES, STAFF_BACKGROUNDS } from '../data/club.js';
 import { koreanName } from '../data/names.js';
+import { nameFor, ethFor, pickStaffImportNat } from '../data/nations.js';
 
 // ───────── 구조 보장 ─────────
 export function ensureClub(team) {
@@ -114,14 +115,20 @@ export function gradeOfStaff(ovr) { return ovr >= 82 ? 'S' : ovr >= 70 ? 'A' : o
 export function staffWeeklyOf(s) { const o = staffOvr(s); return Math.round((120 + Math.pow(Math.max(0, o - 35), 2) * 0.85) / 10) * 10; }
 export function staffSignOf(s) { return Math.round(staffWeeklyOf(s) * 9 / 100) * 100; }
 
-export function genStaff(role, grade) {
+function staffNat(role, league) {
+  if (league === 'NPB') return rng() < 0.85 ? 'JP' : pickStaffImportNat(rng);
+  if (league === 'MLB') return rng() < 0.7 ? 'US' : pickStaffImportNat(rng);
+  return rng() < (role === 'manager' ? 0.14 : 0.1) ? pickStaffImportNat(rng) : 'KR';
+}
+export function genStaff(role, grade, league = 'KBO') {
+  const nat = staffNat(role, league);
   const [lo, hi] = GRADE_RANGE[grade];
   const keys = Object.keys(STAFF_ROLES[role].stats);
   const spec = pick(keys); // 특기
   const stats = {};
   for (const k of keys) stats[k] = clamp(Math.round(randInt(lo, hi) + (k === spec ? randInt(4, 10) : gauss(0, 3))), 20, 99);
   const s = {
-    id: uid('st'), role, name: koreanName(rng), age: randInt(38, 66),
+    id: uid('st'), role, nat, eth: ethFor(nat, rng), name: nameFor(nat, rng), age: randInt(38, 66),
     stats, spec, bg: pick(STAFF_BACKGROUNDS[role]), years: randInt(1, 3),
   };
   if (role === 'manager') s.style = pick(Object.keys(MANAGER_STYLES));
@@ -132,7 +139,7 @@ export function genStaff(role, grade) {
 export function genStaffMarket(state) {
   const out = [];
   for (const role of Object.keys(STAFF_ROLES)) {
-    for (let i = 0; i < 3; i++) out.push(genStaff(role, weightedPick(['C', 'B', 'A', 'S'], (g) => ({ C: 5, B: 4.5, A: 2.4, S: 0.9 }[g]))));
+    for (let i = 0; i < 3; i++) out.push(genStaff(role, weightedPick(['C', 'B', 'A', 'S'], (g) => ({ C: 5, B: 4.5, A: 2.4, S: 0.9 }[g])), state.league || 'KBO'));
   }
   state.staffMarket = out;
 }

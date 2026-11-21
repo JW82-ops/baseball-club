@@ -8,6 +8,7 @@ import { genSponsorOffers } from './sponsor.js';
 import { SAVE_VERSION } from '../data/constants.js';
 import { ensureMil } from './military.js';
 import { emptyBat, emptyPit } from './player.js';
+import { natOf } from '../data/nations.js';
 
 // 구버전 세이브를 현재 구조로 올림 (불러오기 직후 호출)
 export function upgradeSave(state) {
@@ -77,6 +78,14 @@ export function upgradeSave(state) {
     if (state.settings.clutch == null) state.settings.clutch = true;
     state.sns = state.sns || [];
     state.version = 4;
+  }
+  if (state.version < 5) {
+    // 국적: 기존 외국인은 출신지로, 나머지는 한국
+    for (const id in state.players) { const p = state.players[id]; if (!p.nat) p.nat = natOf(p); }
+    for (const r in user.staff || {}) if (user.staff[r] && !user.staff[r].nat) user.staff[r].nat = 'KR';
+    for (const s of state.staffMarket || []) if (!s.nat) s.nat = 'KR';
+    if (user.owner == null) user.owner = 0;
+    state.version = 5;
   }
   ensureClub(user);
   state.version = Math.max(state.version, SAVE_VERSION);

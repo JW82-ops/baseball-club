@@ -3,6 +3,7 @@ import { clamp, uid } from '../core/util.js';
 import { koreanName, HIGH_SCHOOLS, UNIVERSITIES } from '../data/names.js';
 import { TRAITS } from '../data/traits.js';
 import { GROWTH_TYPES, BAT_POS, POS_DEF_WEIGHT } from '../data/constants.js';
+import { nameFor, ethFor } from '../data/nations.js';
 
 // ───────── 능력치 → OVR ─────────
 const BAT_W = { contact: 0.28, power: 0.24, eye: 0.14, speed: 0.10, fielding: 0.14, arm: 0.10 };
@@ -141,7 +142,8 @@ export function createPlayer(opts) {
   }
   const p = {
     id: uid('p'),
-    name: opts.name || koreanName(rng),
+    name: opts.name || nameFor(opts.nat || 'KR', rng),
+    nat: opts.nat || 'KR', eth: opts.eth ?? ethFor(opts.nat || 'KR', rng),
     type, pos, age,
     bats: type === 'B' ? weightedPick(['R', 'L', 'S'], (h) => ({ R: 62, L: 33, S: 5 }[h])) : weightedPick(['R', 'L'], (h) => ({ R: 70, L: 30 }[h])),
     throws: type === 'P' ? null : 'R',

@@ -5,8 +5,10 @@ import { registerActions, $ } from '../dom.js';
 
 import { slotInfo } from '../../core/store.js';
 import { LEAGUES } from '../../data/club.js';
+import { CITY_EMBLEMS } from '../../data/teams.js';
+import { ownerImg, OWNER_COUNT } from '../portraits.js';
 
-export const draft = { city: '서울', name: '파이어볼쓰', colorIdx: 0, emblem: 'flame', philosophy: 'develop', seasonLength: 72, difficulty: 'normal' };
+export const draft = { city: '서울', name: '피닉스', colorIdx: 0, emblem: 'flame', emblemImg: 'e0', owner: 0, philosophy: 'develop', seasonLength: 72, difficulty: 'normal' };
 export const title = { creating: false, slot: 1 };
 
 export function renderTitle() {
@@ -17,13 +19,13 @@ export function renderTitle() {
       <h1>프로야구팀을<br>만들자</h1>
       <p>신생 구단을 창단해 유망주를 키우고, KBO를 넘어 NPB·MLB까지 정복하세요.</p>
     </div>
-    ${[1, 2, 3].map((n) => { const i = slotInfo(n); return i ? `<div class="slotcard"><button class="grow row gap" data-act="loadSlot" data-n="${n}" style="text-align:left">${emblem({ color: i.color, color2: '#000', emblem: i.emblem }, 44)}<div class="grow"><span class="tiny faint">슬롯 ${n}</span><br><b>${esc(i.name)}</b><div class="tiny muted">${LEAGUES[i.league].flag} ${i.season} ${PH[i.phase] || ''} · ${i.w}승 ${i.l}패</div></div></button><button class="btn sm ghost" data-act="deleteSlot" data-n="${n}" aria-label="삭제">🗑</button></div>` : `<button class="slotcard empty" data-act="newSlot" data-n="${n}"><span class="tiny faint">슬롯 ${n}</span><b>＋ 새 구단 창단</b></button>`; }).join('')}
+    ${[1, 2, 3].map((n) => { const i = slotInfo(n); return i ? `<div class="slotcard"><button class="grow row gap" data-act="loadSlot" data-n="${n}" style="text-align:left">${emblem({ color: i.color, color2: '#000', emblem: i.emblem, emblemImg: i.emblemImg }, 48)}<div class="grow"><span class="tiny faint">슬롯 ${n}</span><br><b>${esc(i.name)}</b><div class="tiny muted">${LEAGUES[i.league].flag} ${i.season} ${PH[i.phase] || ''} · ${i.w}승 ${i.l}패</div></div></button><button class="btn sm ghost" data-act="deleteSlot" data-n="${n}" aria-label="삭제">🗑</button></div>` : `<button class="slotcard empty" data-act="newSlot" data-n="${n}"><span class="tiny faint">슬롯 ${n}</span><b>＋ 새 구단 창단</b></button>`; }).join('')}
   </div>`;
 }
 
 export function renderCreate() {
   const c = CLUB_COLORS[draft.colorIdx];
-  const team = { color: c.primary, color2: c.secondary, emblem: draft.emblem };
+  const team = { color: c.primary, color2: c.secondary, emblem: draft.emblem, emblemImg: draft.emblemImg };
   return `
   <div class="create">
     <div class="create-hero">
@@ -36,8 +38,8 @@ export function renderCreate() {
       <div><h3>${esc(draft.city)} ${esc(draft.name || '구단명')}</h3><p class="small muted">${PHILOSOPHIES[draft.philosophy].icon} ${PHILOSOPHIES[draft.philosophy].ko} · ${draft.seasonLength}경기 시즌</p></div>
     </div>
     <div class="field">
-      <label>연고지</label>
-      <select data-change="cSet" data-k="city">${CITIES.map((x) => `<option ${x === draft.city ? 'selected' : ''}>${x}</option>`).join('')}</select>
+      <label>연고지 · 엠블럼</label>
+      <div class="citygrid">${CITIES.map((x) => { const ce = CITY_EMBLEMS[x]; return `<button class="cityem ${x === draft.city ? 'on' : ''}" data-act="cCity" data-v="${x}"><img src="img/emblem/${ce.img}.webp" alt="" width="64" height="64" loading="lazy"><b>${x}</b><small>${ce.mascot}</small></button>`; }).join('')}</div>
     </div>
     <div class="field">
       <label for="cname">구단 이름</label>
@@ -48,8 +50,8 @@ export function renderCreate() {
       <div class="swatches">${CLUB_COLORS.map((col, i) => `<button aria-label="${col.name}" class="${i === draft.colorIdx ? 'on' : ''}" style="background:${col.primary}" data-act="cPick" data-k="colorIdx" data-v="${i}"></button>`).join('')}</div>
     </div>
     <div class="field">
-      <label>엠블럼</label>
-      <div class="emblems">${Object.keys(EMBLEMS).map((k) => `<button aria-label="${k}" class="${k === draft.emblem ? 'on' : ''}" data-act="cPick" data-k="emblem" data-v="${k}"><svg viewBox="0 0 24 24"><path d="${EMBLEMS[k]}"/></svg></button>`).join('')}</div>
+      <label>구단주 (나)</label>
+      <div class="ownergrid">${Array.from({ length: OWNER_COUNT }, (_, i) => `<button class="ownerpick ${draft.owner === i ? 'on' : ''}" data-act="cPick" data-k="owner" data-v="${i}"><img src="${ownerImg(i)}" alt="" loading="lazy"></button>`).join('')}</div>
     </div>
     <div class="field">
       <label>구단 운영 철학</label>
@@ -72,8 +74,18 @@ export function initCreateActions(rerender, onCreate) {
   registerActions({
     cSet: (d) => { draft[d.k] = d.value.trim(); if (d.k !== 'name') rerender(); else { const h = $('.preview h3'); if (h) h.textContent = `${draft.city} ${draft.name}`; } },
     cPick: (d) => {
-      const v = d.k === 'colorIdx' || d.k === 'seasonLength' ? Number(d.v) : d.v;
+      const v = d.k === 'colorIdx' || d.k === 'seasonLength' || d.k === 'owner' ? Number(d.v) : d.v;
       draft[d.k] = v;
+      rerender();
+    },
+    cCity: (d) => {
+      const prev = CITY_EMBLEMS[draft.city];
+      const nm = ($('#cname')?.value || '').trim();
+      draft.city = d.v;
+      const ce = CITY_EMBLEMS[d.v];
+      draft.emblemImg = ce.img;
+      if (!nm || nm === prev?.mascot) draft.name = ce.mascot; else draft.name = nm;
+      draft.colorIdx = ce.color;
       rerender();
     },
     createClub: () => {

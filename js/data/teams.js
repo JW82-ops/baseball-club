@@ -59,3 +59,21 @@ export const MLB_TEAMS = [
   { id: 'rangers', city: '텍사스', name: '텍사스 레인저쓰', short: '레인저쓰', color: '#003278', color2: '#c0111f', emblem: 'bolt', strength: 69, style: 'balanced' },
   { id: 'cubs', city: '시카고', name: '시카고 컵쓰', short: '컵쓰', color: '#0e3386', color2: '#cc3433', emblem: 'ball', strength: 68, style: 'develop' },
 ];
+
+// 도시별 오리지널 엠블럼 (img/emblem/e{n}.webp) — 추천 구단명과 어울리는 컬러
+export const CITY_EMBLEMS = {
+  서울: { img: 'e0', mascot: '피닉스', ko: '불사조', color: 0 },
+  인천: { img: 'e1', mascot: '윙스', ko: '비행기·등대', color: 1 },
+  수원: { img: 'e2', mascot: '가디언즈', ko: '성곽 수호대', color: 2 },
+  대전: { img: 'e3', mascot: '코메츠', ko: '혜성', color: 4 },
+  대구: { img: 'e4', mascot: '선라이즈', ko: '태양', color: 3 },
+  광주: { img: 'e5', mascot: '크레인즈', ko: '두루미', color: 0 },
+  부산: { img: 'e6', mascot: '샤크스', ko: '상어', color: 1 },
+  창원: { img: 'e7', mascot: '스틸봇', ko: '강철 로봇', color: 5 },
+  울산: { img: 'e8', mascot: '웨일즈', ko: '고래', color: 5 },
+  청주: { img: 'e9', mascot: '아울스', ko: '부엉이', color: 2 },
+  전주: { img: 'e10', mascot: '폭스', ko: '여우', color: 0 },
+  제주: { img: 'e11', mascot: '포니즈', ko: '조랑말', color: 3 },
+  포항: { img: 'e12', mascot: '해머즈', ko: '대장간 해머', color: 3 },
+  춘천: { img: 'e13', mascot: '오터스', ko: '수달', color: 5 },
+};

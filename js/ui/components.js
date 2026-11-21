@@ -20,6 +20,7 @@ export function stadiumArt(team, isUser) {
 }
 
 export function emblem(team, size = 28) {
+  if (team.emblemImg) return `<span class="emblem img" style="width:${size}px;height:${size}px"><img src="img/emblem/${team.emblemImg}.webp" alt="" width="${size}" height="${size}" decoding="async"></span>`;
   const path = EMBLEMS[team.emblem] || EMBLEMS.ball;
   return `<span class="emblem" style="--c1:${team.color};--c2:${team.color2 || '#000'};width:${size}px;height:${size}px">
     <svg viewBox="0 0 24 24" width="${Math.round(size * 0.62)}" height="${Math.round(size * 0.62)}"><path d="${path}" fill="currentColor"/></svg></span>`;

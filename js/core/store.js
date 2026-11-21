@@ -13,7 +13,7 @@ export function slotInfo(n) {
     if (!raw) return null;
     const s = JSON.parse(raw);
     const t = s.teams[s.userTeamId];
-    return { name: t.name, season: s.season, phase: s.phase, w: t.w, l: t.l, league: s.league || 'KBO', savedAt: s.savedAt, color: t.color, emblem: t.emblem };
+    return { name: t.name, season: s.season, phase: s.phase, w: t.w, l: t.l, league: s.league || 'KBO', savedAt: s.savedAt, color: t.color, emblem: t.emblem, emblemImg: t.emblemImg };
   } catch { return null; }
 }
 export function setState(s) { state = s; }

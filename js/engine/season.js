@@ -1,4 +1,4 @@
-import { randInt, gauss, chance, pick } from '../core/rng.js';
+import { randInt, gauss, chance, pick, rng } from '../core/rng.js';
 import { clamp, formatMoney } from '../core/util.js';
 import { GAMES_PER_WEEK, ROSTER, TRAINING_FOCUS } from '../data/constants.js';
 import { PHILOSOPHIES } from '../data/constants.js';
@@ -28,6 +28,7 @@ import { computeSynergies } from './synergy.js';
 import { rollWeeklyEvent, offerMissions, trackUserGame, settleMission, emptyWeekStats } from './events.js';
 import { settleFA, genForeignPool } from './market.js';
 import { assignNumber, considerHof } from './hof.js';
+import { leagueNat } from '../data/nations.js';
 
 export const CAMP_WEEKS = 6;
 export function weeksInSeason(state) { return Math.ceil(state.schedule.length / GAMES_PER_WEEK); }
@@ -611,7 +612,7 @@ function setupDraft(state) {
     if (i < 3) pot += randInt(6, 14);
     pot = clamp(pot, ovr + 4, 95);
     const type = chance(0.52) ? 'P' : 'B';
-    const p = createPlayer({ type, age, ovr, pot, pos: type === 'P' ? (chance(0.55) ? 'SP' : 'RP') : undefined, origin: hs ? undefined : undefined });
+    const p = createPlayer({ type, age, ovr, pot, nat: leagueNat(state.league, rng), pos: type === 'P' ? (chance(0.55) ? 'SP' : 'RP') : undefined, origin: hs ? undefined : undefined });
     p.draftClass = state.season + 1;
     p.amateur = true;
     state.players[p.id] = p;
@@ -719,7 +720,7 @@ export function runCampAndStartSeason(state) {
       // AI: 로스터 보충
       while (t.roster.length < 50) {
         const type = chance(0.5) ? 'P' : 'B';
-        const p = createPlayer({ type, age: randInt(24, 31), ovr: t.strength - 14 + Math.round(gauss(0, 4)) });
+        const p = createPlayer({ type, age: randInt(24, 31), nat: leagueNat(state.league, rng), ovr: t.strength - 14 + Math.round(gauss(0, 4)) });
         p.team = t.id; resetSeasonStats(p);
         state.players[p.id] = p; t.roster.push(p.id);
         assignNumber(state, t, p);
