@@ -4,6 +4,7 @@ import { BUILDINGS, SUBS, MAX_CONCURRENT_BUILDS, STAFF_ROLES, MANAGER_STYLES, ST
 import { koreanName } from '../data/names.js';
 import { nameFor, ethFor, pickStaffImportNat } from '../data/nations.js';
 import { frontLv, scoutRegionBonus } from './front.js';
+import { planAttrMult, planInjuryMult, affMult, coachFor } from './dev2.js';
 
 // ───────── 구조 보장 ─────────
 export function ensureClub(team) {
@@ -228,9 +229,10 @@ export function devCtxFor(state, team, p, synergyList = [], eff = null) {
       else m *= coachMult(staffStat(team, 'fieldCoach', k));
     } else if (['velo', 'control', 'breaking', 'stamina'].includes(k)) m *= coachMult(staffStat(team, 'pitchCoach', k));
     else m *= coachMult(staffStat(team, 'manager', 'leadership'));
+    m *= planAttrMult(team, k) * affMult(coachFor(team, p, k), p);
     attrMult[k] = m;
   }
-  return { attrMult, injuryMult: injuryMultFor(team, eff), extraXp: p.level === 2 ? eff.futXp : 0 };
+  return { attrMult, injuryMult: injuryMultFor(team, eff) * planInjuryMult(team), extraXp: p.level === 2 ? eff.futXp : 0 };
 }
 
 export function injuryMultFor(team, eff = null) {

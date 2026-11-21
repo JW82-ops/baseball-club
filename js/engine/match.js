@@ -11,6 +11,7 @@ import { staffStat, mgrStyle, clubEffects } from './club.js';
 import { teamChem, moodPerf } from './mood.js';
 import { updateForm, formAdj } from './form.js';
 import { velocityKmh } from './player.js';
+import { workloadRisk } from './dev2.js';
 
 // 리그 평균 1군 능력치(≈65)를 기준점으로
 const z = (v) => (v - 65) / 20;
@@ -36,7 +37,7 @@ function pickStarter(state, team) {
   for (let i = 0; i < rot.length; i++) {
     const idx = (team.rotIdx + i) % rot.length;
     const p = state.players[rot[idx]];
-    if (p && !p.injury && p.cond >= 55) {
+    if (p && !p.injury && p.cond >= 55 && !(p.innCap && workloadRisk(p) > 0.1)) {
       team.rotIdx = (idx + 1) % rot.length;
       return p.id;
     }

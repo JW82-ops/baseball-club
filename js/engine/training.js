@@ -57,6 +57,7 @@ export function trainingProgress(state, team, p) {
 export function trainingFocusMult(focus, key) {
   if (focus === 'newpitch') return key === 'breaking' ? 1.2 : 0.45;
   if (focus === 'convert') return key === 'fielding' || key === 'arm' ? 1.4 : 0.55;
+  if (focus?.startsWith?.('mech:')) return key === focus.slice(5) ? 1.5 : 0.6;
   return null;
 }
 

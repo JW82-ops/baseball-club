@@ -10,6 +10,8 @@ import { scoutLevel } from './draft.js';
 import { moodLabel } from '../../engine/mood.js';
 import { formIcon } from '../../engine/form.js';
 import { militaryList } from '../../engine/military.js';
+import { REHAB } from '../../engine/dev2.js';
+import { teamPlayers } from '../../engine/roster.js';
 
 export function statSnippet(p) {
   if (p.level === 2 && p.cur?.fut && ((p.cur.fut.pa || 0) > 0 || (p.cur.fut.outs || 0) > 0) && !(p.cur.bat.pa || p.cur.pit.g)) {
@@ -99,10 +101,19 @@ function lineupView() {
     </div>`;
 }
 
+function rehabView() {
+  const team = userTeam(state);
+  const inj = teamPlayers(state, team).filter((p) => p.injury && !['camp', 'leave'].includes(p.injury.cause)).sort((a, b) => b.injury.weeks - a.injury.weeks);
+  return `<p class="tiny faint mt">부상 선수의 재활 프로그램을 고르세요. 의무팀 레벨이 높을수록 회복이 빨라요. <button class="linkish" data-act="learn" data-k="rehab">재활이란?</button></p>
+    <div class="mt">${inj.map((p) => `<div class="panel" style="margin-bottom:10px"><div class="row gap">${avatar(p, team.color, 40)}<div class="grow"><button class="nm" data-act="openPlayer" data-pid="${p.id}" style="text-align:left"><b>${esc(p.name)}</b></button><div class="tiny bad">${esc(p.injury.name)} · ${p.injury.weeks}주 남음</div></div>${gradeTag(calcOvr(p))}</div>
+      <div class="seg mt">${Object.entries(REHAB).map(([k, R]) => `<button class="${(p.injury.plan || 'normal') === k ? 'on' : ''}" data-act="setRehab" data-pid="${p.id}" data-v="${k}">${R.ko}</button>`).join('')}</div>
+      <p class="tiny muted mt">${REHAB[p.injury.plan || 'normal'].desc}</p></div>`).join('') || '<div class="panel empty">재활 중인 선수가 없어요. 💪</div>'}</div>`;
+}
+
 export function renderRoster() {
   return `
   <section class="sec">
-    <div class="seg">${[['first', '1군'], ['futures', '2군'], ['lineup', '라인업·투수진']].map(([k, l]) => `<button class="${ui.rosterView === k ? 'on' : ''}" data-act="rosterView" data-v="${k}">${l}</button>`).join('')}</div>
-    ${ui.rosterView === 'lineup' ? lineupView() : listView()}
+    <div class="seg">${[['first', '1군'], ['futures', '2군'], ['rehab', '재활군'], ['lineup', '라인업·투수진']].map(([k, l]) => `<button class="${ui.rosterView === k ? 'on' : ''}" data-act="rosterView" data-v="${k}">${l}</button>`).join('')}</div>
+    ${ui.rosterView === 'lineup' ? lineupView() : ui.rosterView === 'rehab' ? rehabView() : listView()}
   </section>`;
 }

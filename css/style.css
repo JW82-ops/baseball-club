@@ -728,3 +728,10 @@ select, input[type=text] {
 select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid var(--line-2); border-radius: 10px; padding: 7px 8px; font: inherit; font-size: 13.5px; }
 .capbar.over i { background: linear-gradient(90deg, #ffc53d, #ff6f61); }
 .bar-note .linkish { font-size: 12px; }
+.planrow { display: grid; grid-template-columns: 38px 1fr; gap: 6px; align-items: start; margin-top: 8px; }
+.planrow > span { padding-top: 6px; font-weight: 700; color: var(--gold); }
+.planchips { display: flex; flex-wrap: wrap; gap: 5px; }
+.planchips button { font-size: 12px; padding: 5px 9px; border-radius: 99px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); }
+.planchips button.on { background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo)); color: #3d2300; font-weight: 800; border-color: transparent; box-shadow: 0 2px 0 var(--gold-edge); }
+.planfx { display: flex; flex-wrap: wrap; gap: 6px; }
+.planfx span { font-size: 12px; padding: 3px 8px; border-radius: 99px; background: rgba(0, 0, 0, .25); }

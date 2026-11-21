@@ -138,6 +138,7 @@ export function injure(p, cause = 'game') {
   const pool = INJURIES.filter((i) => i.kind === 'any' || i.kind === p.type);
   const inj = weightedPick(pool, (i) => i.f);
   p.injury = { name: inj.name, weeks: randInt(inj.w[0], inj.w[1]), cause };
+  p.lastInjury = inj.name;
   p.cond = Math.min(p.cond, 60);
   return p.injury;
 }

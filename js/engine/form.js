@@ -26,5 +26,5 @@ export function updateForm(p, s) {
   return undefined;
 }
 
-export const formAdj = (p) => (p.streak === 'hot' ? 3 : p.streak === 'cold' ? -3 : 0);
+export const formAdj = (p) => (p.streak === 'hot' ? 3 : p.streak === 'cold' ? -3 : 0) - (p.mech ? 4 : 0);
 export const formIcon = (p) => (p.streak === 'hot' ? '🔥' : p.streak === 'cold' ? '🧊' : '');

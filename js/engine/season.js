@@ -32,6 +32,7 @@ import { leagueNat } from '../data/nations.js';
 import { frontWeekly, REGIONS, evaluateBoard, startBoardSeason, satLabel, draftGemCount, decayScout, ensureFront } from './front.js';
 import { regCount } from './roster.js';
 import { settleCap, updateCapLimit, secondDraftYear, finishSecondDraft, waiverWeek, runAllStar, goldenGloves } from './kborules.js';
+import { rehabWeek, mechProgress, planCondBonus, workloadWeek, settleWinter } from './dev2.js';
 
 export const CAMP_WEEKS = 6;
 export function weeksInSeason(state) { return Math.ceil(state.schedule.length / GAMES_PER_WEEK); }
@@ -224,9 +225,13 @@ export function weeklyCycle(state, opts = {}) {
       });
       const campKey = p.injury?.cause === 'camp' ? p.injury.camp : null;
       const wasLeave = p.injury?.cause === 'leave';
-      const healed = healWeek(p, healB);
+      const hr = isUser ? rehabWeek(p, healB, healWeek) : healWeek(p, healB);
+      const healed = hr === true;
+      if (hr === 'reinjury') addNews(state, `🚑 ${p.name} 조기 복귀 후 ${p.injury.name} (${p.injury.weeks}주)`, 'bad');
       if (isUser && healed && campKey) { addNews(state, `✈️ ${finishCamp(p, campKey)}`, 'big'); }
       if (isUser && !opts.camp) { const tp = trainingProgress(state, team, p); if (tp) { addNews(state, `✨ ${tp}`, 'big'); report.events.push({ type: 'train', text: tp }); } }
+      if (isUser && p.mech) { const mp = mechProgress(team, p, staffStat(team, p.type === 'P' ? 'pitchCoach' : 'hitCoach', p.mech.target)); if (mp) { addNews(state, `🔧 ${mp}`, 'big'); report.events.push({ type: 'train', text: mp }); } }
+      if (isUser) { const cb = planCondBonus(team); if (cb && !p.injury) p.cond = Math.min(100, p.cond + cb); }
       if (isUser) {
         if (res.after !== res.before) report.risers.push({ pid: p.id, name: p.name, before: res.before, after: res.after });
         res.events.forEach((e) => { report.events.push(e); addNews(state, e.type === 'injury' ? `🚑 ${e.text}` : `✨ ${e.text}`, e.type === 'injury' ? 'bad' : 'big'); });
@@ -250,6 +255,7 @@ export function weeklyCycle(state, opts = {}) {
       addNews(state, `🔭 ${R.ko} 스카우트 리포트 ${f.th === 60 ? '1차' : f.th === 120 ? '2차' : '최종'} 완료 — ${R.kind === 'hs' || R.kind === 'college' ? '드래프트 유망주 정보가 정확해지고 숨은 진주를 찾을 확률이 올라가요' : R.kind === 'indie' ? '독립리그 선수 평가가 정확해져요' : '다음 외국인 시장에 이 지역 후보가 추가돼요'}`, 'info');
     }
     for (const n of waiverWeek(state)) addNews(state, n, 'info');
+    for (const n of workloadWeek(user, teamPlayers(state, user).filter((p) => p.type === 'P'))) addNews(state, n, 'bad');
     if (state.phase === 'regular' && state.day >= Math.floor(state.schedule.length * 0.5) && state.allStar?.season !== state.season) {
       const as = runAllStar(state);
       addNews(state, `⭐ ${state.season} 올스타전: ${as.sides[0].name} ${as.score[0]} : ${as.score[1]} ${as.sides[1].name} — MVP ${state.players[as.mvp]?.name || ''}${as.mine.length ? ` · 우리 구단 ${as.mine.length}명 출전` : ''}`, 'big');
@@ -739,6 +745,7 @@ export function runCampAndStartSeason(state) {
   state.promotionOffer = null;
   offseasonInternational(state, 'camp');
   state.season += 1;
+  for (const n of settleWinter(state)) addNews(state, n, 'big');
   for (let w = 0; w < CAMP_WEEKS; w++) {
     const rep = weeklyCycle(state, { camp: true });
     if (w === 0) state.campLog = { risers: [], events: [] };

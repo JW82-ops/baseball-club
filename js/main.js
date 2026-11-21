@@ -46,6 +46,7 @@ import { stadiumArt } from './ui/components.js';
 import { showLearn, shortWhy } from './ui/screens/learn.js';
 import { upgradeDept, assignScout, DEPTS, REGIONS } from './engine/front.js';
 import { waivePlayer, claimWaiver, signDev, convertDev, secondDraftPick, capInfo, faGrade } from './engine/kborules.js';
+import { planOf, startMech, REHAB, sendWinter } from './engine/dev2.js';
 
 // ───────── 렌더링 ─────────
 const PHASE_KO = { regular: '정규시즌', post: '포스트시즌', offseason: '오프시즌', contracts: '계약 협상', draft: '신인 드래프트', camp: '스프링캠프' };
@@ -412,6 +413,11 @@ registerActions({
     commit();
   },
   learn: (d) => showLearn(d.k),
+  setPlan: (d) => { const t = userTeam(state); t.plan = [...planOf(t)]; t.plan[Number(d.i)] = d.v; commit(); },
+  startMech: (d) => { const p = state.players[d.pid]; const err = startMech(p, d.t); if (err) return toast(err, 'bad'); save(); openModal(renderPlayer(p.id)); toast(`${p.name} 폼 교정 시작`, 'good'); },
+  toggleInnCap: (d) => { const p = state.players[d.pid]; p.innCap = d.checked; save(); toast(d.checked ? `${p.name} 이닝 관리 ON` : `${p.name} 이닝 관리 OFF`); },
+  setRehab: (d) => { const p = state.players[d.pid]; if (p?.injury) p.injury.plan = d.v; commit(`${p.name} 재활: ${REHAB[d.v].ko}`); },
+  sendWinter: (d) => { const err = sendWinter(state, d.pid, d.k); if (err) return toast(err, 'bad'); commit(); },
   claimWaiver: (d) => { const err = claimWaiver(state, d.pid); if (err) return toast(err, 'bad'); fillUserFirstTeam(state); commit(`${state.players[d.pid].name} 웨이버 클레임 성공!`, 'good'); },
   signDev: (d) => { const err = signDev(state, d.pid); if (err) return toast(err, 'bad'); commit(`${state.players[d.pid].name} 육성선수 계약`, 'good'); },
   convertDev: (d) => { const err = convertDev(state, d.pid); if (err) return toast(err, 'bad'); save(); openModal(renderPlayer(d.pid)); render(); toast(`${state.players[d.pid].name} 정식 선수 전환!`, 'good'); },

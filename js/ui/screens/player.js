@@ -19,6 +19,7 @@ import { playerImg, bodyHtml } from '../portraits.js';
 import { advBat, advPit } from '../../engine/sabr.js';
 import { batterZones } from '../../engine/pitch.js';
 import { canConvertDev } from '../../engine/kborules.js';
+import { MECH, coachFor, affinity, affLabel, inningLimit, seasonIP } from '../../engine/dev2.js';
 
 function batRow(label, s) {
   const l = batLine(s);
@@ -176,9 +177,20 @@ function specialSection(p) {
       ? `<p class="small">🔄 ${POS_KO[p.convert.to]} 전향 훈련 중 <b class="amber">${Math.min(99, Math.round(p.convert.prog))}%</b></p><div class="mission"><div class="bar"><i style="width:${Math.min(100, p.convert.prog)}%"></i></div></div><button class="btn sm ghost mt" data-act="stopSpecial" data-pid="${p.id}">중단</button>`
       : `<p class="small muted">포지션 전향 훈련. 포수·유격수·중견수는 오래 걸려요.</p><div class="chips mt">${convertTargets(p).map((x) => `<button class="chip" data-act="convertPos" data-pid="${p.id}" data-t="${x}">${POS_KO[x]}</button>`).join('')}</div>`;
   }
+  const mech = p.mech
+    ? `<p class="small mt-l">🔧 ${MECH[p.type][p.mech.target]} 중 <b class="amber">${Math.min(99, Math.round(p.mech.prog))}%</b> <span class="tiny faint">(교정 중엔 경기력 -4)</span></p><div class="mission"><div class="bar"><i style="width:${Math.min(100, p.mech.prog)}%"></i></div></div>`
+    : `<p class="small mt-l">🔧 폼 교정 <span class="tiny faint">(약 8주 · 성공하면 잠재력 한계 상승, 실패하면 능력 하락 위험)</span></p><div class="chips mt">${Object.entries(MECH[p.type]).map(([k, ko]) => `<button class="chip" data-act="startMech" data-pid="${p.id}" data-t="${k}">${ko}</button>`).join('')}</div>`;
+  const coach = (k) => coachFor(t, p, k);
+  const affs = (p.type === 'P' ? ['control'] : ['contact', 'fielding']).map((k) => { const c = coach(k); if (!c) return ''; const a = affinity(c, p); const [l, cls] = affLabel(a); return `<span class="chip ${cls === 'bad' ? 'bad' : ''}">${p.type === 'P' ? '투수코치' : k === 'contact' ? '타격코치' : '수비코치'} ${esc(c.name)}: ${l} (${a >= 0 ? '+' : ''}${Math.round(a * 10)}%)</span>`; }).join('');
+  const lim = inningLimit(p);
+  const wl = lim ? `<p class="small mt-l">⚾ 시즌 이닝 <b class="${seasonIP(p) > lim ? 'bad' : seasonIP(p) > lim * 0.85 ? 'amber' : ''}">${seasonIP(p).toFixed(1)}</b> / 권장 ${lim}이닝 <button class="linkish" data-act="learn" data-k="workload">?</button></p>
+    <label class="row gap small mt"><input type="checkbox" data-change="toggleInnCap" data-pid="${p.id}" ${p.innCap ? 'checked' : ''}> 권장 이닝을 넘기면 선발 로테이션에서 쉬게 하기</label>` : '';
   return `<div class="sec">
     <div class="sec-h"><h2>특별 훈련</h2></div>
+    ${affs ? `<div class="chips">${affs}</div><p class="tiny faint">코치와 궁합이 좋으면 해당 능력이 더 빨리 커요. <button class="linkish" data-act="learn" data-k="affinity">궁합이란?</button></p>` : ''}
+    ${wl}
     ${learn}
+    ${mech}
     <p class="small mt-l">해외·특별 캠프 <span class="tiny faint">(참가 중엔 경기에 못 나가요)</span></p>
     ${camps.map(([k, c]) => `<div class="subrow"><span class="si">${c.icon}</span><div class="grow"><b>${c.ko}</b><div class="tiny muted">${c.desc} · ${c.weeks}주</div></div><button class="btn sm ${t.cash >= c.cost && !p.injury ? 'primary' : ''}" data-act="sendCamp" data-pid="${p.id}" data-k="${k}" ${t.cash >= c.cost && !p.injury ? '' : 'disabled'}>${formatMoney(c.cost)}</button></div>`).join('')}
   </div>`;

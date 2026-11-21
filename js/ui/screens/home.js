@@ -18,6 +18,7 @@ import { icon } from '../portraits.js';
 import { satLabel, goalProgress } from '../../engine/front.js';
 import { devCandidates, secondDraftYear, secondDraftPool, SECOND_FEES } from '../../engine/kborules.js';
 import { scoutLevelOf } from '../../engine/club.js';
+import { WINTER } from '../../engine/dev2.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -278,6 +279,15 @@ function secondDraftSection() {
     ${sd.picks.length ? `<p class="small good mt">지명: ${sd.picks.map((x) => esc(state.players[x.pid]?.name || '')).join(', ')}</p>` : ''}
     <div class="panel plist mt">${sd.picks.length >= 3 ? '<div class="empty">3명을 모두 지명했어요.</div>' : pool.map((p) => `<div class="prow">${avatar(p, state.teams[p.team]?.color || '#5f6f66', 36)}<div class="grow"><button class="nm" data-act="openPlayer" data-pid="${p.id}" style="text-align:left">${esc(p.name)}</button><div class="meta">${esc(state.teams[p.team]?.short || '')} · ${posShort(p)} · ${p.age}세 · OVR ${calcOvr(p)}</div></div><button class="btn sm primary" data-act="secondPick" data-pid="${p.id}">지명 ${formatMoney(SECOND_FEES[sd.picks.length])}</button></div>`).join('')}</div></section>`;
 }
+function winterSection() {
+  const user = userTeam(state);
+  const sent = state.winterLeague || [];
+  const young = user.roster.map((id) => state.players[id]).filter((p) => p && p.age <= 25 && !p.injury && !p.foreign && !p.devContract).sort((a, b) => ovrOf(b) - ovrOf(a)).slice(0, 10);
+  return `<section class="sec mt-l"><div class="sec-h"><h2>✈️ 해외 윈터리그 파견</h2><span class="sub">${sent.length}/3명</span></div>
+    <p class="tiny faint">25세 이하 유망주를 겨울 동안 해외 리그에 보내 실전 경험을 쌓게 해요. 캠프가 시작될 때 성장한 채로 돌아와요. 한 번 더 누르면 취소(비용은 환불 안 됨).</p>
+    <div class="panel plist mt">${young.map((p) => { const w = sent.find((x) => x.pid === p.id); return `<div class="prow">${avatar(p, user.color, 36)}<div class="grow"><div class="nm">${esc(p.name)}${w ? ` <span class="gem">${WINTER[w.lg].icon} ${WINTER[w.lg].ko}</span>` : ''}</div><div class="meta">${posShort(p)} · ${p.age}세 · OVR ${ovrOf(p)}</div></div><div class="row gap" style="gap:4px">${Object.entries(WINTER).map(([k, W]) => `<button class="btn sm ${w?.lg === k ? 'primary' : 'ghost'}" title="${W.ko} · ${W.desc} · ${formatMoney(W.cost)}" data-act="sendWinter" data-pid="${p.id}" data-k="${k}">${W.icon}</button>`).join('')}</div></div>`; }).join('')}</div>
+    <p class="tiny faint mt">${Object.values(WINTER).map((W) => `${W.icon} ${W.ko}: ${W.desc} · ${formatMoney(W.cost)}`).join(' / ')}</p></section>`;
+}
 function allStarCard() {
   const a = state.allStar;
   if (!a || a.seen || a.season !== state.season) return '';
@@ -332,6 +342,7 @@ function contractsView() {
     ${items.some((x) => x.kind === 'stay' && x.status === 'pending') ? '<button class="btn sm block mt" data-act="negoAll" data-m="stay">FA 잔류 희망자 요구 조건 전원 수용</button>' : ''}
     <div class="mt">${sorted.map(row).join('') || '<div class="panel empty">이번 오프시즌엔 협상할 선수가 없어요.</div>'}</div>
     ${enlistSection()}
+    ${winterSection()}
     ${secondDraftSection()}
     <button class="btn primary block mt-l" data-act="proceedDraft">협상 마감 → FA 시장 · 드래프트</button>
     <p class="tiny faint mt center">남은 연봉협상은 기준액으로, 남은 FA 선언자는 시장으로 나가요.</p>

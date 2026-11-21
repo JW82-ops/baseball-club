@@ -5,6 +5,20 @@ import { calcOvr, potentialEstimate } from '../../engine/player.js';
 import { teamPlayers } from '../../engine/roster.js';
 import { INTENSITY, TRAINING_FOCUS, PHILOSOPHIES } from '../../data/constants.js';
 import { scoutLevel } from './draft.js';
+import { PLAN_SLOTS, BLOCKS, planOf, planSummary } from '../../engine/dev2.js';
+
+function planSection(team) {
+  const plan = planOf(team);
+  const sum = planSummary(team);
+  const KO = { contact: '컨택', power: '파워', eye: '선구안', speed: '주력', fielding: '수비', arm: '송구', velo: '구위', control: '제구', breaking: '변화구', stamina: '체력', composure: '멘탈' };
+  const tops = Object.entries(sum.attr).filter(([, v]) => Math.abs(v - 1) > 0.001).sort((a, b) => b[1] - a[1]);
+  return `<section class="sec"><div class="sec-h"><h2>📅 주간 훈련 시간표</h2><span class="sub">팀 전체 적용</span></div>
+    <div class="panel">
+      ${PLAN_SLOTS.map((sl, i) => `<div class="planrow"><span class="small">${sl}</span><div class="planchips">${Object.entries(BLOCKS).map(([k, B]) => `<button class="${plan[i] === k ? 'on' : ''}" data-act="setPlan" data-i="${i}" data-v="${k}">${B.icon} ${B.ko}</button>`).join('')}</div></div>`).join('')}
+      <div class="planfx mt">${tops.map(([k, v]) => `<span class="${v > 1 ? 'good' : 'bad'}">${KO[k]} ${v > 1 ? '+' : ''}${Math.round((v - 1) * 100)}%</span>`).join('')}<span class="${sum.injury < 1 ? 'good' : ''}">부상 위험 ${sum.injury < 1 ? '' : '+'}${Math.round((sum.injury - 1) * 100)}%</span>${sum.cond ? `<span class="good">컨디션 +${sum.cond}/주</span>` : ''}</div>
+      <p class="tiny faint mt">같은 훈련을 여러 칸에 넣으면 그 능력이 더 빨리 크고, 휴식을 넣으면 성장은 조금 줄지만 부상이 줄고 컨디션이 회복돼요.</p>
+    </div></section>`;
+}
 
 export function renderDevelop() {
   const team = userTeam(state);
@@ -35,6 +49,7 @@ export function renderDevelop() {
     </div>
   </section>
 
+  ${planSection(team)}
   <section class="sec">
     <div class="sec-h"><h2>주간 육성 리포트</h2><span class="sub">${w ? (w.camp ? '스프링캠프' : `${w.season} 시즌 ${w.week}주차`) : '아직 없음'}</span></div>
     <div class="panel plist">
