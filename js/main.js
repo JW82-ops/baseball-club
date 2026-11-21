@@ -44,6 +44,7 @@ import { icon } from './ui/portraits.js';
 import { gameDate } from './engine/calendar.js';
 import { stadiumArt } from './ui/components.js';
 import { showLearn, shortWhy } from './ui/screens/learn.js';
+import { upgradeDept, assignScout, DEPTS, REGIONS } from './engine/front.js';
 
 // ───────── 렌더링 ─────────
 const PHASE_KO = { regular: '정규시즌', post: '포스트시즌', offseason: '오프시즌', contracts: '계약 협상', draft: '신인 드래프트', camp: '스프링캠프' };
@@ -113,7 +114,7 @@ function sceneFor(tab) {
     if (ph === 'post') return 'crowd';
     return `stadium${Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1))}`;
   }
-  if (tab === 'club') return { facility: 'office', staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'facility'] || 'office';
+  if (tab === 'club') return { front: 'office', facility: 'stadium' + Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1)), staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'facility'] || 'office';
   if (tab === 'roster' && ui.rosterView === 'futures') return 'futures';
   return { roster: 'clubhouse', develop: 'gym', league: 'crowd', mail: 'contract' }[tab] || 'stadium1';
 }
@@ -410,6 +411,8 @@ registerActions({
     commit();
   },
   learn: (d) => showLearn(d.k),
+  upgradeDept: (d) => { const err = upgradeDept(state, d.k); if (err) return toast(err, 'bad'); sfx.coin?.(); commit(`${DEPTS[d.k].ko} Lv.${userTeam(state).front[d.k]} 확장!`, 'good'); },
+  scoutAssign: (d) => { assignScout(state, Number(d.slot), d.value); commit(d.value ? `스카우트를 ${REGIONS[d.value].ko}에 보냈어요` : '스카우트 대기'); },
   learnClose: () => document.querySelector('.learnpop')?.remove(),
   natSeen: () => { if (state.natLast) state.natLast.seen = true; commit(); },
   toggleClutch: (d) => { state.settings.clutch = d.checked; commit(d.checked ? '승부처 알림 켜짐' : '승부처 알림 꺼짐'); },

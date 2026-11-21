@@ -15,6 +15,7 @@ import { calcOvr as ovrOf } from '../../engine/player.js';
 import { sangmuChance, milLabel } from '../../engine/military.js';
 import { teamPlayers as tps } from '../../engine/roster.js';
 import { icon } from '../portraits.js';
+import { satLabel, goalProgress } from '../../engine/front.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -166,6 +167,15 @@ function natCard() {
     <button class="btn sm mt" data-act="natSeen">확인</button>`, 'tall')}</section>`;
 }
 
+function boardCard() {
+  const b = state.board;
+  if (!b?.goals?.length) return '';
+  const sl = satLabel(b.sat);
+  return `<section class="sec"><div class="panel boardmini" data-act="tab" data-tab="club" role="button">
+    <div class="row gap"><span style="font-size:22px">${sl[1]}</span><div class="grow"><b class="small">모기업 이사회 목표</b><div class="satbar thin"><i style="width:${b.sat}%"></i></div></div><span class="tiny muted">만족 ${b.sat}</span></div>
+    <div class="goalrow mt">${b.goals.map((g) => `<span>${g.ko}<b>${goalProgress(state, g)}</b></span>`).join('')}</div></div></section>`;
+}
+
 function regularView() {
   const sg = userGameToday(state);
   const prog = seasonProgress(state);
@@ -182,6 +192,7 @@ function regularView() {
       <button class="btn sm" data-act="simDays" data-n="${remain}">시즌 끝까지</button>
     </div>
   </section>
+  ${boardCard()}
   ${missionCard()}
   ${lastGameCard()}
   ${snsCard()}

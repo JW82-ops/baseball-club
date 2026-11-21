@@ -34,7 +34,7 @@ export function renderDraft() {
     <div class="panel plist mt">${pool.slice(0, 40).map((p) => `
       <button class="prow" data-act="openPlayer" data-pid="${p.id}" data-draft="1">
         ${avatar(p, '#5f6f66', 38)}
-        <div class="grow"><div class="nm">${esc(p.name)}</div><div class="meta">${posShort(p)} · ${p.age}세 · ${esc(p.origin)} · ${esc(p.archKo)}</div></div>
+        <div class="grow"><div class="nm">${esc(p.name)}${p.scoutPick ? ' <span class="gem">⭐ 스카우트 추천</span>' : ''}</div><div class="meta">${posShort(p)} · ${p.age}세 · ${esc(p.origin)} · ${esc(p.archKo)}</div></div>
         <div class="right">${gradeTag(calcOvr(p))}${potTag(p, lv)}</div>
       </button>`).join('')}</div>
   </section>

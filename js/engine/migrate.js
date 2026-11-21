@@ -9,6 +9,7 @@ import { SAVE_VERSION } from '../data/constants.js';
 import { ensureMil } from './military.js';
 import { emptyBat, emptyPit } from './player.js';
 import { natOf } from '../data/nations.js';
+import { ensureFront } from './front.js';
 
 // 구버전 세이브를 현재 구조로 올림 (불러오기 직후 호출)
 export function upgradeSave(state) {
@@ -87,6 +88,7 @@ export function upgradeSave(state) {
     if (user.owner == null) user.owner = 0;
     state.version = 5;
   }
+  if (state.version < 6) { ensureFront(state); state.version = 6; }
   ensureClub(user);
   state.version = Math.max(state.version, SAVE_VERSION);
   return state;

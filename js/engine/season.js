@@ -7,7 +7,7 @@ import { developWeek, healWeek, ageUp, retireChance } from './development.js';
 import { autoAssignLevels, ensureLineupValid, firstTeam, teamPlayers, futures, teamOvr } from './roster.js';
 import { createGame, simToEnd, applyGame, boxSummary } from './match.js';
 import { makeSchedule, standings, addNews, pct } from './league.js';
-import { ensureClub, clubEffects, staffWeekly, tickConstruction, devCtxFor, healBonusFor, recoveryBonus, genStaffMarket, staffOffseason } from './club.js';
+import { staffStat, ensureClub, clubEffects, staffWeekly, tickConstruction, devCtxFor, healBonusFor, recoveryBonus, genStaffMarket, staffOffseason } from './club.js';
 import { LEAGUES } from '../data/club.js';
 import { weeklyMood, initRelations, relNewcomer, pruneRels } from './mood.js';
 import { weeklyMail, weeklyMailUpkeep, checkSponsorMail, systemMail } from './mail.js';
@@ -29,6 +29,7 @@ import { rollWeeklyEvent, offerMissions, trackUserGame, settleMission, emptyWeek
 import { settleFA, genForeignPool } from './market.js';
 import { assignNumber, considerHof } from './hof.js';
 import { leagueNat } from '../data/nations.js';
+import { frontWeekly, REGIONS, evaluateBoard, startBoardSeason, satLabel, draftGemCount, decayScout, ensureFront } from './front.js';
 
 export const CAMP_WEEKS = 6;
 export function weeksInSeason(state) { return Math.ceil(state.schedule.length / GAMES_PER_WEEK); }
@@ -241,6 +242,11 @@ export function weeklyCycle(state, opts = {}) {
     report.events.push({ type: 'build', text: `${d.name} 완공` });
   }
   if (!opts.camp) {
+    const sc = (staffStat(user, 'headScout', 'highschool') + staffStat(user, 'headScout', 'college') + staffStat(user, 'headScout', 'foreign')) / 3;
+    for (const f of frontWeekly(state, sc)) {
+      const R = REGIONS[f.r];
+      addNews(state, `🔭 ${R.ko} 스카우트 리포트 ${f.th === 60 ? '1차' : f.th === 120 ? '2차' : '최종'} 완료 — ${R.kind === 'hs' || R.kind === 'college' ? '드래프트 유망주 정보가 정확해지고 숨은 진주를 찾을 확률이 올라가요' : R.kind === 'indie' ? '독립리그 선수 평가가 정확해져요' : '다음 외국인 시장에 이 지역 후보가 추가돼요'}`, 'info');
+    }
     userFinanceWeek(state);
     payWeeklySponsors(state, weeksInSeason(state));
     weeklyPaper(state, ws);
@@ -487,6 +493,12 @@ function endSeason(state) {
     ledger: { ...user.ledger },
   });
   const userRank = state.finalStandings.indexOf(user.id) + 1;
+  {
+    const bd = evaluateBoard(state, userRank, state.post.seeds.includes(user.id), champ === user.id);
+    const sl = satLabel(bd.sat);
+    pushMail(state, { from: null, fromName: '모기업 이사회', kind: 'note', subject: `${state.season} 시즌 구단 평가`, body: `${bd.goals.map((g) => `${g.done ? '✅' : '❌'} ${g.ko}`).join(' / ')}. 이사회 만족도 ${bd.sat}점(${sl[0]}). 다음 시즌 지원금은 ${formatMoney(bd.support)}으로 정했습니다.` });
+    addNews(state, `🏢 모기업 이사회 평가: 만족도 ${bd.sat}점 ${sl[1]} — 목표 ${bd.goals.filter((g) => g.done).length}/${bd.goals.length} 달성`, 'big');
+  }
   for (const n of settleSponsorsSeason(state, userRank, state.post.seeds.includes(user.id), champ === user.id)) addNews(state, `🤝 ${n}`, 'info');
   for (const n of updateSeasonRecords(state)) addNews(state, n, 'big');
   for (const a of futuresAwards(state)) { const p = state.players[a.pid]; if (p?.team === user.id) addNews(state, `🌱 ${p.name} ${a.award}`, 'big'); }
@@ -618,6 +630,15 @@ function setupDraft(state) {
     state.players[p.id] = p;
     pool.push(p.id);
   }
+  // 스카우트 리포트로 찾은 숨은 진주 (유저에게만 ⭐ 표시)
+  const gems = draftGemCount(state);
+  const cand = pool.map((id) => state.players[id]).filter((p) => !p.scoutPick).sort(() => rng() - 0.5);
+  for (let i = 0; i < gems && i < cand.length; i++) {
+    const p = cand[i];
+    for (const k in p.cap) p.cap[k] = Math.min(99, p.cap[k] + randInt(6, 11));
+    p.scoutPick = true;
+  }
+  decayScout(state, ['hs', 'college'], 0.45);
   // 하위 팀부터 지명 (정규시즌 역순)
   const order = state.finalStandings.slice().reverse();
   state.draft = { year: state.season + 1, pool, order, round: 1, pickIdx: 0, picks: [] };
@@ -732,6 +753,10 @@ export function runCampAndStartSeason(state) {
       ensureLineupValid(state, t);
       fillUserFirstTeam(state);
     }
+  }
+  {
+    const sup = startBoardSeason(state);
+    if (sup) addNews(state, `🏢 모기업 지원금 ${formatMoney(sup)} 입금. 올 시즌 이사회 목표: ${state.board.goals.map((g) => g.ko).join(', ')}`, 'big');
   }
   state.schedule = makeSchedule(state.teamOrder, state.settings.seasonLength);
   state.day = 0;

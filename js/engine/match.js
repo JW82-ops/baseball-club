@@ -58,6 +58,7 @@ function side(state, team) {
     pitMgmt: ((team.isUser ? staffStat(team, 'manager', 'pitching') : 55) - 50) / 20,
     style: team.isUser ? mgrStyle(team) : null,
     chem: team.isUser ? teamChem(state, team) : 0,
+    anal: team.isUser ? (team.front?.analytics || 1) - 1 : (team.aiInvest ?? 1) * 0.6,
     homeAdv: 0,
     teamId: team.id,
     lineup,
@@ -156,7 +157,7 @@ function batterEff(state, g, b, pit, slotIdx = 0) {
   return {
     contact: b.r.contact * m + adj + cAdj,
     power: b.r.power * m + adj * 0.8 + pAdj,
-    eye: b.r.eye * m + adj * 0.4 + eAdj,
+    eye: b.r.eye * m + adj * 0.4 + eAdj + (o.anal || 0) * 0.6,
     speed: b.r.speed * m,
   };
 }
@@ -183,7 +184,7 @@ function pitcherEff(state, g, p, sd) {
   adj += formAdj(p);
   return {
     stuff: (p.r.velo * 0.5 + p.r.breaking * 0.5) * m - tired + adj,
-    control: p.r.control * m - tired * 0.8 + adj * 0.5,
+    control: p.r.control * m - tired * 0.8 + adj * 0.5 + (sd.anal || 0) * 0.8,
   };
 }
 

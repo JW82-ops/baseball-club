@@ -18,9 +18,50 @@ import { CLUB_COLORS } from '../../data/teams.js';
 import { avatar as av } from '../components.js';
 import { slot as curSlot } from '../../core/store.js';
 import { staffImg, bodyHtml, icon, ownerImg } from '../portraits.js';
+import { ensureFront, frontLv, DEPTS, DEPT_COST, DEPT_UPKEEP, REGIONS, satLabel, goalProgress, boardSupportBase } from '../../engine/front.js';
+import { flagOf } from '../../data/nations.js';
 
-const TAB_ICO = { facility: 'build', staff: 'staff', sponsor: 'sponsor', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
-const TABS = [['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['achv', '업적'], ['finance', '재정·설정']];
+const TAB_ICO = { front: 'club', facility: 'build', staff: 'staff', sponsor: 'sponsor', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
+const TABS = [['front', '프런트'], ['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['achv', '업적'], ['finance', '재정·설정']];
+
+// ───────── 프런트 ─────────
+function frontView(t) {
+  ensureFront(state);
+  const b = state.board;
+  const sl = satLabel(b.sat);
+  const n = frontLv(t, 'scouting');
+  const pts = state.scout.pts;
+  const boardCard = `<div class="panel">
+    <div class="row gap"><span style="font-size:30px">${sl[1]}</span><div class="grow"><b>모기업 이사회</b><div class="tiny muted">만족도 ${b.sat}점 · ${sl[0]} · 시즌 종료 후 평가해서 다음 시즌 지원금을 정해요</div></div></div>
+    <div class="satbar mt"><i style="width:${b.sat}%"></i></div>
+    <div class="mt">${b.goals.map((g) => `<div class="goal ${g.done === true ? 'ok' : g.done === false ? 'no' : ''}"><span>${g.done === true ? '✅' : g.done === false ? '❌' : '🎯'} ${g.ko}</span><b>${goalProgress(state, g)}</b></div>`).join('')}</div>
+    <p class="tiny faint mt">예상 지원금: 만족도에 따라 ${formatMoney(Math.round(boardSupportBase(state) * 0.5))} ~ ${formatMoney(Math.round(boardSupportBase(state) * 1.45))}</p>
+  </div>`;
+  const depts = Object.entries(DEPTS).map(([k, D]) => {
+    const lv = frontLv(t, k);
+    const cost = DEPT_COST[lv];
+    return `<div class="dept"><div class="row gap"><span class="dept-ic">${D.icon}</span><div class="grow"><div class="row between"><b>${D.ko}</b><span class="small amber">Lv.${lv}</span></div>
+      <div class="pips">${[1, 2, 3, 4, 5].map((i) => `<i class="${i <= lv ? 'on' : ''}"></i>`).join('')}</div>
+      <p class="tiny muted">${D.desc}</p><p class="tiny good">${D.per(lv)}${lv > 1 ? ` · 주간 유지비 ${formatMoney((lv - 1) * DEPT_UPKEEP)}` : ''}</p></div></div>
+      ${lv < 5 ? `<button class="btn sm block mt ${t.cash >= cost ? 'primary' : ''}" data-act="upgradeDept" data-k="${k}" ${t.cash >= cost ? '' : 'disabled'}>Lv.${lv + 1} 확장 · ${formatMoney(cost)}</button>` : '<p class="small good mt">최고 레벨</p>'}</div>`;
+  }).join('');
+  const slots = Array.from({ length: n }, (_, i) => {
+    const cur = state.scout.assign[i] || '';
+    return `<div class="row gap mt"><span class="small" style="width:72px">🔭 스카우트 ${i + 1}</span><select class="grow" data-change="scoutAssign" data-slot="${i}"><option value="">대기</option>${Object.entries(REGIONS).map(([r, R]) => `<option value="${r}" ${cur === r ? 'selected' : ''}>${R.icon} ${R.ko}</option>`).join('')}</select></div>`;
+  }).join('');
+  const regs = Object.entries(REGIONS).map(([r, R]) => {
+    const v = Math.round(pts[r] || 0);
+    const on = state.scout.assign.slice(0, n).includes(r);
+    return `<div class="regrow ${on ? 'on' : ''}"><span class="small">${R.icon} ${R.ko}</span><div class="regbar"><i style="width:${v / 2}%"></i><em style="left:30%"></em><em style="left:60%"></em><em style="left:90%"></em></div><b class="tiny">${v}</b></div>`;
+  }).join('');
+  return `${boardCard}
+    <div class="sec-h mt-l"><h2>부서</h2><span class="sub">확장하면 주간 유지비가 들어요</span></div>
+    ${depts}
+    <div class="sec-h mt-l"><h2>스카우트 파견</h2><button class="linkish" data-act="learn" data-k="scout">스카우트란?</button></div>
+    <div class="panel">${slots}
+      <p class="tiny muted mt">매주 리포트가 쌓여요. 60·120·180에서 단계가 올라가요. 고교·대학은 드래프트 정보 정확도와 숨은 진주(⭐), 해외는 외국인 시장 추가 후보와 정확한 평가로 이어져요.</p>
+      <div class="mt">${regs}</div></div>`;
+}
 
 // ───────── 시설 ─────────
 function buildingCard(t, k) {
@@ -162,7 +203,7 @@ function marketRow(p, t, isFA) {
   const price = isFA ? `요구 ${formatMoney(p.askSalary || p.salary)}` : formatMoney(signingFee(p));
   return `<button class="prow" data-act="${isFA ? 'faSheet' : 'openPlayer'}" data-pid="${p.id}">
     ${avatar(p, '#5f6f66', 38)}
-    <div class="grow"><div class="nm">${esc(p.name)}</div><div class="meta">${posShort(p)} · ${p.age}세 · ${esc(p.origin)}${isFA && p.prevTeam ? ` · 전 ${esc(state.teams[p.prevTeam]?.short || '')}` : ` · 연봉 ${formatMoney(p.salary)}`}</div></div>
+    <div class="grow"><div class="nm">${esc(p.name)} <span class="tiny">${flagOf(p)}</span>${p.scoutPick ? ' <span class="gem">⭐ 리포트</span>' : ''}</div><div class="meta">${posShort(p)} · ${p.age}세 · ${esc(p.origin)}${isFA && p.prevTeam ? ` · 전 ${esc(state.teams[p.prevTeam]?.short || '')}` : ` · 연봉 ${formatMoney(p.salary)}`}</div></div>
     <div class="right">${gradeTag(calcOvr(p))}<span class="small amber">${price}</span></div>
   </button>`;
 }
@@ -292,7 +333,7 @@ export function renderClub() {
   const phil = PHILOSOPHIES[t.philosophy];
   const titles = state.history.filter((h) => h.champion === t.id).length;
   const view = ui.clubView || 'facility';
-  const body = { facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
+  const body = { front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
   return `
   <section class="sec">
     <div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>

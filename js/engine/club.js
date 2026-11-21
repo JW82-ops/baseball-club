@@ -3,6 +3,7 @@ import { clamp, uid } from '../core/util.js';
 import { BUILDINGS, SUBS, MAX_CONCURRENT_BUILDS, STAFF_ROLES, MANAGER_STYLES, STAFF_BACKGROUNDS } from '../data/club.js';
 import { koreanName } from '../data/names.js';
 import { nameFor, ethFor, pickStaffImportNat } from '../data/nations.js';
+import { frontLv, scoutRegionBonus } from './front.js';
 
 // ───────── 구조 보장 ─────────
 export function ensureClub(team) {
@@ -199,6 +200,11 @@ export function clubEffects(team) {
     else e[eff] += v;
   }
   if (e.roof) e.injury *= 1 - e.roof * 0.04;
+  // 프런트 부서
+  const med = frontLv(team, 'medical'), mkt = frontLv(team, 'marketing');
+  e.injury *= 1 - (med - 1) * 0.05; e.heal += (med - 1) * 0.06; e.recovery += (med - 1) * 0.6;
+  e.fanGrowth += (mkt - 1) * 0.03; e.merch += (mkt - 1) * 0.06;
+  e.scout += (frontLv(team, 'scouting') - 1) * 0.3;
   return e;
 }
 
@@ -252,7 +258,7 @@ export function scoutLevelOf(state, p = null) {
     const origin = p.foreign ? 'foreign' : /고$|고\(/.test(p.origin || '') ? 'highschool' : 'college';
     stat = staffStat(t, 'headScout', origin) * 0.6 + staffStat(t, 'headScout', p.type === 'P' ? 'pitcherEye' : 'batterEye') * 0.4;
   }
-  return clamp(1 + eff.scout + (stat - 40) / 14, 1, 8);
+  return clamp(1 + eff.scout + (stat - 40) / 14 + (p ? scoutRegionBonus(state, p) : 0), 1, 8);
 }
 
 export { MANAGER_STYLES };

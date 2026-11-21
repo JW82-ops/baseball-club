@@ -6,6 +6,7 @@ import { LEAGUES } from '../data/club.js';
 import { relNewcomer } from './mood.js';
 import { rng } from '../core/rng.js';
 import { NATS, pickImportNat } from '../data/nations.js';
+import { regionImportBoost, decayScout } from './front.js';
 
 const FOREIGN_FIRST = ['마이클', '데이비드', '라이언', '조시', '케빈', '타일러', '브랜든', '호세', '루이스', '카를로스', '라파엘', '미겔', '알렉스', '네이선', '코디', '저스틴', '에릭', '헥터', '안드레', '윌머', '다니엘', '오스틴', '케이시', '로니'];
 const FOREIGN_LAST = ['존슨', '스미스', '로드리게스', '마르티네스', '가르시아', '페레스', '윌리엄스', '브라운', '데이비스', '로페즈', '에르난데스', '앤더슨', '톰슨', '화이트', '클락', '레예스', '산체스', '라미레스', '페냐', '카브레라', '알칸타라', '스톤', '헤이즈', '메디나'];
@@ -32,6 +33,16 @@ export function genForeignPool(state) {
     state.players[p.id] = p;
     pool.push(p.id);
   }
+  // 스카우트 리포트 지역의 추가 후보
+  for (const x of regionImportBoost(state)) {
+    const type = chance(0.55) ? 'P' : 'B';
+    const ovr = Math.min(90, Math.round(71 + x.bonus + Math.abs(gauss(0, 4))));
+    const p = createPlayer({ type, nat: x.nat, age: randInt(25, 31), ovr, pot: ovr + randInt(1, 4), pos: type === 'P' ? (chance(0.75) ? 'SP' : 'RP') : undefined });
+    p.origin = NATS[x.nat].ko; p.foreign = true; p.market = 'foreign'; p.scoutPick = true;
+    p.salary = foreignSalary(p);
+    state.players[p.id] = p; pool.push(p.id);
+  }
+  if (state.scout) decayScout(state, ['lat', 'us', 'asia'], 0.6);
   // 이전 풀 정리
   for (const id of state.foreignPool || []) if (state.players[id] && !state.players[id].team) delete state.players[id];
   state.foreignPool = pool;

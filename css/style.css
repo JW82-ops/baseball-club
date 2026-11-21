@@ -703,3 +703,26 @@ select, input[type=text] {
 .choice .why { color: #ffe08a !important; font-size: 12px !important; margin-top: 4px !important; }
 .linkish { color: var(--gold); text-decoration: underline; font-size: inherit; }
 .learnhead b { font-family: var(--display); font-weight: 400; font-size: 18px; }
+
+/* ───────── 프런트 ───────── */
+.satbar { height: 10px; border-radius: 99px; background: rgba(0, 0, 0, .35); overflow: hidden; box-shadow: inset 0 1px 3px rgba(0, 0, 0, .4); }
+.satbar.thin { height: 6px; margin-top: 4px; }
+.satbar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #ff6f61, #ffc53d 45%, #63d48f); }
+.goal { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; margin-top: 6px; border-radius: 10px; background: rgba(255, 255, 255, .05); font-size: 13.5px; }
+.goal.ok { background: rgba(99, 212, 143, .14); }
+.goal.no { background: rgba(255, 111, 97, .12); }
+.goal b { color: var(--gold); font-size: 13px; }
+.dept { background: var(--glass); border: 1px solid var(--line); border-radius: var(--r-m); padding: 12px 14px; margin: 10px 0; box-shadow: inset 0 1px 0 var(--glass-hi), 0 6px 16px rgba(0, 0, 0, .2); }
+.dept-ic { width: 44px; height: 44px; flex: none; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; background: rgba(255, 255, 255, .08); }
+.regrow { display: grid; grid-template-columns: 104px 1fr 30px; gap: 8px; align-items: center; margin-top: 7px; opacity: .75; }
+.regrow.on { opacity: 1; }
+.regrow.on span { color: var(--gold); font-weight: 700; }
+.regbar { position: relative; height: 8px; border-radius: 99px; background: rgba(0, 0, 0, .35); overflow: hidden; }
+.regbar i { display: block; height: 100%; background: linear-gradient(90deg, #4fa3ff, #63d48f); border-radius: 99px; }
+.regbar em { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, .35); }
+.gem { font-size: 11px; color: #ffe08a; background: rgba(255, 197, 61, .15); border: 1px solid rgba(255, 197, 61, .4); border-radius: 99px; padding: 1px 6px; vertical-align: middle; }
+.boardmini { cursor: pointer; }
+.goalrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.goalrow span { font-size: 12px; padding: 4px 9px; border-radius: 99px; background: rgba(255, 255, 255, .07); }
+.goalrow b { color: var(--gold); margin-left: 5px; }
+select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid var(--line-2); border-radius: 10px; padding: 7px 8px; font: inherit; font-size: 13.5px; }
