@@ -1,0 +1,9 @@
+{
+  "name": "프로야구팀을 만들자",
+  "short_name": "야구구단",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#10261c",
+  "theme_color": "#10261c",
+  "icons": [{ "src": "img/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
