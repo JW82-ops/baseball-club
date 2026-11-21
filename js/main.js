@@ -1,9 +1,9 @@
-import { state, setState, save, load, hasSave, wipe, exportSave, importSave } from './core/store.js';
+import { state, setState, save, load, hasSave, wipe, exportSave, importSave, setSlot, slot as curSlot } from './core/store.js';
 import { formatMoney, formatFans } from './core/util.js';
 import { ui, setRenderer, rerender } from './ui/ui-state.js';
 import { $, $$, registerActions, initActions, toast, openModal, closeModal, confirmBox, isModalOpen } from './ui/dom.js';
 import { esc, emblem } from './ui/components.js';
-import { renderCreate, initCreateActions } from './ui/screens/create.js';
+import { renderTitle, initCreateActions, title } from './ui/screens/create.js';
 import { renderHome, lineScore } from './ui/screens/home.js';
 import { renderRoster } from './ui/screens/roster.js';
 import { renderPlayer } from './ui/screens/player.js';
@@ -17,7 +17,8 @@ import {
   userTeam, simDay, prepareUserLiveGame, runOffseasonStart, advanceDraftToUser, draftPick, aiDraftChoice,
   finishDraft, runCampAndStartSeason, releasePlayer, fillUserFirstTeam,
 } from './engine/season.js';
-import { simToEnd } from './engine/match.js';
+import { simToEnd, stepPA } from './engine/match.js';
+import { isClutch, clutchOptions, clutchSituation } from './engine/clutch.js';
 import { upgradeBuilding, buildSub, hireStaff, fireStaff, bNext } from './engine/club.js';
 import { slotSheetHtml, subSheetHtml, staffMarketHtml } from './ui/screens/club.js';
 import { renderMail } from './ui/screens/mail.js';
@@ -28,6 +29,9 @@ import { evaluateTrade, executeTrade } from './engine/trade.js';
 import { addMoodEvent } from './engine/mood.js';
 import { proceedToDraft } from './engine/season.js';
 import { settleFA } from './engine/market.js';
+import { applyEnlist } from './engine/military.js';
+import { startLearnPitch, startConvert, sendCamp } from './engine/training.js';
+import { CLUB_COLORS } from './data/teams.js';
 import { resolveEvent, acceptMission } from './engine/events.js';
 import { signPlayer } from './engine/market.js';
 import { assignNumber, induct, passHof } from './engine/hof.js';
@@ -63,7 +67,7 @@ function render() {
   if (!state) {
     $('#hud').hidden = true;
     $('#tabs').hidden = true;
-    main.innerHTML = renderCreate(hasSave());
+    main.innerHTML = renderTitle();
     return;
   }
   $('#hud').hidden = false;
@@ -118,6 +122,50 @@ function simDays(n) {
   if (state.phase === 'post') toast('정규시즌 종료! 포스트시즌이 시작됐어요', 'big');
 }
 
+// 빠른 진행 + 승부처 개입
+function quickGame() {
+  if (state.settings.clutch === false) {
+    if (state.phase === 'post') { userResultToast(simDay(state)); return commit(); }
+    return simDays(1);
+  }
+  const g = prepareUserLiveGame(state);
+  if (!g) { if (state.phase === 'post') { userResultToast(simDay(state)); return commit(); } return simDays(1); }
+  ui.qs = g;
+  continueQuick();
+}
+function continueQuick() {
+  const g = ui.qs;
+  if (!g) return;
+  let guard = 0;
+  while (!g.over && guard++ < 500) {
+    if (!g.noClutch && isClutch(state, g)) { showClutch(g, continueQuick); return; }
+    stepPA(state, g);
+  }
+  ui.qs = null;
+  const res = simDay(state, { liveGame: g });
+  save(); render(); window.scrollTo(0, 0);
+  userResultToast(res);
+  if (state.phase === 'post' && !state.post?.champion) toast('포스트시즌 진행 중', 'big');
+}
+export function showClutch(g, cb) {
+  const opts = clutchOptions(state, g);
+  ui.clutchOpts = opts;
+  ui.clutchCb = cb;
+  sfx.cheer(0.06, 1);
+  const recent = g.log.slice(-4).filter((e) => !['half', 'info'].includes(e.type)).map((e) => `<li>${esc(e.text)}</li>`).join('');
+  const home = state.teams[g.homeId], away = state.teams[g.awayId];
+  openModal(`<div class="clutch">
+    <span class="small amber">⚡ 승부처</span>
+    <h2 class="disp">${esc(away.short)} ${g.away.runs} : ${g.home.runs} ${esc(home.short)}</h2>
+    <p class="small">${esc(clutchSituation(state, g))}</p>
+    ${recent ? `<ul class="news mt small">${recent}</ul>` : ''}
+    <p class="small muted mt">감독님, 어떻게 할까요?</p>
+    ${opts.map((o, i) => `<button class="choice" data-act="clutchPick" data-i="${i}"><b>${esc(o.label)}</b>${o.sub ? `<span>${esc(o.sub)}</span>` : ''}</button>`).join('')}
+    <button class="btn sm ghost block mt" data-act="clutchOff">이 경기는 그만 묻기</button>
+  </div>`, { sheet: false, onClose: () => { const c = ui.clutchCb; ui.clutchCb = null; if (c) setTimeout(c, 60); } });
+}
+window.__showClutch = showClutch;
+
 function finishLive() {
   const g = ui.live;
   unmountLive();
@@ -136,9 +184,29 @@ registerActions({
   closeModal: () => closeModal(),
   tab: (d) => { ui.tab = d.tab; ui.lineupSel = null; render(); window.scrollTo(0, 0); },
   continueGame: () => { load(); upgradeSave(state); fillUserFirstTeam(state); save(); render(); },
+  loadSlot: (d) => { setSlot(Number(d.n)); if (load()) { upgradeSave(state); fillUserFirstTeam(state); save(); ui.tab = 'home'; render(); window.scrollTo(0, 0); } else toast('세이브를 불러오지 못했어요', 'bad'); },
+  newSlot: (d) => { title.creating = true; title.slot = Number(d.n); render(); window.scrollTo(0, 0); },
+  backTitle: () => { title.creating = false; render(); },
+  deleteSlot: (d) => confirmBox(`슬롯 ${d.n}의 진행을 삭제할까요? 되돌릴 수 없어요.`, '삭제', () => { setSlot(Number(d.n)); wipe(); render(); }, 'danger'),
+  toTitle: () => { save(); setState(null); title.creating = false; render(); window.scrollTo(0, 0); },
 
   // 홈
-  simGame: () => simDays(1),
+  simGame: () => quickGame(),
+  clutchPick: (d) => {
+    const o = ui.clutchOpts?.[Number(d.i)];
+    if (o) o.act();
+    sfx.click();
+    closeModal();
+    const cb = ui.clutchCb; ui.clutchCb = null;
+    if (cb) setTimeout(cb, 60);
+  },
+  clutchOff: () => {
+    if (ui.qs) ui.qs.noClutch = true;
+    if (ui.live) ui.live.noClutch = true;
+    closeModal();
+    const cb = ui.clutchCb; ui.clutchCb = null;
+    if (cb) setTimeout(cb, 60);
+  },
   simDays: (d) => simDays(Number(d.n)),
   watchGame: () => {
     const g = prepareUserLiveGame(state);
@@ -262,6 +330,20 @@ registerActions({
     sfx.click();
     commit(msg || '답장을 보냈어요', 'good');
   },
+  enlist: (d) => { const r = applyEnlist(state, d.pid, d.t); commit(r.msg, r.ok ? 'good' : 'bad'); },
+  learnPitch: (d) => { const p = state.players[d.pid]; startLearnPitch(p, d.t); save(); openModal(renderPlayer(p.id)); toast(`${p.name} 신구종 연마 시작`); },
+  convertPos: (d) => { const p = state.players[d.pid]; startConvert(p, d.t); save(); openModal(renderPlayer(p.id)); toast(`${p.name} 포지션 전향 훈련 시작`); },
+  stopSpecial: (d) => { const p = state.players[d.pid]; p.learning = null; p.convert = null; p.focus = 'balanced'; save(); openModal(renderPlayer(p.id)); },
+  sendCamp: (d) => { const p = state.players[d.pid]; const r = sendCamp(state, userTeam(state), p, d.k); if (r.ok) { sfx.coin(); closeModal(); } commit(r.msg, r.ok ? 'good' : 'bad'); },
+  setUniform: (d) => {
+    const t = userTeam(state);
+    t.uniform = t.uniform || {};
+    if (d.k === 'color') { const c = CLUB_COLORS[Number(d.v)]; t.color = c.primary; t.color2 = c.secondary; }
+    else t.uniform[d.k] = d.v;
+    commit();
+  },
+  toggleClutch: (d) => { state.settings.clutch = d.checked; commit(d.checked ? '승부처 알림 켜짐' : '승부처 알림 꺼짐'); },
+  setDifficulty: (d) => { state.settings.difficulty = d.v; commit('난이도 변경'); },
   tradeTeam: (d) => { ui.trade = { otherId: d.id || null, give: [], get: [], cash: 0 }; render(); },
   tradeGet: (d) => { const tr = ui.trade; tr.get = tr.get.includes(d.pid) ? tr.get.filter((x) => x !== d.pid) : [...tr.get, d.pid]; render(); },
   tradeGive: (d) => { const tr = ui.trade; tr.give = tr.give.includes(d.pid) ? tr.give.filter((x) => x !== d.pid) : [...tr.give, d.pid]; render(); },
@@ -272,6 +354,7 @@ registerActions({
     if (!ev.ok) { toast(ev.msg, 'bad'); return; }
     const names = tr.get.map((id) => state.players[id].name).join(', ');
     executeTrade(state, tr.otherId, tr.give, tr.get, tr.cash);
+    state.flags = state.flags || {}; state.flags.traded = true;
     ui.trade = { otherId: tr.otherId, give: [], get: [], cash: 0 };
     sfx.levelup();
     commit(`트레이드 성사! ${names} 영입`, 'big');
@@ -467,7 +550,7 @@ registerActions({
       commit('세이브를 불러왔어요', 'good');
     } catch (e) { toast(e.message || '불러오기에 실패했어요', 'bad'); }
   },
-  resetGame: () => confirmBox('지금까지의 진행이 모두 지워져요. 처음부터 다시 창단할까요?', '처음부터', () => { wipe(); ui.tab = 'home'; render(); }, 'danger'),
+  resetGame: () => confirmBox('이 슬롯의 진행이 모두 지워져요. 처음부터 다시 창단할까요?', '처음부터', () => { const n = curSlot; wipe(); title.creating = true; title.slot = n; ui.tab = 'home'; render(); }, 'danger'),
 });
 
 function offerSheet(pid, mode, note = '') {
@@ -516,7 +599,9 @@ function boxModal() {
 // ───────── 부팅 ─────────
 initActions();
 initCreateActions(render, (opts) => {
+  setSlot(title.slot);
   wipe();
+  title.creating = false;
   const s = createNewGame(opts);
   setState(s);
   ui.tab = 'home';

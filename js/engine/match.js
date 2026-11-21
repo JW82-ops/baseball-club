@@ -8,6 +8,7 @@ import { injure } from './development.js';
 import { computeSynergies } from './synergy.js';
 import { staffStat, mgrStyle, clubEffects } from './club.js';
 import { teamChem, moodPerf } from './mood.js';
+import { updateForm, formAdj } from './form.js';
 import { velocityKmh } from './player.js';
 
 // 리그 평균 1군 능력치(≈65)를 기준점으로
@@ -149,6 +150,8 @@ function batterEff(state, g, b, pit, slotIdx = 0) {
   if (b.bats === 'S') adj += 1;
   else if (b.bats !== ph) adj += 3;
   else adj -= 3;
+  const f = formAdj(b);
+  cAdj += f; pAdj += f * 0.7;
   return {
     contact: b.r.contact * m + adj + cAdj,
     power: b.r.power * m + adj * 0.8 + pAdj,
@@ -176,6 +179,7 @@ function pitcherEff(state, g, p, sd) {
   adj += sd.homeAdv + sd.chem * 0.2;
   if (sd.pitcher !== sd.starter) adj += sd.pitMgmt;
   if (sd.style === 'pitching') adj += 1.5;
+  adj += formAdj(p);
   return {
     stuff: (p.r.velo * 0.5 + p.r.breaking * 0.5) * m - tired + adj,
     control: p.r.control * m - tired * 0.8 + adj * 0.5,
@@ -755,6 +759,8 @@ export function applyGame(state, g) {
       p.cond = clamp(p.cond - drain, 0, 100);
       p.xp = (p.xp || 0) + (s.pit.gs ? 2 : 1);
     }
+    const ch = updateForm(p, s);
+    if (ch && p.team === state.userTeamId) { g.formChanges = g.formChanges || []; g.formChanges.push({ pid, streak: ch }); }
     // 경기 중 부상
     let inj = 0.0016;
     if (hasTrait(p, 'glass')) inj *= 2;

@@ -13,8 +13,12 @@ import { HOF_BAR } from '../../engine/hof.js';
 import { brandValue, tierFor } from '../../engine/sponsor.js';
 import { playerValue, tradeOpen, evaluateTrade } from '../../engine/trade.js';
 import { moodLabel } from '../../engine/mood.js';
+import { ACHV } from '../../engine/achievements.js';
+import { CLUB_COLORS } from '../../data/teams.js';
+import { avatar as av } from '../components.js';
+import { slot as curSlot } from '../../core/store.js';
 
-const TABS = [['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['finance', '재정']];
+const TABS = [['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['achv', '업적'], ['finance', '재정·설정']];
 
 // ───────── 시설 ─────────
 function buildingCard(t, k) {
@@ -246,16 +250,36 @@ function financeView(t) {
         <button class="btn sm" data-act="ticket" data-d="-0.1">−</button><b>${Math.round(t.ticket * 10000).toLocaleString()}원</b><button class="btn sm" data-act="ticket" data-d="0.1">＋</button></div>
       <p class="tiny faint mt">티켓이 비싸면 관중이 줄어요. 리그 평균보다 너무 비싸지 않게 조절하세요.</p>
     </div>
+    <div class="sec-h mt-l"><h2>유니폼 디자인</h2></div>
+    <div class="panel">
+      <div class="row gap">${av({ id: 'uniform-preview', team: t.id, bats: 'R' }, t.color, 64)}
+        <div class="grow"><p class="small">메인 컬러</p><div class="swatches mt">${CLUB_COLORS.map((c, i) => `<button aria-label="${c.name}" class="${t.color === c.primary ? 'on' : ''}" style="background:${c.primary};width:30px;height:30px" data-act="setUniform" data-k="color" data-v="${i}"></button>`).join('')}</div></div></div>
+      <p class="small mt">상의 패턴</p>
+      <div class="seg mt">${[['solid', '단색'], ['pin', '핀스트라이프'], ['stripe', '가슴 라인']].map(([k, l]) => `<button class="${(t.uniform?.pattern || 'solid') === k ? 'on' : ''}" data-act="setUniform" data-k="pattern" data-v="${k}">${l}</button>`).join('')}</div>
+      <p class="small mt">모자</p>
+      <div class="seg mt">${[['solid', '단색'], ['two', '투톤']].map(([k, l]) => `<button class="${(t.uniform?.cap || 'solid') === k ? 'on' : ''}" data-act="setUniform" data-k="cap" data-v="${k}">${l}</button>`).join('')}</div>
+    </div>
     <div class="sec-h mt-l"><h2>설정</h2></div>
     <div class="panel">
-      <p class="small">다음 시즌부터 적용할 경기 수</p>
+      <label class="row gap small"><input type="checkbox" data-change="toggleClutch" ${state.settings.clutch !== false ? 'checked' : ''}/> 승부처에서 작전 물어보기 (결과만 보기·중계 모두)</label>
+      <p class="small mt">난이도 <span class="tiny faint">(수입·AI 투자에 바로 반영)</span></p>
+      <div class="seg mt">${[['easy', '쉬움'], ['normal', '보통'], ['hard', '어려움']].map(([k, l]) => `<button class="${(state.settings.difficulty || 'normal') === k ? 'on' : ''}" data-act="setDifficulty" data-v="${k}">${l}</button>`).join('')}</div>
+      <p class="small mt">다음 시즌부터 적용할 경기 수</p>
       <div class="seg mt">${SEASON_LENGTHS.map((n) => `<button class="${state.settings.seasonLength === n ? 'on' : ''}" data-act="seasonLen" data-v="${n}">${n}경기</button>`).join('')}</div>
       <div class="row gap mt-l wrap">
         <button class="btn sm" data-act="exportSave">세이브 내보내기</button>
         <button class="btn sm" data-act="importSave">세이브 불러오기</button>
+        <button class="btn sm" data-act="toTitle">슬롯 선택 화면 (현재 ${curSlot}번)</button>
         <button class="btn sm danger" data-act="resetGame">처음부터 다시</button>
       </div>
     </div>`;
+}
+
+function achvView() {
+  const got = state.achv || {};
+  const n = ACHV.filter((a) => got[a.id]).length;
+  return `<p class="small muted">${n}/${ACHV.length} 달성</p>
+    <div class="achv-grid mt">${ACHV.map((a) => `<div class="achv ${got[a.id] ? 'on' : ''}"><span>${got[a.id] ? a.icon : '🔒'}</span><b>${a.ko}</b><small>${got[a.id] ? `${got[a.id]} 달성` : a.desc}</small></div>`).join('')}</div>`;
 }
 
 export function renderClub() {
@@ -263,7 +287,7 @@ export function renderClub() {
   const phil = PHILOSOPHIES[t.philosophy];
   const titles = state.history.filter((h) => h.champion === t.id).length;
   const view = ui.clubView || 'facility';
-  const body = { facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, finance: financeView }[view](t);
+  const body = { facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
   return `
   <section class="sec">
     <div class="panel row gap card-accent">${emblem(t, 50)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>

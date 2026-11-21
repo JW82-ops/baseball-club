@@ -12,6 +12,8 @@ import { LEAGUES } from '../../data/club.js';
 import { fairSalary } from '../../engine/contracts.js';
 import { moodLabel } from '../../engine/mood.js';
 import { calcOvr as ovrOf } from '../../engine/player.js';
+import { sangmuChance, milLabel } from '../../engine/military.js';
+import { teamPlayers as tps } from '../../engine/roster.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -35,7 +37,7 @@ function matchupCard(sg, title) {
   const hp = probable(home), ap = probable(away);
   return `
   <div class="matchup">
-    <div class="mh"><span>${title}</span><span>${esc(home.city || '')} 홈</span></div>
+    <div class="mh"><span>${title}</span><span>${userTeam(state).rivalId && (sg.home === userTeam(state).rivalId || sg.away === userTeam(state).rivalId) ? '<b class="amber">⚔️ 라이벌전</b> · ' : ''}${esc(home.city || '')} 홈</span></div>
     <div class="teams">
       <div class="tm">${emblem(away, 46)}<b>${esc(away.short || away.name)}</b><small>${recordStr(away)}</small></div>
       <div class="vs">VS</div>
@@ -170,6 +172,7 @@ function regularView() {
   </section>
   ${missionCard()}
   ${lastGameCard()}
+  ${snsCard()}
   ${paperCard()}
   ${weekCard()}
   ${synergyCard()}
@@ -275,9 +278,20 @@ function contractsView() {
     <div class="row gap mt"><button class="btn sm grow" data-act="negoAll" data-m="accept">연봉협상 전원 수용</button><button class="btn sm grow" data-act="negoAll" data-m="fair">전원 기준액</button></div>
     ${items.some((x) => x.kind === 'stay' && x.status === 'pending') ? '<button class="btn sm block mt" data-act="negoAll" data-m="stay">FA 잔류 희망자 요구 조건 전원 수용</button>' : ''}
     <div class="mt">${sorted.map(row).join('') || '<div class="panel empty">이번 오프시즌엔 협상할 선수가 없어요.</div>'}</div>
+    ${enlistSection()}
     <button class="btn primary block mt-l" data-act="proceedDraft">협상 마감 → FA 시장 · 드래프트</button>
     <p class="tiny faint mt center">남은 연봉협상은 기준액으로, 남은 FA 선언자는 시장으로 나가요.</p>
   </section>`;
+}
+
+function enlistSection() {
+  const t = userTeam(state);
+  const c = tps(state, t).filter((p) => p.mil === 'none' && p.age >= 20).sort((a, b) => b.age - a.age);
+  if (!c.length) return '';
+  return `<div class="sec-h mt-l"><h2>🪖 병역 관리</h2><span class="sub">미필 ${c.length}명</span></div>
+    <p class="tiny faint">입대하면 다음 시즌을 통째로 빠지고 그다음 시즌 캠프에 복귀해요. 상무는 실전으로 성장하지만 합격해야 하고, 현역은 감각이 떨어져요. 28세가 되면 강제로 현역 입대해요. 아시안게임 금메달이면 면제!</p>
+    ${c.map((p) => `<div class="nego"><div class="row gap"><div class="grow"><b>${esc(p.name)}</b> <span class="tiny muted">${p.age}세 · OVR ${ovrOf(p)} · ${milLabel(p)}${p.sangmuFailed === state.season ? ' · 올해 상무 탈락' : ''}</span></div></div>
+      <div class="row gap mt"><button class="btn sm grow" data-act="enlist" data-pid="${p.id}" data-t="sangmu" ${p.sangmuFailed === state.season ? 'disabled' : ''}>상무 지원 (합격률 ${Math.round(sangmuChance(p) * 100)}%)</button><button class="btn sm grow ghost" data-act="enlist" data-pid="${p.id}" data-t="active">현역 입대</button></div></div>`).join('')}`;
 }
 
 function mailCard() {
@@ -286,6 +300,13 @@ function mailCard() {
   const m = pend[0];
   return `<section class="sec"><button class="panel card-accent mailcard" data-act="tab" data-tab="mail">
     <span class="tiny amber">✉️ 답장을 기다리는 메일 ${pend.length}통</span><br><b>${esc(m.fromName || '')}</b> <span class="small">${esc(m.subject)}</span></button></section>`;
+}
+
+function snsCard() {
+  const list = (state.sns || []).slice(0, 4);
+  if (!list.length) return '';
+  return `<section class="sec"><div class="sec-h"><h2>팬 반응</h2><span class="sub">실시간</span></div>
+    <div class="panel sns">${list.map((x) => `<div class="post ${x.mood}"><b>@${esc(x.h)}</b><p>${esc(x.text)}</p><span class="tiny faint">♥ ${x.likes.toLocaleString()}</span></div>`).join('')}</div></section>`;
 }
 
 function paperCard() {

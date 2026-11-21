@@ -3,6 +3,7 @@ import { POS_KO, GROWTH_TYPES, PITCHES as PITCHES_KO } from '../data/constants.j
 import { TRAITS } from '../data/traits.js';
 import { calcOvr, gradeFromOvr, potentialEstimate, velocityKmh } from '../engine/player.js';
 import { escapeHtml } from '../core/util.js';
+import { state } from '../core/store.js';
 
 export const esc = escapeHtml;
 
@@ -26,6 +27,9 @@ export function potTag(p, scoutLv) {
 }
 
 export function avatar(p, color = '#888', size = 44) {
+  const team = p.team && state?.teams?.[p.team];
+  const uni = team?.uniform || {};
+  const c2 = team?.color2 || '#111';
   let seed = 0;
   for (const ch of p.id) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
   const skins = ['#f3d2b3', '#e8bd96', '#d9a77d', '#c48a60'];
@@ -38,10 +42,12 @@ export function avatar(p, color = '#888', size = 44) {
   return `<svg class="avatar" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true">
     <rect width="48" height="48" rx="10" fill="#0e2219"/>
     <path d="M9 48c0-10 6-14 15-14s15 4 15 14z" fill="${color}"/>
+    ${uni.pattern === 'pin' ? `<g stroke="${c2}" stroke-width=".7" opacity=".55"><path d="M14 40v8M18 37v11M22 35v13M26 35v13M30 37v11M34 40v8"/></g>` : uni.pattern === 'stripe' ? `<path d="M10 43h28v2.4H10z" fill="${c2}" opacity=".8"/>` : ''}
     <path d="M21 34l3 6 3-6z" fill="#f2efe6" opacity=".85"/>
     <circle cx="24" cy="24" r="10" fill="${skin}"/>
     <path d="M13.5 22c0-8 4.6-11.5 10.5-11.5S34.5 14 34.5 22z" fill="${color}"/>
-    <rect x="12" y="19.5" width="17" height="3" rx="1.5" fill="${color}"/>
+    <rect x="12" y="19.5" width="17" height="3" rx="1.5" fill="${uni.cap === 'two' ? c2 : color}"/>
+    ${uni.cap === 'two' ? `<path d="M19 12.5c1.5-1.3 3.2-2 5-2s3.5.7 5 2" stroke="${c2}" stroke-width="2.5" fill="none"/>` : ''}
     <path d="M14.5 21.5c2-.6 3.5-.6 5 0" stroke="${hair}" stroke-width="1.3" fill="none" transform="translate(0 ${brow - 22})"/>
     <circle cx="20.5" cy="25" r="1.2" fill="#1b1b1b"/><circle cx="27.5" cy="25" r="1.2" fill="#1b1b1b"/>
     ${glasses ? '<g fill="none" stroke="#d6d3c7" stroke-width=".9"><rect x="17.5" y="23.2" width="5.5" height="3.6" rx="1"/><rect x="25" y="23.2" width="5.5" height="3.6" rx="1"/><path d="M23 25h2"/></g>' : ''}

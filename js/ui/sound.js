@@ -75,5 +75,6 @@ export const sfx = {
   win: () => [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, 'sine', 0.35, 0.12, i * 0.12)),
   loss: () => [400, 350, 300, 240].forEach((f, i) => tone(f, 'triangle', 0.3, 0.08, i * 0.13)),
   levelup: () => [659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => tone(f, 'triangle', 0.18, 0.08, i * 0.07)),
+  chant: () => { [0, 0.18, 0.36, 0.7, 0.88].forEach((w) => noise(0.06, 0.12, 1800, 1.2, w)); },
   coin: () => { tone(988, 'square', 0.07, 0.04); tone(1319, 'square', 0.2, 0.04, 0.07); },
 };

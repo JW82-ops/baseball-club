@@ -6,6 +6,8 @@ import { initRelations } from './mood.js';
 import { ensureContract } from './contracts.js';
 import { genSponsorOffers } from './sponsor.js';
 import { SAVE_VERSION } from '../data/constants.js';
+import { ensureMil } from './military.js';
+import { emptyBat, emptyPit } from './player.js';
 
 // 구버전 세이브를 현재 구조로 올림 (불러오기 직후 호출)
 export function upgradeSave(state) {
@@ -62,6 +64,19 @@ export function upgradeSave(state) {
     genStaffMarket(state);
     genSponsorOffers(state);
     state.version = 3;
+  }
+  if (state.version < 4) {
+    for (const id in state.players) {
+      const p = state.players[id];
+      if (!p.team) continue;
+      ensureMil(p);
+      if (p.cur && !p.cur.fut) p.cur.fut = p.type === 'P' ? emptyPit() : emptyBat();
+    }
+    for (const tid of state.teamOrder) if (!state.teams[tid].isUser && state.teams[tid].aiInvest == null) state.teams[tid].aiInvest = 1;
+    state.settings.difficulty = state.settings.difficulty || 'normal';
+    if (state.settings.clutch == null) state.settings.clutch = true;
+    state.sns = state.sns || [];
+    state.version = 4;
   }
   ensureClub(user);
   state.version = Math.max(state.version, SAVE_VERSION);

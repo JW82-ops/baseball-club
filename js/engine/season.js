@@ -15,6 +15,15 @@ import { payWeeklySponsors, settleSponsorsSeason, genSponsorOffers } from './spo
 import { startContractPhase, finishContractPhase, ensureContract } from './contracts.js';
 import { updateSeasonRecords, weeklyPaper } from './records.js';
 import { checkPromotionOffer, promote } from './promotion.js';
+import { offseasonMilitary, returnFromService, militaryWeek, ensureMil } from './military.js';
+import { eventFor, runTournament, EVENTS as NAT_EVENTS } from './national.js';
+import { futuresWeek, futuresAwards } from './futures.js';
+import { snsAfterGame, trackRivalry, checkMilestones, rookieDebut, lastSeasonCheck, retirementCeremony, pressTriggers, snsPost } from './story.js';
+import { trainingProgress, finishCamp } from './training.js';
+import { checkAchievements } from './achievements.js';
+import { pushMail } from './mail.js';
+import { teamChem } from './mood.js';
+import { playerValue } from './trade.js';
 import { computeSynergies } from './synergy.js';
 import { rollWeeklyEvent, offerMissions, trackUserGame, settleMission, emptyWeekStats } from './events.js';
 import { settleFA, genForeignPool } from './market.js';
@@ -60,6 +69,7 @@ export function simDay(state, opts = {}) {
       userResult = { sg, g };
       trackUserGame(state, g, sg);
       state.lastBox = { day: state.day, season: state.season, ...boxSummary(state, g), homeId: sg.home, awayId: sg.away };
+      userGameStory(state, g, sg);
       userFinanceGame(state, sg);
       handleGameInjuries(state, g);
     } else if (g.injuries) for (const pid of g.injuries) state.players[pid].level = 2;
@@ -111,6 +121,31 @@ function recordResult(state, sg, g) {
       else if (pt && pt.so >= 10) addNews(state, `${p.name} ${pt.so}탈삼진 쇼!`, 'good');
     }
   }
+}
+
+function gameStar(state, g, sd) {
+  let best = null, bv = -1;
+  for (const l of sd.lineup) {
+    const b = g.stats[l.pid]?.bat; if (!b) continue;
+    const v = b.h + b.hr * 2 + b.rbi;
+    if (v > bv) { bv = v; best = state.players[l.pid]; }
+  }
+  return bv >= 3 ? best : null;
+}
+
+function userGameStory(state, g, sg) {
+  const uidv = state.userTeamId;
+  const side = sg.home === uidv ? g.home : g.away;
+  snsAfterGame(state, g, sg, gameStar(state, g, side));
+  trackRivalry(state, g, sg);
+  rookieDebut(state, g);
+  checkMilestones(state, [...side.lineup.map((l) => l.pid), ...side.used]);
+  for (const f of g.formChanges || []) {
+    const p = state.players[f.pid];
+    if (f.streak === 'hot') addNews(state, `🔥 ${p.name} 감 잡았다! 핫 스트릭`, 'good');
+    else if (f.streak === 'cold') addNews(state, `🧊 ${p.name} 슬럼프에 빠졌어요`, 'bad');
+  }
+  pressTriggers(state, (m) => pushMail(state, m));
 }
 
 function handleGameInjuries(state, g) {
@@ -183,16 +218,22 @@ export function weeklyCycle(state, opts = {}) {
         tickScale: ts * (opts.camp ? 1.1 : 1),
         ...dc,
       });
+      const campKey = p.injury?.cause === 'camp' ? p.injury.camp : null;
+      const wasLeave = p.injury?.cause === 'leave';
       const healed = healWeek(p, healB);
+      if (isUser && healed && campKey) { addNews(state, `✈️ ${finishCamp(p, campKey)}`, 'big'); }
+      if (isUser && !opts.camp) { const tp = trainingProgress(state, team, p); if (tp) { addNews(state, `✨ ${tp}`, 'big'); report.events.push({ type: 'train', text: tp }); } }
       if (isUser) {
         if (res.after !== res.before) report.risers.push({ pid: p.id, name: p.name, before: res.before, after: res.after });
         res.events.forEach((e) => { report.events.push(e); addNews(state, e.type === 'injury' ? `🚑 ${e.text}` : `✨ ${e.text}`, e.type === 'injury' ? 'bad' : 'big'); });
         if (res.events.some((e) => e.type === 'injury')) p.level = 2;
-        if (healed) addNews(state, `💪 ${p.name} 부상 회복 — 1군 복귀 가능`, 'good');
+        if (healed && !campKey) addNews(state, wasLeave ? `🏠 ${p.name} 휴가 복귀 — 1군에 다시 올려주세요` : `💪 ${p.name} 부상 회복 — 1군 복귀 가능`, 'good');
       }
     }
     if (!isUser) autoAssignLevels(state, team);
+    if (!opts.camp) futuresWeek(state, team);
   }
+  militaryWeek(state, developWeek, ts);
   const user = userTeam(state);
   for (const d of tickConstruction(user)) {
     addNews(state, `🏗️ ${d.name} 공사 완료! ${d.title}${d.kind === 'b' ? ` (Lv.${d.lv})` : ''}`, 'big');
@@ -202,6 +243,9 @@ export function weeklyCycle(state, opts = {}) {
     userFinanceWeek(state);
     payWeeklySponsors(state, weeksInSeason(state));
     weeklyPaper(state, ws);
+    midSeasonInternational(state);
+    state.flags = state.flags || {};
+    state.flags.chem = teamChem(state, user);
     const m = settleMission(state);
     if (m) {
       addNews(state, m.done ? `🎯 스폰서 미션 성공: ${m.title} (+${formatMoney(m.reward)})` : `🎯 스폰서 미션 실패: ${m.title} (${m.final}/${m.target})`, m.done ? 'good' : 'bad');
@@ -216,9 +260,66 @@ export function weeklyCycle(state, opts = {}) {
     } else state.missionOffers = [];
   }
   fillUserFirstTeam(state);
+  for (const a of checkAchievements(state)) { addNews(state, `🏆 업적 달성: ${a.icon} ${a.ko}`, 'big'); (state.newAchv = state.newAchv || []).push(a.id); }
   report.risers.sort((a, b) => (b.after - b.before) - (a.after - a.before));
   state.weekLog = report;
   return report;
+}
+
+function natNews(state, r) {
+  const E = NAT_EVENTS[r.ev];
+  const md = { gold: '🥇 금메달', silver: '🥈 은메달', bronze: '🥉 동메달' }[r.medal] || '메달 획득 실패';
+  addNews(state, `🇰🇷 ${state.season} ${E.ko} 대표팀 ${md}${r.mine.length ? ` — 우리 구단 ${r.mine.map((p) => p.name).join(', ')} 출전` : ''}`, r.medal === 'gold' ? 'big' : 'info');
+  for (const n of r.notes) addNews(state, n, 'big');
+  pushMail(state, { from: null, fromName: 'KBO 사무국', kind: 'note', subject: `${E.ko} 결과`, body: `${r.log.map((x) => `${x.round} vs ${x.opp} ${x.win ? '승' : '패'} ${x.score}`).join(' / ')}. 최종: ${md}.${r.mine.length ? ` 우리 구단 출전: ${r.mine.map((p) => p.name).join(', ')}` : ''}` });
+  if (r.medal === 'gold') snsPost(state, `대한민국 ${E.short} 금메달!!! ${r.mine.length ? `${r.mine[0].name} 최고 👏` : ''} 🇰🇷`, 'pos', 2);
+}
+function midSeasonInternational(state) {
+  const ev = eventFor(state.season, 'mid');
+  if (!ev || state.natDone?.[`${state.season}${ev}`]) return;
+  if (state.day < Math.floor(state.schedule.length * 0.72)) return;
+  state.natDone = state.natDone || {};
+  state.natDone[`${state.season}${ev}`] = 1;
+  natNews(state, runTournament(state, ev));
+}
+export function offseasonInternational(state, when) {
+  const ev = eventFor(state.season + (when === 'camp' ? 1 : 0), when);
+  const season = state.season + (when === 'camp' ? 1 : 0);
+  if (!ev || state.natDone?.[`${season}${ev}`]) return;
+  state.natDone = state.natDone || {};
+  state.natDone[`${season}${ev}`] = 1;
+  natNews(state, runTournament(state, ev));
+}
+
+// AI 구단 운영: 투자 레벨 변화, 인플레이션 억제, AI끼리 트레이드
+function aiOffseason(state) {
+  const st = state.finalStandings || state.teamOrder;
+  const lg = LEAGUES[state.league || 'KBO'];
+  for (const tid of state.teamOrder) {
+    const t = state.teams[tid];
+    if (t.isUser) continue;
+    const o = teamOvr(state, t);
+    const target = t.strength + lg.strengthAdd;
+    if (o > target + 2) t.aiInvest = Math.max(0, (t.aiInvest || 0) - 1);
+    else if (o < target - 1 && chance(0.6)) t.aiInvest = Math.min(4, (t.aiInvest || 0) + 1);
+    const rank = st.indexOf(tid) + 1;
+    t.mode = rank <= 3 ? 'contend' : rank >= 8 ? 'rebuild' : 'neutral';
+  }
+  const cont = state.teamOrder.filter((id) => state.teams[id].mode === 'contend');
+  const reb = state.teamOrder.filter((id) => state.teams[id].mode === 'rebuild');
+  for (let i = 0; i < 2 && cont.length && reb.length; i++) {
+    const a = state.teams[pick(cont)], b = state.teams[pick(reb)];
+    const vet = teamPlayers(state, b).filter((p) => p.age >= 28 && calcOvr(p) >= 68 && !p.injury).sort((x, y) => calcOvr(y) - calcOvr(x))[0];
+    const pros = teamPlayers(state, a).filter((p) => p.age <= 23 && !p.injury).sort((x, y) => potOvr(y) - potOvr(x)).slice(0, 4);
+    if (!vet || !pros.length) continue;
+    const want = playerValue(vet, b);
+    const give = pros.find((p) => playerValue(p, b) >= want * 0.8) || pros[0];
+    for (const [p, from, to] of [[vet, b, a], [give, a, b]]) {
+      from.roster = from.roster.filter((x) => x !== p.id); to.roster.push(p.id); p.team = to.id; p.level = 2;
+      assignNumber(state, to, p);
+    }
+    addNews(state, `🔁 트레이드: ${a.short} ${give.name}(${give.age}세) ↔ ${b.short} ${vet.name}(${calcOvr(vet)})`, 'info');
+  }
 }
 
 function aiFocus(p) {
@@ -240,7 +341,9 @@ function userFinanceGame(state, sg) {
   const eff = clubEffects(team);
   const winF = 0.75 + pct(team) * 0.6;
   const priceF = Math.pow(1.5 * (LEAGUES[state.league || 'KBO'].ticketMult) / Math.max(0.3, team.ticket), 0.6);
-  const demand = (4000 + team.fans * 0.11) * winF * priceF * (0.85 + Math.random() * 0.3);
+  const rivalF = team.rivalId && (sg.away === team.rivalId) ? 1.25 : 1;
+  const diffF = { easy: 1.2, normal: 1, hard: 0.85 }[state.settings.difficulty || 'normal'];
+  const demand = (4000 + team.fans * 0.11) * winF * priceF * rivalF * diffF * (0.85 + Math.random() * 0.3);
   const att = Math.round(Math.min(team.capacity, demand));
   const ticket = Math.round(att * team.ticket);
   const merch = Math.round(att * 0.35 * (1 + eff.merch) * LEAGUES[state.league || 'KBO'].ticketMult) + eff.vip;
@@ -384,6 +487,7 @@ function endSeason(state) {
   const userRank = state.finalStandings.indexOf(user.id) + 1;
   for (const n of settleSponsorsSeason(state, userRank, state.post.seeds.includes(user.id), champ === user.id)) addNews(state, `🤝 ${n}`, 'info');
   for (const n of updateSeasonRecords(state)) addNews(state, n, 'big');
+  for (const a of futuresAwards(state)) { const p = state.players[a.pid]; if (p?.team === user.id) addNews(state, `🌱 ${p.name} ${a.award}`, 'big'); }
   const promo = checkPromotionOffer(state);
   if (promo) systemMail(state, `${LEAGUES[promo].ko} 사무국`, `${LEAGUES[promo].flag} ${LEAGUES[promo].ko} 진출 제안`, `${state.season} 시즌 우승을 축하드립니다. ${user.name}을(를) ${LEAGUES[promo].ko}로 초청합니다. 오프시즌 화면에서 수락 여부를 결정해 주세요.`);
   state.phase = 'offseason';
@@ -426,9 +530,11 @@ export function runOffseasonStart(state) {
     const p = state.players[id];
     if (!p.team || p.amateur) continue; // 시장·아마추어 선수 제외
     p.history.push(packHistory(p, state.season, state.teams[p.team]?.short, p.team));
-    if (chance(retireChance(p))) {
-      if (p.team === user.id) retiredUser.push(p.name);
-      retirePlayer(state, p);
+    if (p.lastSeason === state.season || chance(retireChance(p))) {
+      const wasUser = p.team === user.id;
+      if (wasUser) retiredUser.push(p.name);
+      const entry = retirePlayer(state, p);
+      if (wasUser && entry) retirementCeremony(state, entry);
       continue;
     }
     ageUp(p);
@@ -440,6 +546,10 @@ export function runOffseasonStart(state) {
     if (t.isUser) continue;
     trimRoster(state, t, 52);
   }
+  for (const n of offseasonMilitary(state)) addNews(state, `🪖 ${n}`, 'info');
+  offseasonInternational(state, 'off');
+  aiOffseason(state);
+  state.flags = state.flags || {};
   const left = staffOffseason(state, user);
   if (left.length) addNews(state, `👔 고령으로 코치 은퇴: ${left.join(', ')}`, 'info');
   startContractPhase(state); // phase = 'contracts'
@@ -462,6 +572,7 @@ function retirePlayer(state, p) {
   state.retired.push(entry);
   considerHof(state, entry);
   if (state.retired.length > 400) state.retired.shift();
+  return entry;
   delete state.players[p.id];
 }
 
@@ -585,6 +696,7 @@ export function runCampAndStartSeason(state) {
   settleFA(state, assignNumber);
   if (state.pendingPromotion) promote(state, state.pendingPromotion);
   state.promotionOffer = null;
+  offseasonInternational(state, 'camp');
   state.season += 1;
   for (let w = 0; w < CAMP_WEEKS; w++) {
     const rep = weeklyCycle(state, { camp: true });
@@ -632,7 +744,9 @@ export function runCampAndStartSeason(state) {
   offerMissions(state);
   genSponsorOffers(state);
   pruneRels(state);
-  for (const id in state.players) { const pl = state.players[id]; if (pl.team) ensureContract(pl); }
+  for (const id in state.players) { const pl = state.players[id]; if (pl.team) { ensureContract(pl); ensureMil(pl); } }
+  for (const n of returnFromService(state)) addNews(state, `🎖️ ${n}`, 'big');
+  lastSeasonCheck(state, retireChance);
   addNews(state, `⚾ ${state.season} 시즌 개막! 스프링캠프를 마치고 새 시즌을 시작합니다.`, 'big');
 }
 

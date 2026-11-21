@@ -50,6 +50,7 @@ export function renderDevelop() {
     <p class="tiny faint mt">선수를 눌러 훈련 포인트를 정해주세요. 잠재력은 추정치이고, 오래 지켜볼수록 정확해져요.</p>
   </section>
 
+  ${specialOverview(all, team)}
   <section class="sec">
     <div class="sec-h"><h2>컨디션 관리</h2></div>
     <div class="panel plist">
@@ -65,4 +66,10 @@ function row(p, team, right, meta) {
   return `<button class="prow" data-act="openPlayer" data-pid="${p.id}">${avatar(p, team.color, 36)}
     <div class="grow"><div class="nm">${esc(p.name)} ${condDot(p)}</div><div class="meta">${posShort(p)} · ${p.age}세${meta ? ` · ${meta}` : ''}</div></div>
     ${gradeTag(calcOvr(p))}${right}</button>`;
+}
+
+function specialOverview(all, team) {
+  const rows = all.filter((p) => p.learning || p.convert || p.injury?.cause === 'camp');
+  return `<section class="sec"><div class="sec-h"><h2>특별 훈련 현황</h2><span class="sub">선수 카드에서 시작</span></div>
+    <div class="panel plist">${rows.map((p) => row(p, team, `<span class="small amber">${p.injury?.cause === 'camp' ? `${p.injury.weeks}주` : `${Math.round((p.learning || p.convert).prog)}%`}</span>`, p.injury?.cause === 'camp' ? esc(p.injury.name) : p.learning ? '신구종 연마' : '포지션 전향')).join('') || '<div class="empty">진행 중인 특별 훈련이 없어요. 선수 카드 > 특별 훈련에서 신구종·포지션 전향·해외 캠프를 시작할 수 있어요.</div>'}</div></section>`;
 }

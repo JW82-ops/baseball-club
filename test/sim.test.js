@@ -55,3 +55,8 @@ import('../js/engine/club.js').then(({ startUpgrade, facLv }) => {
   console.log('league', s.league, 'inbox', (s.inbox||[]).length, 'rels', Object.keys(s.rels||{}).length, 'paper', (s.paper||[]).length, 'sponsors', Object.keys(u.sponsors||{}).length, 'offers', (s.sponsorOffers||[]).length);
   console.log('hof cand', (s.hofCandidates||[]).length, 'retired user', s.retired.filter(r=>r.wasUser).length, 'foreignPool', s.foreignPool.length, 'staffMarket', s.staffMarket.length, 'event', s.pendingEvent?.title, 'offers', (s.missionOffers||[]).map(m=>m.title).join('/'));
 });
+setTimeout(() => {
+  const mil = s.teamOrder.reduce((a, id) => a + (s.teams[id].military || []).length, 0);
+  console.log('military', mil, 'intl', JSON.stringify((s.international || []).map(x => [x.season, x.ev, x.medal, x.mine.length])), 'achv', Object.keys(s.achv || {}).join(','), 'sns', (s.sns || []).length);
+  console.log(s.news.filter(n => /🪖|🎖️|🇰🇷|🔥|🌱|🎤|🎗️|⚔️|🔁/.test(n.text)).slice(0, 14).map(n => n.text).join('\n'));
+}, 50);

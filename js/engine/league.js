@@ -9,6 +9,7 @@ import { assignNumber } from './hof.js';
 import { genForeignPool } from './market.js';
 import { offerMissions, emptyWeekStats } from './events.js';
 import { initRelations } from './mood.js';
+import { ensureMil } from './military.js';
 import { ensureContract } from './contracts.js';
 import { genSponsorOffers } from './sponsor.js';
 import { clubEffects, bInfo } from './club.js';
@@ -79,7 +80,7 @@ export function createNewGame(opts) {
     season: opts.year || 2026,
     phase: 'regular',
     day: 0,
-    settings: { seasonLength: opts.seasonLength || 72, intensity: 'normal', speed: 'normal' },
+    settings: { seasonLength: opts.seasonLength || 72, intensity: 'normal', speed: 'normal', difficulty: opts.difficulty || 'normal', clutch: true },
     userTeamId: 'user',
     teams: {},
     teamOrder: [],
@@ -100,17 +101,17 @@ export function createNewGame(opts) {
     color: color.primary, color2: color.secondary, emblem: opts.emblem || 'flame',
     philosophy: opts.philosophy || 'balanced', style: opts.philosophy || 'balanced',
     roster: [], w: 0, l: 0, t: 0, rs: 0, ra: 0, streak: 0, last10: [],
-    cash: phil.cash, fans: 12000, capacity: 12000, ticket: 1.5,
+    cash: Math.round(phil.cash * ({ easy: 1.3, normal: 1, hard: 0.8 }[opts.difficulty || 'normal'])), fans: 12000, capacity: 12000, ticket: 1.5,
     ledger: { income: 0, expense: 0, ticket: 0, merch: 0, salary: 0, prize: 0 },
     autoRest: true, stealMode: 'normal',
   };
-  const userS = { develop: 67, balanced: 69, win: 71 }[user.philosophy] ?? 68;
+  const userS = ({ develop: 67, balanced: 69, win: 71 }[user.philosophy] ?? 68) + ({ easy: 3, normal: 0, hard: -2 }[opts.difficulty || 'normal']);
   state.teams.user = user;
   state.teamOrder.push('user');
   generateRoster(state, user, userS, user.philosophy);
 
   for (const t of KBO_TEAMS) {
-    const team = { ...t, roster: [], w: 0, l: 0, t: 0, rs: 0, ra: 0, streak: 0, last10: [], fans: 50000, autoRest: true };
+    const team = { ...t, roster: [], w: 0, l: 0, t: 0, rs: 0, ra: 0, streak: 0, last10: [], fans: 50000, autoRest: true, aiInvest: opts.difficulty === 'hard' ? 2 : opts.difficulty === 'easy' ? 0 : 1 };
     state.teams[t.id] = team;
     state.teamOrder.push(t.id);
     generateRoster(state, team, t.strength, t.style);
@@ -120,7 +121,7 @@ export function createNewGame(opts) {
   user.capacity = bInfo(user, 'stadium').cap;
   state.league = 'KBO';
   state.inbox = []; state.promises = []; state.rels = {}; state.paper = [];
-  for (const id in state.players) ensureContract(state.players[id]);
+  for (const id in state.players) { ensureContract(state.players[id]); ensureMil(state.players[id]); }
   initRelations(state, user);
   genStaffMarket(state);
   genForeignPool(state);

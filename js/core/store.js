@@ -1,13 +1,28 @@
 import { SAVE_KEY, SAVE_VERSION } from '../data/constants.js';
 
 export let state = null;
+export let slot = 1;
+export function setSlot(n) { slot = n; }
+const key = (n = slot) => `${SAVE_KEY}_${n}`;
+// 구버전 단일 세이브 → 1번 슬롯
+try { const old = localStorage.getItem(SAVE_KEY); if (old && !localStorage.getItem(key(1))) { localStorage.setItem(key(1), old); localStorage.removeItem(SAVE_KEY); } } catch { /* noop */ }
+
+export function slotInfo(n) {
+  try {
+    const raw = localStorage.getItem(key(n));
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    const t = s.teams[s.userTeamId];
+    return { name: t.name, season: s.season, phase: s.phase, w: t.w, l: t.l, league: s.league || 'KBO', savedAt: s.savedAt, color: t.color, emblem: t.emblem };
+  } catch { return null; }
+}
 export function setState(s) { state = s; }
 
 export function save() {
   if (!state) return false;
   try {
     state.savedAt = Date.now();
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    localStorage.setItem(key(), JSON.stringify(state));
     return true;
   } catch (e) {
     console.warn('save failed', e);
@@ -17,7 +32,7 @@ export function save() {
 
 export function load() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(key());
     if (!raw) return null;
     const s = migrate(JSON.parse(raw));
     state = s;
@@ -29,11 +44,11 @@ export function load() {
 }
 
 export function hasSave() {
-  try { return !!localStorage.getItem(SAVE_KEY); } catch { return false; }
+  try { return !!localStorage.getItem(key()); } catch { return false; }
 }
 
 export function wipe() {
-  try { localStorage.removeItem(SAVE_KEY); } catch { /* noop */ }
+  try { localStorage.removeItem(key()); } catch { /* noop */ }
   state = null;
 }
 

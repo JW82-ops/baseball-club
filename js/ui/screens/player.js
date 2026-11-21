@@ -11,6 +11,10 @@ import { moodLabel, relsOf, relLabel } from '../../engine/mood.js';
 import { PERSONALITIES } from '../../data/club.js';
 import { FA_SERVICE, fairSalary } from '../../engine/contracts.js';
 import { scoutLevelOf } from '../../engine/club.js';
+import { formIcon } from '../../engine/form.js';
+import { milLabel } from '../../engine/military.js';
+import { CAMPS, learnablePitches, convertTargets } from '../../engine/training.js';
+import { PITCHES } from '../../data/constants.js';
 
 function batRow(label, s) {
   const l = batLine(s);
@@ -45,7 +49,7 @@ export function renderPlayer(pid, opts = {}) {
   const draftMode = opts.draft || p.amateur || !!p.market;
   const focusKeys = Object.keys(TRAINING_FOCUS).filter((k) => {
     const f = TRAINING_FOCUS[k];
-    return (!f.bat && !f.pit) || (p.type === 'P' ? f.pit : f.bat);
+    return !f.special && ((!f.bat && !f.pit) || (p.type === 'P' ? f.pit : f.bat));
   });
 
   const showCur = p.cur && (state.phase === 'regular' || state.phase === 'post');
@@ -54,10 +58,12 @@ export function renderPlayer(pid, opts = {}) {
   const statTable = p.type === 'B'
     ? `<table class="tbl"><tr><th>시즌</th><th>타율</th><th>홈런</th><th>타점</th><th>도루</th><th>OPS</th><th>타석</th></tr>
        ${showCur ? batRow(`${state.season}`, p.cur.bat) : ''}
+       ${showCur && p.cur.fut?.pa ? batRow(`<span class="faint">퓨처스</span>`, p.cur.fut) : ''}
        ${hist.map((h) => batRow(`${h.s} <span class="faint">${esc(h.ts || '')}</span>`, unpackBat(h))).join('')}
        ${p.history.length ? batRow('<b>통산</b>', addCur(career.bat, showCur ? p.cur.bat : null)) : ''}</table>`
     : `<table class="tbl"><tr><th>시즌</th><th>ERA</th><th>승패</th><th>세/홀</th><th>이닝</th><th>K</th><th>WHIP</th></tr>
        ${showCur ? pitRow(`${state.season}`, p.cur.pit) : ''}
+       ${showCur && p.cur.fut?.outs ? pitRow(`<span class="faint">퓨처스</span>`, p.cur.fut) : ''}
        ${hist.map((h) => pitRow(`${h.s} <span class="faint">${esc(h.ts || '')}</span>`, unpackPit(h))).join('')}
        ${p.history.length ? pitRow('<b>통산</b>', addCur(career.pit, showCur ? p.cur.pit : null)) : ''}</table>`;
 
@@ -69,7 +75,7 @@ export function renderPlayer(pid, opts = {}) {
   <div class="pcard-top">
     ${avatar(p, color, 64)}
     <div class="grow">
-      <h2>${esc(p.name)}${p.num != null && p.team ? ` <span class="num" style="font-size:16px">#${p.num}</span>` : ''}${p.foreign ? ' <span class="chip" style="font-size:11px">외국인</span>' : ''}</h2>
+      <h2>${esc(p.name)}${formIcon(p)}${p.num != null && p.team ? ` <span class="num" style="font-size:16px">#${p.num}</span>` : ''}${p.foreign ? ' <span class="chip" style="font-size:11px">외국인</span>' : ''}</h2>
       <p class="small muted">${team ? esc(team.short) + ' · ' : ''}${p.type === 'P' ? (p.pos === 'SP' ? '선발투수' : '불펜투수') : POS_KO[p.pos]} · ${hand} · ${p.age}세 ${condDot(p)}</p>
       <div class="row gap mt" style="margin-top:6px">${gradeTag(calcOvr(p), { big: true })}<span class="pot">잠재 ${est.loG === est.hiG ? est.loG : `${est.loG}~${est.hiG}`}</span></div>
     </div>
@@ -83,7 +89,7 @@ export function renderPlayer(pid, opts = {}) {
     <div><span>출신</span><b>${esc(p.origin)}</b></div>
     ${p.team ? `<div><span>기분</span><b class="${moodLabel(p.morale).cls}">${moodLabel(p.morale).e} ${moodLabel(p.morale).ko} ${Math.round(p.morale ?? 70)}</b></div><div><span>컨디션</span><b>${Math.round(p.cond)}</b></div><div><span>잠재 OVR</span><b class="amber">${est.lo}~${est.hi}</b></div>
     <div><span>성격</span><b>${PERSONALITIES[p.personality] ? `${PERSONALITIES[p.personality].icon} ${PERSONALITIES[p.personality].ko}` : '-'}</b></div><div><span>충성도</span><b>${Math.round(p.loyalty ?? 40)}</b></div><div><span>계약</span><b>${p.contract ? `${Math.max(0, p.contract.years)}년 남음` : '-'}</b></div>
-    <div><span>연차</span><b>${p.service ?? 0}년${(p.service ?? 0) >= FA_SERVICE ? ' (FA)' : ''}</b></div>` : ''}
+    <div><span>연차</span><b>${p.service ?? 0}년${(p.service ?? 0) >= FA_SERVICE ? ' (FA)' : ''}</b></div><div><span>병역</span><b>${milLabel(p)}</b></div><div><span>국가대표</span><b>${p.national?.length ? `${p.national.length}회${p.national.some((x) => x.medal === 'gold') ? ' 🥇' : ''}` : '-'}</b></div>` : ''}
   </div>
   ${p.injury ? `<div class="bar-note mt">🚑 ${esc(p.injury.name)} — 복귀까지 ${p.injury.weeks}주</div>` : ''}
   <div class="sec mt-l">
@@ -94,6 +100,7 @@ export function renderPlayer(pid, opts = {}) {
   </div>
   ${p.traits.length ? `<div class="sec"><div class="sec-h"><h2>특성</h2></div>${traitChips(p)}</div>` : ''}
   ${isMine && !draftMode ? moodSection(p) : ''}
+  ${isMine && !draftMode && p.level !== 'mil' ? specialSection(p) : ''}
   ${isMine && !draftMode ? `
   <div class="sec">
     <div class="sec-h"><h2>훈련 포인트</h2>${p.dev.length > 1 ? spark(p.dev.slice(-30)) : ''}</div>
@@ -134,5 +141,26 @@ function moodSection(p) {
     <div class="sec-h"><h2>기분 ${ml.e}</h2><span class="sub">${ml.ko} · 경기력 ${((p.morale ?? 70) - 62) * 0.16 >= 0 ? '+' : ''}${(((p.morale ?? 70) - 62) * 0.16).toFixed(1)}%</span></div>
     ${f.length ? `<div class="factors">${f.map((x) => `<span class="${x.v >= 0 ? 'good' : 'bad'}">${x.v >= 0 ? '▲' : '▼'} ${esc(x.t)}</span>`).join('')}</div>` : '<p class="small muted">첫 주가 지나면 기분 요인이 표시돼요.</p>'}
     ${rels.length ? `<div class="sec-h mt"><h2 style="font-size:15px">관계</h2></div><div class="chips">${rels.map((r) => `<button class="chip ${r.v < 0 ? 'bad' : ''}" data-act="openPlayer" data-pid="${r.pid}">${r.v >= 0 ? '🤝' : '⚡'} ${esc(state.players[r.pid].name)} · ${relLabel(r.v)}</button>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+function specialSection(p) {
+  const t = state.teams[p.team];
+  const camps = Object.entries(CAMPS).filter(([, c]) => c.type === 'any' || c.type === p.type);
+  let learn = '';
+  if (p.type === 'P') {
+    learn = p.learning
+      ? `<p class="small">🌀 신구종 「${PITCHES[p.learning.t]}」 연마 중 <b class="amber">${Math.min(99, Math.round(p.learning.prog))}%</b></p><div class="mission"><div class="bar"><i style="width:${Math.min(100, p.learning.prog)}%"></i></div></div><button class="btn sm ghost mt" data-act="stopSpecial" data-pid="${p.id}">중단</button>`
+      : `<p class="small muted">새 구종을 익히면 레퍼토리가 늘고 변화구 한계가 올라가요. 연마 중엔 다른 성장이 느려져요.</p><div class="chips mt">${learnablePitches(p).map((x) => `<button class="chip" data-act="learnPitch" data-pid="${p.id}" data-t="${x}">${PITCHES[x]}</button>`).join('')}</div>`;
+  } else {
+    learn = p.convert
+      ? `<p class="small">🔄 ${POS_KO[p.convert.to]} 전향 훈련 중 <b class="amber">${Math.min(99, Math.round(p.convert.prog))}%</b></p><div class="mission"><div class="bar"><i style="width:${Math.min(100, p.convert.prog)}%"></i></div></div><button class="btn sm ghost mt" data-act="stopSpecial" data-pid="${p.id}">중단</button>`
+      : `<p class="small muted">포지션 전향 훈련. 포수·유격수·중견수는 오래 걸려요.</p><div class="chips mt">${convertTargets(p).map((x) => `<button class="chip" data-act="convertPos" data-pid="${p.id}" data-t="${x}">${POS_KO[x]}</button>`).join('')}</div>`;
+  }
+  return `<div class="sec">
+    <div class="sec-h"><h2>특별 훈련</h2></div>
+    ${learn}
+    <p class="small mt-l">해외·특별 캠프 <span class="tiny faint">(참가 중엔 경기에 못 나가요)</span></p>
+    ${camps.map(([k, c]) => `<div class="subrow"><span class="si">${c.icon}</span><div class="grow"><b>${c.ko}</b><div class="tiny muted">${c.desc} · ${c.weeks}주</div></div><button class="btn sm ${t.cash >= c.cost && !p.injury ? 'primary' : ''}" data-act="sendCamp" data-pid="${p.id}" data-k="${k}" ${t.cash >= c.cost && !p.injury ? '' : 'disabled'}>${formatMoney(c.cost)}</button></div>`).join('')}
   </div>`;
 }

@@ -8,8 +8,14 @@ import { fmtAvg, fmtEra, fmtIP } from '../../core/util.js';
 import { ROSTER, POS_KO } from '../../data/constants.js';
 import { scoutLevel } from './draft.js';
 import { moodLabel } from '../../engine/mood.js';
+import { formIcon } from '../../engine/form.js';
+import { militaryList } from '../../engine/military.js';
 
 export function statSnippet(p) {
+  if (p.level === 2 && p.cur?.fut && ((p.cur.fut.pa || 0) > 0 || (p.cur.fut.outs || 0) > 0) && !(p.cur.bat.pa || p.cur.pit.g)) {
+    const f = p.cur.fut;
+    return p.type === 'B' ? `퓨처스 ${fmtAvg(batLine(f).avg)} ${f.hr}홈런` : `퓨처스 ${fmtEra(pitLine(f).era)} ${f.w}승`;
+  }
   if (p.type === 'B') {
     const s = p.cur.bat;
     if (!s.pa) return '';
@@ -25,7 +31,7 @@ export function playerRow(p, color, opts = {}) {
   return `<button class="prow ${opts.sel ? 'sel' : ''}" data-act="${opts.act || 'openPlayer'}" data-pid="${p.id}">
     ${avatar(p, color, 40)}
     <div class="grow">
-      <div class="nm">${esc(p.name)} <span class="num">${p.num != null ? '#' + p.num : ''}</span>${p.foreign ? ' 🌏' : ''}${p.tradeBlock ? ' 🔁' : ''} ${condDot(p)} <span title="기분 ${moodLabel(p.morale).ko}" style="font-size:13px">${moodLabel(p.morale).e}</span></div>
+      <div class="nm">${esc(p.name)} <span class="num">${p.num != null ? '#' + p.num : ''}</span>${p.foreign ? ' 🌏' : ''}${p.tradeBlock ? ' 🔁' : ''}${formIcon(p)} ${condDot(p)} <span title="기분 ${moodLabel(p.morale).ko}" style="font-size:13px">${moodLabel(p.morale).e}</span></div>
       <div class="meta">${posShort(p)} · ${p.age}세${sn ? ` · ${sn}` : ''}${p.injury ? ` · <span class="bad">${esc(p.injury.name)} ${p.injury.weeks}주</span>` : ''}</div>
     </div>
     <div class="right">${gradeTag(calcOvr(p))}${opts.pot ? potTag(p, scoutLevel()) : ''}</div>
@@ -44,7 +50,8 @@ function listView() {
   return `
     <div class="row gap mt"><div class="seg grow">${[['B', `타자`], ['P', `투수`]].map(([k, l]) => `<button class="${ui.rosterType === k ? 'on' : ''}" data-act="rosterType" data-v="${k}">${l} ${src.filter((p) => p.type === k).length}</button>`).join('')}</div></div>
     <p class="tiny faint mt">${ui.rosterView === 'first' ? `1군 ${c.first}/${ROSTER.FIRST_MAX}명 (투수 ${c.firstP} · 야수 ${c.firstB})` : `2군 ${c.total - c.first}명 · 잠재력 높은 순`} · 전체 ${c.total}/${ROSTER.TOTAL_MAX}</p>
-    <div class="panel plist mt">${list.map((p) => playerRow(p, team.color, { pot: ui.rosterView === 'futures' })).join('') || '<div class="empty">선수가 없어요.</div>'}</div>`;
+    <div class="panel plist mt">${list.map((p) => playerRow(p, team.color, { pot: ui.rosterView === 'futures' })).join('') || '<div class="empty">선수가 없어요.</div>'}</div>
+    ${ui.rosterView === 'futures' && militaryList(state, team).length ? `<div class="sec-h mt-l"><h2>🪖 군 복무 중</h2></div><div class="panel plist">${militaryList(state, team).map((p) => `<button class="prow" data-act="openPlayer" data-pid="${p.id}"><div class="grow"><div class="nm">${esc(p.name)}</div><div class="meta">${p.milType === 'sangmu' ? '상무' : '현역'} · ${p.returnSeason} 시즌 복귀</div></div>${gradeTag(calcOvr(p))}</button>`).join('')}</div>` : ''}`;
 }
 
 function lineupView() {

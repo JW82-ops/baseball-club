@@ -220,7 +220,7 @@ export function unpackBat(h) { const o = emptyBat(); if (h.b) BAT_KEYS.forEach((
 export function unpackPit(h) { const o = emptyPit(); if (h.p) PIT_KEYS.forEach((k, i) => (o[k] = h.p[i])); return o; }
 
 export function resetSeasonStats(p) {
-  p.cur = { bat: emptyBat(), pit: emptyPit() };
+  p.cur = { bat: emptyBat(), pit: emptyPit(), fut: p.type === 'P' ? emptyPit() : emptyBat() };
 }
 
 export function batLine(s) {

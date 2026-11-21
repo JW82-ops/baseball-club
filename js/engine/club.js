@@ -199,7 +199,7 @@ const coachMult = (v) => 1 + (v - 50) / 220;
 
 // 선수 1명의 능력치별 성장 배율 (유저 구단 전용 상세 계산)
 export function devCtxFor(state, team, p, synergyList = [], eff = null) {
-  if (!team.isUser) return { staffMult: 1.05, facilityMult: 1.05 };
+  if (!team.isUser) { const a = 1 + (team.aiInvest || 0) * 0.025; return { staffMult: a, facilityMult: 1 }; }
   eff = eff || clubEffects(team);
   const attrMult = {};
   let base = p.level === 1 ? bInfo(team, 'clubhouse').growth : bInfo(team, 'futures').growth * eff.futGrowth;

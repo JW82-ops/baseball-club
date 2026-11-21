@@ -1,5 +1,5 @@
 export const SAVE_KEY = 'baseball_club_save';
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export const ROSTER = {
   FIRST_MAX: 28,       // 1군 엔트리
@@ -61,6 +61,8 @@ export const TRAINING_FOCUS = {
   breaking: { ko: '변화구', icon: '🌀', pit: true },
   stamina: { ko: '체력', icon: '🔋', pit: true },
   rest: { ko: '휴식', icon: '💤' },
+  newpitch: { ko: '신구종 연마', icon: '🌀', pit: true, special: true },
+  convert: { ko: '포지션 전향', icon: '🔄', bat: true, special: true },
 };
 
 export const INTENSITY = {

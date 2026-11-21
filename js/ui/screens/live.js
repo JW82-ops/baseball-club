@@ -11,6 +11,23 @@ import {
   stepPA, simToEnd, setOrder, pinchHit, manualPitchChange, userSide, userBatting, currentBatter, currentPitcher, currentSlot,
 } from '../../engine/match.js';
 import { fmtAvg, fmtEra, clamp } from '../../core/util.js';
+import { isClutch } from '../../engine/clutch.js';
+import { formIcon } from '../../engine/form.js';
+import { pick } from '../../core/rng.js';
+
+// 캐스터 멘트
+function casterLine(ev) {
+  const t = ev.type;
+  if (t === 'hr') return pick(['넘어갑니다! 담장 밖으로!', '말이 필요 없습니다! 홈런!', '이건 큽니다… 그대로 넘어가요!', '관중석이 들썩입니다!']);
+  if (t === 'hit' && ev.runs) return pick(['주자 홈인! 점수 납니다!', '적시타! 귀중한 득점!', '빠졌습니다! 주자들 들어옵니다!']);
+  if (t === 'hit') return pick(['깨끗한 안타!', '코스 좋습니다!', '정확하게 받아쳤어요!']);
+  if (t === 'so') return pick(['삼진! 헛방망이!', '꼼짝 못 하고 서서 당합니다!', '결정구가 기가 막혔어요!']);
+  if (t === 'bb') return pick(['볼넷, 걸어 나갑니다.', '침착하게 골라냈어요.']);
+  if (t === 'err') return '아, 실책! 수비가 흔들립니다.';
+  if (ev.dp) return '병살! 한 번에 두 개!';
+  if (t === 'out' && ev.runs) return '희생타로 1점 추가합니다.';
+  return pick(['잡아냅니다, 아웃!', '평범한 타구, 처리합니다.', '수비 좋습니다!']);
+}
 
 // ───────── 필드 좌표 (논리 360×320) ─────────
 const W = 360, H = 320;
@@ -274,6 +291,7 @@ async function animatePA(ev, outsBefore) {
     sc.cheer = false;
   }
   if (!ev.dir) await animateRunners(ev, 450);
+  setOverlay('#lv-call', `🎙️ ${casterLine(ev)}`);
   if (ev.runs) { sfx.run(); await banner(`+${ev.runs}점`, 'run', 900); }
 }
 
@@ -321,9 +339,17 @@ async function animateSteal(ev) {
 async function playOne() {
   const g = ui.live;
   if (!g || g.over || anim.busy) return;
+  if (anim.playing && !g.noClutch && state.settings.clutch !== false && isClutch(state, g) && window.__showClutch) {
+    anim.playing = false;
+    updateLiveDom();
+    window.__showClutch(g, () => { buildScene(); updateLiveDom(); if (ui.live && !ui.live.over) { anim.playing = true; anim.token++; loop(); updateLiveDom(); } });
+    return;
+  }
   anim.busy = true;
   const my = anim.token;
   const outsBefore = g.outs;
+  if (userBatting(state, g) && (g.bases[1] || g.bases[2])) sfx.chant?.();
+  const snap = { runners: anim.scene.runners.map((r) => ({ ...r })), batter: anim.scene.batter ? { ...anim.scene.batter } : null };
   stepPA(state, g);
   const evs = g.halfEvents.slice();
   try {
@@ -331,7 +357,7 @@ async function playOne() {
       if (my !== anim.token) break;
       if (ev.type === 'change') { setOverlay('#lv-call', ''); await banner('투수 교체', 'chg', 900); }
       else if (ev.type === 'steal' || (ev.type === 'out' && ev.cs)) await animateSteal(ev);
-      else if (ev.seq) await animatePA(ev, outsBefore);
+      else if (ev.seq) { anim.lastPA = { ev, snap, outsBefore }; await animatePA(ev, outsBefore); }
       else if (ev.type === 'half') { await wait(300); await banner(`${ev.inn}회${ev.top ? '초' : '말'}`, 'half', 900); }
       else if (ev.type === 'walkoff') { anim.scene.cheer = true; sfx.homerun(); await banner('끝내기!!', 'hr', 1600); }
     }
@@ -359,6 +385,23 @@ export function livePlay() {
   updateLiveDom();
 }
 export function livePause() { anim.playing = false; updateLiveDom(); }
+export async function liveReplay() {
+  const L = anim.lastPA;
+  if (!L || anim.busy) return;
+  anim.playing = false;
+  anim.busy = true;
+  const keep = { runners: anim.scene.runners, batter: anim.scene.batter };
+  anim.scene.runners = L.snap.runners.map((r) => ({ ...r }));
+  anim.scene.batter = L.snap.batter ? { ...L.snap.batter } : null;
+  setOverlay('#lv-call', '⏪ 다시보기');
+  const sp = ui.liveSpeed; ui.liveSpeed = 0.7;
+  try { await animatePA(L.ev, L.outsBefore); } catch { /* noop */ }
+  ui.liveSpeed = sp;
+  anim.scene.runners = keep.runners; anim.scene.batter = keep.batter;
+  anim.busy = false;
+  buildScene();
+  updateLiveDom();
+}
 export async function liveStepOnce() {
   if (anim.busy) return;
   anim.playing = false;
@@ -509,8 +552,8 @@ export function updateLiveDom() {
     const gb = g.stats[bat.id]?.bat;
     const slot = currentSlot(g);
     setOverlay('#lv-matchup', `
-      <div><span class="faint">${slot + 1}번</span> <b>${esc(bat.name)}</b> ${gradeTag(calcOvr(bat))}<br><small>${bat.cur.bat.ab ? `타율 ${fmtAvg(batLine(bat.cur.bat).avg)}` : '시즌 첫 타석'}${gb && gb.pa ? ` · 오늘 ${gb.ab}타수 ${gb.h}안타` : ''}</small></div>
-      <div class="r"><span class="faint">투수</span> <b>${esc(pit.name)}</b><br><small>${sd.pc}구 · 체력 ${Math.round(pit.cond)}</small></div>`);
+      <div><span class="faint">${slot + 1}번</span> <b>${esc(bat.name)}</b>${formIcon(bat)} ${gradeTag(calcOvr(bat))}<br><small>${bat.cur.bat.ab ? `타율 ${fmtAvg(batLine(bat.cur.bat).avg)}` : '시즌 첫 타석'}${gb && gb.pa ? ` · 오늘 ${gb.ab}타수 ${gb.h}안타` : ''}</small></div>
+      <div class="r"><span class="faint">투수</span> <b>${esc(pit.name)}</b>${formIcon(pit)}<br><small>${sd.pc}구 · 체력 ${Math.round(pit.cond)}</small></div>`);
   } else setOverlay('#lv-matchup', '');
   const userBat = !g.over && userBatting(state, g);
   const o = g.orders || {};
@@ -528,7 +571,7 @@ export function updateLiveDom() {
   setOverlay('#lv-ctrl', g.over ? '' : `
     <div class="seg spd">${[1, 2, 4].map((v) => `<button class="${ui.liveSpeed === v ? 'on' : ''}" data-act="lvSpeed" data-v="${v}">${v}x</button>`).join('')}</div>
     <button class="btn sm ${anim.playing ? '' : 'primary'}" data-act="lvPlay">${anim.playing ? '⏸ 정지' : '▶ 재생'}</button>
-    <button class="btn sm" data-act="lvStep" ${anim.playing ? 'disabled' : ''}>한 타석</button>
+    ${!anim.playing && anim.lastPA && (anim.lastPA.ev.type === 'hr' || anim.lastPA.ev.runs) ? '<button class="btn sm" data-act="lvReplay">⏪</button>' : `<button class="btn sm" data-act="lvStep" ${anim.playing ? 'disabled' : ''}>한 타석</button>`}
     <button class="btn sm ghost" data-act="lvSkip" data-m="half">이닝⏭</button>
     <button class="btn sm ghost" data-act="lvSkip" data-m="end">끝⏭</button>`);
   const feed = g.log.slice(-16).reverse().filter((e) => e.type !== 'info').slice(0, 8)
@@ -568,6 +611,7 @@ function pitchSheet() {
 registerActions({
   lvPlay: () => livePlay(),
   lvStep: () => liveStepOnce(),
+  lvReplay: () => liveReplay(),
   lvSkip: (d) => liveSkip(d.m),
   lvSpeed: (d) => { ui.liveSpeed = Number(d.v); updateLiveDom(); },
   lvOrder: (d) => {

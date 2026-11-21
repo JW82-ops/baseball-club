@@ -3,9 +3,25 @@ import { PHILOSOPHIES, SEASON_LENGTHS } from '../../data/constants.js';
 import { esc, emblem } from '../components.js';
 import { registerActions, $ } from '../dom.js';
 
-export const draft = { city: '서울', name: '파이어볼쓰', colorIdx: 0, emblem: 'flame', philosophy: 'develop', seasonLength: 72 };
+import { slotInfo } from '../../core/store.js';
+import { LEAGUES } from '../../data/club.js';
 
-export function renderCreate(hasSave) {
+export const draft = { city: '서울', name: '파이어볼쓰', colorIdx: 0, emblem: 'flame', philosophy: 'develop', seasonLength: 72, difficulty: 'normal' };
+export const title = { creating: false, slot: 1 };
+
+export function renderTitle() {
+  if (title.creating) return renderCreate();
+  const PH = { regular: '정규시즌', post: '포스트시즌', offseason: '오프시즌', contracts: '계약 협상', draft: '드래프트', camp: '스프링캠프' };
+  return `<div class="create">
+    <div class="create-hero title-hero">
+      <h1>프로야구팀을<br>만들자</h1>
+      <p>신생 구단을 창단해 유망주를 키우고, KBO를 넘어 NPB·MLB까지 정복하세요.</p>
+    </div>
+    ${[1, 2, 3].map((n) => { const i = slotInfo(n); return i ? `<div class="slotcard"><button class="grow row gap" data-act="loadSlot" data-n="${n}" style="text-align:left">${emblem({ color: i.color, color2: '#000', emblem: i.emblem }, 44)}<div class="grow"><span class="tiny faint">슬롯 ${n}</span><br><b>${esc(i.name)}</b><div class="tiny muted">${LEAGUES[i.league].flag} ${i.season} ${PH[i.phase] || ''} · ${i.w}승 ${i.l}패</div></div></button><button class="btn sm ghost" data-act="deleteSlot" data-n="${n}" aria-label="삭제">🗑</button></div>` : `<button class="slotcard empty" data-act="newSlot" data-n="${n}"><span class="tiny faint">슬롯 ${n}</span><b>＋ 새 구단 창단</b></button>`; }).join('')}
+  </div>`;
+}
+
+export function renderCreate() {
   const c = CLUB_COLORS[draft.colorIdx];
   const team = { color: c.primary, color2: c.secondary, emblem: draft.emblem };
   return `
@@ -14,7 +30,7 @@ export function renderCreate(hasSave) {
       <h1>프로야구팀을<br>만들자</h1>
       <p>신생 구단을 창단해서 2군 유망주를 키우고, KBO 정상에 도전하세요.</p>
     </div>
-    ${hasSave ? `<button class="btn primary block" data-act="continueGame">이어하기</button><p class="small muted center mt">새로 창단하면 기존 진행은 지워져요.</p><div class="mt-l"></div>` : ''}
+    <button class="btn sm ghost" data-act="backTitle">← 슬롯 선택</button><p class="tiny faint mt">슬롯 ${title.slot}에 새 구단을 만들어요.</p>
     <div class="preview">
       ${emblem(team, 52)}
       <div><h3>${esc(draft.city)} ${esc(draft.name || '구단명')}</h3><p class="small muted">${PHILOSOPHIES[draft.philosophy].icon} ${PHILOSOPHIES[draft.philosophy].ko} · ${draft.seasonLength}경기 시즌</p></div>
@@ -38,6 +54,11 @@ export function renderCreate(hasSave) {
     <div class="field">
       <label>구단 운영 철학</label>
       <div class="phil">${Object.entries(PHILOSOPHIES).map(([k, ph]) => `<button class="${k === draft.philosophy ? 'on' : ''}" data-act="cPick" data-k="philosophy" data-v="${k}"><b>${ph.icon} ${ph.ko}</b><p>${ph.desc}</p></button>`).join('')}</div>
+    </div>
+    <div class="field">
+      <label>난이도</label>
+      <div class="seg">${[['easy', '쉬움'], ['normal', '보통'], ['hard', '어려움']].map(([k, l]) => `<button class="${draft.difficulty === k ? 'on' : ''}" data-act="cPick" data-k="difficulty" data-v="${k}">${l}</button>`).join('')}</div>
+      <p class="tiny faint mt">${{ easy: '시작 전력 +3, 자금 ×1.3, 수입 ×1.2. AI 구단 투자 소극적.', normal: '기본 밸런스.', hard: '시작 전력 -2, 자금 ×0.8, 수입 ×0.85. AI 구단 투자 적극적.' }[draft.difficulty]}</p>
     </div>
     <div class="field">
       <label>시즌 길이</label>

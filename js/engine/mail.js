@@ -8,11 +8,13 @@ import { addMoodEvent, addRel, getRel, relsOf } from './mood.js';
 import { subLv, activeBuilds } from './club.js';
 import { aiTradeOffer, evaluateTrade, executeTrade, playerValue } from './trade.js';
 import { brandValue, tierFor, genSponsorOffers } from './sponsor.js';
+import { resolvePress } from './story.js';
 
 export const weekAbs = (state) => state.season * 100 + Math.floor(state.day / 6);
 const mine = (state) => state.teams[state.userTeamId];
 const P = (state, id) => state.players[id];
 
+export function pushMail(state, m) { push(state, m); }
 function push(state, m) {
   state.inbox = state.inbox || [];
   state.inbox.unshift({ id: uid('m'), season: state.season, day: state.day, week: weekAbs(state), read: false, resolved: !m.choices, ...m });
@@ -298,6 +300,7 @@ export function resolveMail(state, id, idx) {
       executeTrade(state, o.otherId, o.give, o.get, o.cash || 0);
       return `트레이드 성사! ${o.get.map((id) => P(state, id).name).join(', ')} 영입`;
     }
+    case 'press': return resolvePress(state, m, idx);
     default: return '';
   }
 }

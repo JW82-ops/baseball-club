@@ -3,6 +3,7 @@ import { clamp } from '../core/util.js';
 import { GROWTH_TYPES, INTENSITY } from '../data/constants.js';
 import { TRAITS, hasTrait } from '../data/traits.js';
 import { calcOvr, potOvr } from './player.js';
+import { trainingFocusMult } from './training.js';
 
 const DECLINE_W = {
   speed: 1.4, velo: 1.2, stamina: 1.1, fielding: 1.0, arm: 0.9, contact: 0.8, power: 0.65,
@@ -11,6 +12,8 @@ const DECLINE_W = {
 
 // 훈련 포커스 → 속성별 배율
 function focusMult(focus, key) {
+  const tm = trainingFocusMult(focus, key);
+  if (tm != null) return tm;
   if (focus === 'rest') return 0;
   if (focus === 'balanced' || !focus) return 1;
   if (focus === key) return 2.3;
