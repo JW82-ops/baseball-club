@@ -31,7 +31,7 @@ function addP(state, team, opts) {
 }
 
 function vetAge(style) { return style === 'win' ? randInt(27, 35) : style === 'develop' ? randInt(23, 31) : randInt(25, 33); }
-function regPot(ovr, age) { return age < 26 ? ovr + randInt(3, 14) : age < 29 ? ovr + randInt(0, 6) : ovr + randInt(0, 2); }
+function regPot(ovr, age) { return age < 26 ? ovr + randInt(2, 10) : age < 29 ? ovr + randInt(0, 5) : ovr + randInt(0, 2); }
 
 // 외국인 선수 슬롯 채우기 (상위 선발 2 + 주전 야수 1, NPB는 +1)
 export function makeImport(state, p) {

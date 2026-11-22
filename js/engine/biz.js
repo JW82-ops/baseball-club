@@ -17,6 +17,18 @@ export const MERCH_LV = [
   { ko: '플래그십 스토어 + 온라인몰', mult: 1.55, cost: 20000 },
 ];
 
+// 팬 규모 상한(시장 크기): 리그 규모와 구장 크기에 따라. 상한에 가까울수록 늘기 어려워요
+import { LEAGUES } from '../data/club.js';
+export function fanCap(state, team) {
+  const lg = LEAGUES[state.league || 'KBO'];
+  return Math.round(90000 * (lg.fanMult || 1) * (1 + 0.08 * ((team.buildings?.stadium?.lv || 1) - 1)));
+}
+export function fanSat(state, team) { return Math.max(0.05, Math.min(1, 1 - team.fans / fanCap(state, team))); }
+export function clampFans(state, team) {
+  const cap = fanCap(state, team);
+  if (team.fans > cap) team.fans = Math.round(cap + (team.fans - cap) * 0.35);
+  if (team.fans > cap * 1.15) team.fans = Math.round(cap * 1.15);
+}
 export const weekIdx = (state) => Math.floor(state.day / GAMES_PER_WEEK);
 export function activePromo(state) {
   const p = state.promo;

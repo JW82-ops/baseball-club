@@ -7,9 +7,9 @@ import { developWeek, healWeek, ageUp, retireChance } from './development.js';
 import { autoAssignLevels, ensureLineupValid, firstTeam, teamPlayers, futures, teamOvr } from './roster.js';
 import { createGame, simToEnd, applyGame, boxSummary } from './match.js';
 import { makeSchedule, standings, addNews, pct } from './league.js';
-import { staffStat, ensureClub, clubEffects, staffWeekly, tickConstruction, devCtxFor, healBonusFor, recoveryBonus, genStaffMarket, staffOffseason } from './club.js';
+import { upkeepWeekly, staffStat, ensureClub, clubEffects, staffWeekly, tickConstruction, devCtxFor, healBonusFor, recoveryBonus, genStaffMarket, staffOffseason } from './club.js';
 import { LEAGUES } from '../data/club.js';
-import { gateFactors, activePromo, PROMOS, merchMult, broadcastWeekly } from './biz.js';
+import { gateFactors, activePromo, PROMOS, merchMult, broadcastWeekly, fanSat, clampFans } from './biz.js';
 import { weeklyMood, initRelations, relNewcomer, pruneRels } from './mood.js';
 import { weeklyMail, weeklyMailUpkeep, checkSponsorMail, systemMail } from './mail.js';
 import { payWeeklySponsors, settleSponsorsSeason, genSponsorOffers } from './sponsor.js';
@@ -386,7 +386,7 @@ function userFinanceGame(state, sg) {
   team.ledger.merch += merch;
   team.ledger.income += ticket + merch;
   if (cost) { team.ledger.expense += cost; team.ledger.promo = (team.ledger.promo || 0) + cost; }
-  if (P?.fan) team.fans += Math.round(team.fans * P.fan);
+  if (P?.fan) team.fans += Math.round(team.fans * P.fan * fanSat(state, team));
   team.lastAttendance = att;
   team.lastGate = { att, cap: team.capacity, sell: att >= team.capacity, factors: gf.map((f) => ({ ko: f.ko, icon: f.icon, v: f.v })), promo: pk, ticket, merch, cost, opp: sg.away, day: state.day, season: state.season };
   team.attLog = [...(team.attLog || []), att].slice(-15);
@@ -402,7 +402,10 @@ function userFinanceWeek(state) {
   const rank = standings(state).findIndex((x) => x.team.id === team.id) + 1;
   const tv = broadcastWeekly(team, rank, LEAGUES[state.league || 'KBO'].ticketMult);
   team.ledger.broadcast = (team.ledger.broadcast || 0) + tv;
-  team.cash += sponsor + tv - salary - staff;
+  const upkeep = upkeepWeekly(team);
+  team.ledger.upkeep = (team.ledger.upkeep || 0) + upkeep;
+  team.ledger.expense += upkeep;
+  team.cash += sponsor + tv - salary - staff - upkeep;
   team.ledger.salary += salary;
   team.ledger.staffPay = (team.ledger.staffPay || 0) + staff;
   team.ledger.expense += salary + staff;
@@ -413,8 +416,10 @@ function userFinanceWeek(state) {
   const stars = firstTeam(state, team).filter((p) => calcOvr(p) >= 80).length;
   // 성적·스타·기본 유입. 지는 팀도 급격히 줄진 않도록 비율 기반
   const fg = 1 + clubEffects(team).fanGrowth;
-  const delta = Math.round((team.fans * (wins - GAMES_PER_WEEK / 2) * 0.012 + stars * 150 + 250) * (wins >= 3 ? fg : 1));
+  let delta = Math.round((team.fans * (wins - GAMES_PER_WEEK / 2) * 0.012 + stars * 150 + 250) * (wins >= 3 ? fg : 1));
+  if (delta > 0) delta = Math.round(delta * fanSat(state, team));
   team.fans = Math.max(5000, team.fans + delta);
+  clampFans(state, team);
   if (team.cash < 0) addNews(state, `⚠️ 구단 자금이 마이너스입니다 (${formatMoney(team.cash)})`, 'bad');
 }
 
@@ -505,7 +510,8 @@ function endSeason(state) {
   if (champ === user.id) {
     user.cash += Math.round(150000 * lgM);
     user.ledger.prize += Math.round(150000 * lgM);
-    user.fans += 40000;
+    user.fans += 25000;
+    clampFans(state, user);
   } else if (state.post.seeds.includes(user.id)) {
     const bonus = 20000 + (state.post.rounds.filter((r) => r.low === user.id || r.high === user.id).length) * 15000;
     user.cash += bonus;
@@ -532,6 +538,17 @@ function endSeason(state) {
     stars: userSeasonStars(state, user),
   });
   const userRank = state.finalStandings.indexOf(user.id) + 1;
+  {
+    // 모기업 환수: 쌓아 둔 돈이 너무 많으면 일부를 모기업이 가져가요
+    const payroll = teamPlayers(state, user).reduce((a, p) => a + p.salary, 0);
+    const keep = Math.max(300000, payroll * 1.5);
+    if (user.cash > keep) {
+      const take = Math.round((user.cash - keep) * 0.5 / 100) * 100;
+      user.cash -= take;
+      user.ledger.dividend = (user.ledger.dividend || 0) + take;
+      addNews(state, `🏢 모기업이 흑자 ${formatMoney(take)}을 환수했어요. 남은 돈은 선수·시설에 투자해 보세요.`, 'info');
+    }
+  }
   {
     const ct = settleCap(state);
     if (ct) addNews(state, `💸 샐러리캡 초과(${ct.times}회째): 초과액 ${formatMoney(ct.excess)}의 ${ct.times > 1 ? 100 : 50}% = 제재금 ${formatMoney(ct.tax)} 납부`, 'bad');
@@ -583,6 +600,8 @@ export function computeAwards(state) {
 export function runOffseasonStart(state) {
   if (state.phase !== 'offseason') return;
   const user = userTeam(state);
+  // 비시즌엔 관심이 조금 식어요(기본 팬층 쪽으로 6%)
+  user.fans = Math.round(user.fans - Math.max(0, user.fans - 12000) * 0.06);
   const retiredUser = [];
   for (const id of Object.keys(state.players)) {
     const p = state.players[id];
@@ -683,8 +702,8 @@ function setupDraft(state) {
     const age = hs ? 18 : 22;
     const ovr = Math.round(hs ? randInt(30, 46) : randInt(40, 54));
     // 드래프트 잠재력: 상위 몇 명은 특급
-    let pot = ovr + Math.round(Math.abs(gauss(hs ? 20 : 13, 9)));
-    if (i < 3) pot += randInt(6, 14);
+    let pot = ovr + Math.round(Math.abs(gauss(hs ? 16 : 10, 8)));
+    if (i < 3) pot += randInt(5, 11);
     pot = clamp(pot, ovr + 4, 95);
     const type = chance(0.52) ? 'P' : 'B';
     const p = createPlayer({ type, age, ovr, pot, nat: leagueNat(state.league, rng), pos: type === 'P' ? (chance(0.55) ? 'SP' : 'RP') : undefined, origin: hs ? undefined : undefined });

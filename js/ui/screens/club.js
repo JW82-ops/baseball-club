@@ -6,7 +6,7 @@ import { teamPlayers } from '../../engine/roster.js';
 import { formatMoney, formatFans } from '../../core/util.js';
 import { PHILOSOPHIES, SEASON_LENGTHS } from '../../data/constants.js';
 import { BUILDINGS, SUBS, STAFF_ROLES, MANAGER_STYLES, SPONSOR_SLOTS, SPONSOR_TIERS, LEAGUES, MAX_CONCURRENT_BUILDS } from '../../data/club.js';
-import { bLv, bInfo, bNext, subLv, slotsUsed, slotsTotal, activeBuilds, canUpgradeBuilding, canBuildSub, subNextLevel, staffOvr, staffWeeklyOf, staffSignOf, staffWeekly, scoutLevelOf } from '../../engine/club.js';
+import { UPKEEP, bLv, bInfo, bNext, subLv, slotsUsed, slotsTotal, activeBuilds, canUpgradeBuilding, canBuildSub, subNextLevel, staffOvr, staffWeeklyOf, staffSignOf, staffWeekly, scoutLevelOf } from '../../engine/club.js';
 import { foreignCount, foreignMax, signingFee } from '../../engine/market.js';
 import { calcOvr } from '../../engine/player.js';
 import { HOF_BAR } from '../../engine/hof.js';
@@ -159,7 +159,7 @@ function buildingCard(t, k) {
       <div class="ic">${B.icon}</div>
       <div class="grow"><div class="row between"><h3>${B.ko}</h3><span class="small amber">Lv.${lv}</span></div>
         <div class="pips">${B.levels.map((_, i) => `<i class="${i < lv ? 'on' : b && i === b.to - 1 ? 'bldg' : ''}"></i>`).join('')}</div>
-        <p class="small">${esc(info.title)} · <b>${eff}</b> · 칸 ${used}/${total}</p></div>
+        <p class="small">${esc(info.title)} · <b>${eff}</b> · 칸 ${used}/${total}</p>${UPKEEP[k]?.[lv - 1] ? `<p class="tiny muted">유지비 주 ${formatMoney(UPKEEP[k][lv - 1])}</p>` : ''}</div>
     </div>
     ${b ? progress(`${esc(B.levels[b.to - 1].title)} 증축 중`, b) : next ? `<div class="row gap mt"><span class="tiny muted grow">다음: ${esc(next.title)} · 칸 ${next.slots}개 · ${next.weeks}주</span>
       <button class="btn sm ${err ? '' : 'primary'}" data-act="upgradeBld" data-k="${k}" ${err ? 'disabled' : ''}>${formatMoney(next.cost)}</button></div>${err && err !== '자금이 부족해요' ? `<p class="tiny faint">${err}</p>` : ''}` : '<p class="small good mt">최고 레벨</p>'}
@@ -372,6 +372,8 @@ function financeView(t) {
         <div><span>스태프 비용</span><b>${formatMoney((L.staffPay || 0) + (L.staff || 0))}</b></div>
         <div><span>시설 투자</span><b>${formatMoney(L.facility || 0)}</b></div>
         <div><span>프런트 운영</span><b>${formatMoney(L.front || 0)}</b></div>
+        <div><span>시설 유지비</span><b>${formatMoney(L.upkeep || 0)}</b></div>
+        <div><span>모기업 환수</span><b>${formatMoney(L.dividend || 0)}</b></div>
         <div><span>모기업 지원금</span><b>${formatMoney(L.support || 0)}</b></div>
       </div>
       ${(() => { const ci = capInfo(state); const pct = Math.min(130, Math.round(ci.used / Math.max(1, ci.limit) * 100)); return `<div class="mt"><div class="row between"><span class="small">샐러리캡 (연봉 상위 40명) <button class="linkish" data-act="learn" data-k="cap">?</button></span><b class="small ${ci.used > ci.limit ? 'bad' : ''}">${formatMoney(ci.used)} / ${formatMoney(ci.limit)}</b></div><div class="satbar mt capbar ${ci.used > ci.limit ? 'over' : ''}"><i style="width:${Math.min(100, pct)}%"></i></div><p class="tiny faint mt">시즌이 끝날 때 상한을 넘으면 초과액의 50%(2년 연속이면 100%)를 제재금으로 내요.</p></div>`; })()}

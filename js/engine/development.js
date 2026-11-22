@@ -67,7 +67,7 @@ export function developWeek(p, ctx = {}) {
       inc += gauss(0, 0.1) * (focus === 'rest' ? 0 : 1);
     }
     if (p.age > g.peakEnd) {
-      const dec = (p.age - g.peakEnd) * 0.05 * (DECLINE_W[k] ?? 1) * tickScale * (hasTrait(p, 'iron') ? 0.8 : 1);
+      const dec = (p.age - g.peakEnd) * 0.06 * (DECLINE_W[k] ?? 1) * tickScale * (hasTrait(p, 'iron') ? 0.8 : 1);
       inc -= dec * (focus === k ? 0.6 : 1); // 집중 훈련으로 노쇠 완화
       p.cap[k] = Math.max(p.r[k] + inc, Math.min(p.cap[k], p.r[k] + 2));
     }
@@ -76,7 +76,7 @@ export function developWeek(p, ctx = {}) {
 
   // 각성: 잠재력 한계 돌파
   if (p.age <= 28 && !p.injury) {
-    let ch = 0.0035 * tickScale;
+    let ch = 0.0018 * tickScale;
     if (hasTrait(p, 'genius')) ch *= 3;
     if (hasTrait(p, 'workhorse')) ch *= 1.5;
     if (ctx.intensity === 'hard') ch *= 1.3;

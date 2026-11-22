@@ -158,6 +158,13 @@ export function hireStaff(state, team, id) {
   return { ok: true, msg: `${STAFF_ROLES[c.role].ko} ${c.name} 선임${prev ? ` (전임 ${prev.name} 해임)` : ''}`, prev };
 }
 export function fireStaff(team, role) { team.staff[role] = null; }
+// 시설 유지비(주간, 만원): 큰 시설일수록 관리비가 들어요
+export const UPKEEP = { stadium: [0, 300, 800, 1600, 2800], clubhouse: [0, 150, 350, 700, 1200], futures: [0, 150, 350, 700, 1200] };
+export function upkeepWeekly(team) {
+  let s = 0;
+  for (const k in UPKEEP) s += UPKEEP[k][Math.max(0, Math.min(4, (team.buildings?.[k]?.lv || 1) - 1))];
+  return s;
+}
 export function staffWeekly(team) {
   let s = 0;
   for (const r in team.staff || {}) if (team.staff[r]) s += staffWeeklyOf(team.staff[r]);
