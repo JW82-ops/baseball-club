@@ -17,14 +17,54 @@ import { ACHV } from '../../engine/achievements.js';
 import { CLUB_COLORS } from '../../data/teams.js';
 import { avatar as av } from '../components.js';
 import { sponsorLogo } from '../../data/brandArt.js';
+import { PROMOS, MERCH_LV, activePromo, gateFactors, merchMult } from '../../engine/biz.js';
+
+// ───────── 관중·수익 ─────────
+function bizView(t) {
+  const g = t.lastGate;
+  const log = t.attLog || [];
+  const cur = activePromo(state);
+  const lv = t.merchLv || 1;
+  const next = MERCH_LV[lv];
+  const L = t.ledger;
+  const maxA = Math.max(t.capacity, ...log);
+  const bars = log.map((a) => `<i style="height:${Math.max(6, Math.round((a / maxA) * 100))}%" class="${a >= t.capacity ? 'full' : ''}" title="${a.toLocaleString()}명"></i>`).join('');
+  const today = gateFactors(state, t);
+  return `
+    <div class="panel gatecard">
+      <div class="row between"><span class="small muted">최근 홈 경기 관중</span>${g?.sell ? '<span class="sold">매진!</span>' : ''}</div>
+      <b class="disp gate-num">${g ? g.att.toLocaleString() : '-'}<small> / ${t.capacity.toLocaleString()}석</small></b>
+      ${g ? `<div class="chips mt">${g.factors.map((f) => `<span class="chip">${f.icon} ${esc(f.ko)}${f.v ? ` ${f.v > 0 ? '+' : ''}${Math.round(f.v * 100)}%` : ''}</span>`).join('')}${g.promo ? `<span class="chip" style="border-color:var(--gold);color:var(--gold)">${PROMOS[g.promo].icon} ${PROMOS[g.promo].ko}</span>` : ''}</div>
+        <p class="tiny muted mt">입장 ${formatMoney(g.ticket)} · 굿즈·식음 ${formatMoney(g.merch)}${g.cost ? ` · 이벤트 비용 -${formatMoney(g.cost)}` : ''}</p>` : '<p class="tiny muted mt">홈 경기를 치르면 관중 기록이 쌓여요.</p>'}
+      ${log.length > 1 ? `<div class="attbars mt">${bars}</div><p class="tiny faint">최근 ${log.length}번 홈 경기 · 금색 = 매진</p>` : ''}
+      <p class="tiny muted mt">오늘 조건: ${today.map((f) => `${f.icon} ${esc(f.ko)}`).join(' · ')} — 주말·가을엔 관중이 늘고, 비·추위엔 줄어요. 돔구장(Lv.5)은 날씨를 타지 않아요.</p>
+    </div>
+    <div class="sec-h mt-l"><h2>티켓 가격</h2><button class="linkish" data-act="learn" data-k="ticketp">가격 전략이란?</button></div>
+    <div class="panel"><div class="row gap"><button class="btn sm" data-act="ticket" data-d="-0.1">−</button><b class="disp grow center" style="font-size:22px">${Math.round(t.ticket * 10000).toLocaleString()}원</b><button class="btn sm" data-act="ticket" data-d="0.1">＋</button></div>
+      <p class="tiny faint mt">비싸면 한 명당 수입은 늘지만 관중이 줄어요. 관중이 줄면 굿즈 매출과 팬 증가도 같이 줄어요.</p></div>
+    <div class="sec-h mt-l"><h2>이번 주 이벤트 데이</h2><span class="sub">이번 주 홈 경기에 적용</span></div>
+    <div class="promos">${Object.entries(PROMOS).map(([k, P]) => { const lock = P.needHof && !(state.hof || []).length; return `<button class="promo ${cur === k ? 'on' : ''} ${lock ? 'lock' : ''}" data-act="setPromo" data-k="${k}" ${lock ? 'disabled' : ''}>
+      <span class="pr-art" style="background-image:url(img/mission/${P.img}.webp)"></span>
+      <span class="pr-b"><b>${P.icon} ${P.ko}</b><small>${P.desc}</small><em>경기당 ${formatMoney(P.cost)}${lock ? ' · 헌액자 필요' : ''}</em></span>${cur === k ? '<span class="pr-on">진행 중</span>' : ''}</button>`; }).join('')}</div>
+    ${cur ? '<button class="btn sm ghost block mt" data-act="setPromo" data-k="">이벤트 취소</button>' : ''}
+    <div class="sec-h mt-l"><h2>굿즈 스토어</h2><span class="sub">매출 ×${merchMult(state, t).toFixed(2)}</span></div>
+    <div class="panel"><p class="small"><b>${MERCH_LV[lv - 1].ko}</b> <span class="tiny muted">(${lv}/${MERCH_LV.length}단계)</span></p>
+      <p class="tiny muted">스타 선수(OVR 75+)가 많을수록 유니폼이 잘 팔려요.</p>
+      ${next ? `<button class="btn sm primary block mt" data-act="upgradeMerch">${esc(next.ko)}로 확장 · ${formatMoney(next.cost)}</button>` : '<p class="small good mt">최고 단계예요</p>'}</div>
+    <div class="sec-h mt-l"><h2>이번 시즌 수익</h2></div>
+    <div class="panel"><div class="kv" style="margin-top:0">
+      <div><span>입장 수입</span><b>${formatMoney(L.ticket)}</b></div><div><span>굿즈·식음</span><b>${formatMoney(L.merch)}</b></div>
+      <div><span>중계권</span><b>${formatMoney(L.broadcast || 0)}</b></div><div><span>이벤트 비용</span><b>${formatMoney(L.promo || 0)}</b></div>
+    </div><p class="tiny faint mt">중계권료는 팬이 많고 순위가 높을수록 커져요.</p></div>`;
+}
 import { slot as curSlot } from '../../core/store.js';
 import { staffImg, bodyHtml, icon, ownerImg } from '../portraits.js';
 import { ensureFront, frontLv, DEPTS, DEPT_COST, DEPT_UPKEEP, REGIONS, satLabel, goalProgress, boardSupportBase } from '../../engine/front.js';
 import { flagOf } from '../../data/nations.js';
 import { capInfo } from '../../engine/kborules.js';
 
-const TAB_ICO = { front: 'club', facility: 'build', staff: 'staff', sponsor: 'sponsor', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
-const TABS = [['front', '프런트'], ['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['achv', '업적'], ['finance', '재정·설정']];
+const TAB_ICO = { biz: 'fans', front: 'club', facility: 'build', staff: 'staff', sponsor: 'sponsor', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
+const TABS = [['front', '프런트'], ['biz', '관중·수익'], ['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['achv', '업적'], ['finance', '재정·설정']];
 
 // ───────── 프런트 ─────────
 function frontView(t) {
@@ -292,6 +332,7 @@ function financeView(t) {
         <div><span>총 연봉</span><b>${formatMoney(payroll)}</b></div>
         <div><span>입장 수입</span><b>${formatMoney(L.ticket)}</b></div>
         <div><span>굿즈·VIP</span><b>${formatMoney(L.merch)}</b></div>
+        <div><span>중계권</span><b>${formatMoney(L.broadcast || 0)}</b></div>
         <div><span>스폰서 후원</span><b>${formatMoney((L.sponsorPay || 0) + (L.sponsor || 0))}</b></div>
         <div><span>연봉 지출</span><b>${formatMoney(L.salary)}</b></div>
         <div><span>스태프 비용</span><b>${formatMoney((L.staffPay || 0) + (L.staff || 0))}</b></div>
@@ -301,9 +342,7 @@ function financeView(t) {
       </div>
       ${(() => { const ci = capInfo(state); const pct = Math.min(130, Math.round(ci.used / Math.max(1, ci.limit) * 100)); return `<div class="mt"><div class="row between"><span class="small">샐러리캡 (연봉 상위 40명) <button class="linkish" data-act="learn" data-k="cap">?</button></span><b class="small ${ci.used > ci.limit ? 'bad' : ''}">${formatMoney(ci.used)} / ${formatMoney(ci.limit)}</b></div><div class="satbar mt capbar ${ci.used > ci.limit ? 'over' : ''}"><i style="width:${Math.min(100, pct)}%"></i></div><p class="tiny faint mt">시즌이 끝날 때 상한을 넘으면 초과액의 50%(2년 연속이면 100%)를 제재금으로 내요.</p></div>`; })()}
       <p class="small muted mt">${LEAGUES[state.league || 'KBO'].flag} ${LEAGUES[state.league || 'KBO'].ko} · 구장 ${t.capacity.toLocaleString()}석${t.lastAttendance ? ` · 최근 홈 관중 ${t.lastAttendance.toLocaleString()}명` : ''}</p>
-      <div class="row gap mt"><span class="small">티켓 가격</span><div class="grow"></div>
-        <button class="btn sm" data-act="ticket" data-d="-0.1">−</button><b>${Math.round(t.ticket * 10000).toLocaleString()}원</b><button class="btn sm" data-act="ticket" data-d="0.1">＋</button></div>
-      <p class="tiny faint mt">티켓이 비싸면 관중이 줄어요. 리그 평균보다 너무 비싸지 않게 조절하세요.</p>
+      <p class="tiny muted mt">티켓 가격·이벤트·굿즈는 <button class="linkish" data-act="clubView" data-v="biz">관중·수익</button>에서 정해요.</p>
     </div>
     <div class="sec-h mt-l"><h2>유니폼 디자인</h2></div>
     <div class="panel">
@@ -392,6 +431,7 @@ function mapView(t) {
     ${SPOTS.map(([k, ico, ko, x, y]) => { const inf = spotInfo(t, k); return `<button class="hot ${inf.cls || ''} ${inf.alert ? 'alert' : ''}" style="left:${x}%;top:${y}%" ${k === 'develop' ? 'data-act="tab" data-tab="develop"' : `data-act="clubView" data-v="${k}"`}>${icon(ico, 28)}${ko}${inf.sub ? `<small>${inf.sub}</small>` : ''}</button>`; }).join('')}
   </section>
   <div class="campus-more">
+    <button class="btn sm" data-act="clubView" data-v="biz">${icon('fans', 22)}관중·수익</button>
     <button class="btn sm" data-act="clubView" data-v="finance">${icon('money', 22)}재정·설정</button>
     <button class="btn sm" data-act="clubView" data-v="trade">${icon('roster', 22)}트레이드</button>
     <button class="btn sm" data-act="clubView" data-v="achv">${icon('fans', 22)}업적</button>
@@ -405,7 +445,7 @@ export function renderClub() {
   const view = ui.clubView || 'map';
   const head = `<div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>`;
   if (view === 'map') return `<section class="sec">${head}</section>${mapView(t)}`;
-  const body = { front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
+  const body = { biz: bizView, front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
   return `
   <section class="sec">
     <div class="row gap"><button class="btn sm ghost backmap" data-act="clubView" data-v="map">${icon('club', 22)}캠퍼스</button><h2 class="disp grow" style="font-size:19px">${TABS.find(([k]) => k === view)?.[1] || ''}</h2></div>

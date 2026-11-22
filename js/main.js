@@ -48,6 +48,7 @@ import { gameDate } from './engine/calendar.js';
 import { stadiumArt } from './ui/components.js';
 import { showLearn, shortWhy } from './ui/screens/learn.js';
 import { openPitchCall } from './ui/screens/pitchcall.js';
+import { PROMOS, setPromo, upgradeMerch } from './engine/biz.js';
 import { backupToFile, restoreFromFile, restoreToEmptySlot } from './ui/backup.js';
 let saveFailShown = 0;
 window.addEventListener('savefail', () => { if (Date.now() - saveFailShown > 60000) { saveFailShown = Date.now(); toast('기기 저장 공간이 부족해 저장하지 못했어요. 구단 → 재정·설정에서 백업 파일로 저장하고, 안 쓰는 슬롯을 지워 주세요', 'bad'); } });
@@ -137,7 +138,7 @@ function sceneFor(tab) {
     if (ph === 'post') return 'crowd';
     return `stadium${Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1))}`;
   }
-  if (tab === 'club') return { map: 'stadium1', front: 'office', facility: 'stadium' + Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1)), staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'map'] || 'office';
+  if (tab === 'club') return { map: 'stadium1', biz: 'crowd', front: 'office', facility: 'stadium' + Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1)), staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'map'] || 'office';
   if (tab === 'roster' && ui.rosterView === 'futures') return 'futures';
   return { roster: 'clubhouse', develop: 'gym', league: 'crowd', mail: 'contract' }[tab] || 'stadium1';
 }
@@ -666,6 +667,8 @@ registerActions({
     t.ticket = Math.max(0.5, Math.min(5, Math.round((t.ticket + Number(d.d)) * 10) / 10));
     commit();
   },
+  setPromo: (d) => { const err = setPromo(state, d.k); if (err) return toast(err, 'bad'); commit(d.k ? `${PROMOS[d.k].icon} ${PROMOS[d.k].ko} 준비 완료` : '이벤트를 취소했어요', 'good'); },
+  upgradeMerch: () => { const err = upgradeMerch(userTeam(state)); if (err) return toast(err, 'bad'); sfx.coin?.(); commit('굿즈 스토어 확장!', 'good'); },
   seasonLen: (d) => { state.settings.seasonLength = Number(d.v); commit('다음 시즌부터 적용돼요'); },
   backupFile: () => backupToFile(),
   restoreFile: () => confirmBox('백업 파일로 지금 슬롯을 덮어쓸까요? 지금 진행은 사라져요.', '불러오기', () => restoreFromFile(() => { upgradeSave(state); fillUserFirstTeam(state); save(); closeModal(); ui.tab = 'home'; render(); window.scrollTo(0, 0); })),

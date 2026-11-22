@@ -9,6 +9,7 @@ import { createGame, simToEnd, applyGame, boxSummary } from './match.js';
 import { makeSchedule, standings, addNews, pct } from './league.js';
 import { staffStat, ensureClub, clubEffects, staffWeekly, tickConstruction, devCtxFor, healBonusFor, recoveryBonus, genStaffMarket, staffOffseason } from './club.js';
 import { LEAGUES } from '../data/club.js';
+import { gateFactors, activePromo, PROMOS, merchMult, broadcastWeekly } from './biz.js';
 import { weeklyMood, initRelations, relNewcomer, pruneRels } from './mood.js';
 import { weeklyMail, weeklyMailUpkeep, checkSponsorMail, systemMail } from './mail.js';
 import { payWeeklySponsors, settleSponsorsSeason, genSponsorOffers } from './sponsor.js';
@@ -364,15 +365,24 @@ function userFinanceGame(state, sg) {
   const priceF = Math.pow(1.5 * (LEAGUES[state.league || 'KBO'].ticketMult) / Math.max(0.3, team.ticket), 0.6);
   const rivalF = team.rivalId && (sg.away === team.rivalId) ? 1.25 : 1;
   const diffF = { easy: 1.2, normal: 1, hard: 0.85 }[state.settings.difficulty || 'normal'];
-  const demand = (4000 + team.fans * 0.11) * winF * priceF * rivalF * diffF * (0.85 + Math.random() * 0.3);
+  const gf = gateFactors(state, team);
+  const pk = activePromo(state);
+  const P = pk ? PROMOS[pk] : null;
+  const gateF = 1 + gf.reduce((a, f) => a + f.v, 0) + (P ? P.att : 0);
+  const demand = (4000 + team.fans * 0.11) * winF * priceF * rivalF * diffF * gateF * (0.9 + Math.random() * 0.2);
   const att = Math.round(Math.min(team.capacity, demand));
-  const ticket = Math.round(att * team.ticket);
-  const merch = Math.round(att * 0.35 * (1 + eff.merch) * LEAGUES[state.league || 'KBO'].ticketMult) + eff.vip;
-  team.cash += ticket + merch;
+  const ticket = Math.round(att * team.ticket * (1 + (P?.ticket || 0)));
+  const merch = Math.round(att * 0.35 * (1 + eff.merch) * merchMult(state, team) * (1 + (P?.merch || 0)) * LEAGUES[state.league || 'KBO'].ticketMult) + eff.vip;
+  const cost = P ? P.cost : 0;
+  team.cash += ticket + merch - cost;
   team.ledger.ticket += ticket;
   team.ledger.merch += merch;
   team.ledger.income += ticket + merch;
+  if (cost) { team.ledger.expense += cost; team.ledger.promo = (team.ledger.promo || 0) + cost; }
+  if (P?.fan) team.fans += Math.round(team.fans * P.fan);
   team.lastAttendance = att;
+  team.lastGate = { att, cap: team.capacity, sell: att >= team.capacity, factors: gf.map((f) => ({ ko: f.ko, icon: f.icon, v: f.v })), promo: pk, ticket, merch, cost, opp: sg.away, day: state.day, season: state.season };
+  team.attLog = [...(team.attLog || []), att].slice(-15);
 }
 
 function userFinanceWeek(state) {
@@ -381,12 +391,15 @@ function userFinanceWeek(state) {
   const weeks = weeksInSeason(state) + CAMP_WEEKS + 4;
   const salary = Math.round(payroll / weeks);
   const staff = staffWeekly(team);
-  const sponsor = Math.round((1800 + team.fans * 0.03) * LEAGUES[state.league || 'KBO'].ticketMult);
-  team.cash += sponsor - salary - staff;
+  const sponsor = Math.round((1000 + team.fans * 0.03) * LEAGUES[state.league || 'KBO'].ticketMult);
+  const rank = standings(state).findIndex((x) => x.team.id === team.id) + 1;
+  const tv = broadcastWeekly(team, rank, LEAGUES[state.league || 'KBO'].ticketMult);
+  team.ledger.broadcast = (team.ledger.broadcast || 0) + tv;
+  team.cash += sponsor + tv - salary - staff;
   team.ledger.salary += salary;
   team.ledger.staffPay = (team.ledger.staffPay || 0) + staff;
   team.ledger.expense += salary + staff;
-  team.ledger.income += sponsor;
+  team.ledger.income += sponsor + tv;
   // 팬 변화
   const recent = team.last10.slice(-GAMES_PER_WEEK);
   const wins = recent.filter((r) => r === 'W').length;
