@@ -1,6 +1,7 @@
 import { state, save } from '../../core/store.js';
 import { makeGoals, goalStatus, backGoal } from '../../engine/goals.js';
 import { CAMP_LOCS, CAMP_THEMES, campPlan, campCost } from '../../engine/camp.js';
+import { CRISES, crisisProgress, strikeCount } from '../../engine/crisis.js';
 import { answerMeeting, meetingPending, deadlineLeft } from '../../engine/clubhouse.js';
 import { ui, rerender } from '../ui-state.js';
 import { artBg, artHero, stadiumArt, esc, emblem, gradeTag, avatar, posShort, potTag } from '../components.js';
@@ -164,6 +165,15 @@ function natCard() {
     <button class="btn sm mt" data-act="natSeen">확인</button>`, 'tall')}</section>`;
 }
 
+function crisisCard() {
+  const c = state.crisis;
+  if (!c) return '';
+  const C = CRISES[c.kind]; const pr = crisisProgress(state);
+  const left = Math.max(0, c.due - (state.season * 100 + Math.floor(state.day / 6)));
+  return `<section class="sec"><div class="panel crisisc"><b>🚨 ${C.icon} ${C.ko}</b> <span class="tiny bad">${left}주 남음 · 경고 ${strikeCount(state)}/2</span>
+    <p class="small mt">${C.desc}</p><div class="rg-bar mt"><i style="width:${Math.round(pr.pct * 100)}%;background:${pr.ok ? 'var(--good)' : 'linear-gradient(90deg,#ff7a7a,#ffb347)'}"></i></div><p class="tiny muted">${pr.text}</p>
+    <p class="tiny faint mt">기한 안에 목표를 채우면 극복이에요. 3시즌 안에 두 번 실패하면 모기업이 구단을 팔아요.</p></div></section>`;
+}
 function meetingCard() {
   const mt = state.meeting;
   if (!mt || mt.season !== state.season || !mt.items.length || state.phase !== 'regular') return '';
@@ -224,6 +234,7 @@ function coachLine(sg) {
   if (gs) return { act: 'guideGo', html: `<span class="gprog">📘 가이드 ${state.guide.step + 1}/${GUIDE.length} · ${gs.title}</span>${gs.text}`, cta: gs.cta, guide: true };
   const mails = (state.inbox || []).filter((m) => !m.resolved).length;
   if (mails) return { act: 'tab', tab: 'mail', html: `✉️ 답장을 기다리는 메일이 <b>${mails}통</b> 있어요.`, cta: '메일함 열기' };
+  if (state.crisis) { const C = CRISES[state.crisis.kind]; const pr = crisisProgress(state); return { act: 'lobbyBrief3', html: `🚨 <b>${C.icon} ${C.ko}</b> — ${Math.max(0, state.crisis.due - (state.season * 100 + Math.floor(state.day / 6)))}주 남았어요. ${pr.text}`, cta: '위기 상황 보기' }; }
   { const dl = deadlineLeft(state); if (state.dl?.opened && !state.dl.closed && dl > 0) return { act: 'tab', tab: 'mail', html: `📅 <b>트레이드 마감 D-${dl}</b>! 제안이 몰려 있어요. 사든 팔든 지금 결정해야 해요.`, cta: '메일함에서 제안 보기' }; }
   if (meetingPending(state) && state.phase === 'regular') return { act: 'lobbyBrief2', html: `🗣️ 코치진이 이번 주 <b>건의 ${meetingPending(state)}건</b>을 올렸어요.`, cta: '코치 회의 보기' };
   if (!state.mission && (state.missionOffers || []).length) return { act: 'lobbyMission', html: `🎯 스폰서 미션 제안이 <b>${state.missionOffers.length}건</b> 왔어요.`, cta: '미션 고르기' };
@@ -287,6 +298,7 @@ registerActions({
   campSet: (d) => { campPlan(state)[d.f] = d.v; save(); rerender(); },
   meetAns: (d) => { const r = answerMeeting(state, d.id, d.y === '1'); if (r.msg) toast(r.msg, r.ok ? 'good' : 'bad'); save(); rerender(); if (document.querySelector('#modal:not([hidden]) .meetc')) openModal(meetingCard() || '<div class="panel empty">이번 주 건의를 모두 처리했어요.</div>', { sheet: true, keepScroll: true }); },
   backGoal: (d) => { const g = backGoal(state, d.pid); if (!g) return; toast(`${state.players[d.pid]?.name}의 목표를 공개 응원했어요 📣`, 'good'); save(); rerender(); },
+  lobbyBrief3: () => openModal(crisisCard(), { sheet: true }),
   lobbyBrief2: () => openModal(meetingCard() || '<div class="panel empty">이번 주 건의가 없어요.</div>', { sheet: true }),
   lobbyBrief: () => openModal(`${miniStandings()}${lastGameCard()}`),
   lobbyStaff: () => { ui.tab = 'club'; ui.clubView = 'staff'; rerender(); window.scrollTo(0, 0); },
@@ -295,7 +307,7 @@ registerActions({
 });
 
 function briefing() {
-  const body = `${natCard()}${allStarCard()}${meetingCard()}${boardCard()}${goalsCard()}${state.mission ? missionCard() : ''}${lastGameCard()}${snsCard()}${paperCard()}${weekCard()}${synergyCard()}`;
+  const body = `${natCard()}${allStarCard()}${crisisCard()}${meetingCard()}${boardCard()}${goalsCard()}${state.mission ? missionCard() : ''}${lastGameCard()}${snsCard()}${paperCard()}${weekCard()}${synergyCard()}`;
   return `<div class="lb-more"><div class="lb-grip"><span></span>구단 브리핑</div>${body}${newsCard()}</div>`;
 }
 

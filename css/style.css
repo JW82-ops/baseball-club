@@ -1367,3 +1367,8 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .op-w small { font-size: 10.5px; color: var(--muted); }
 .op p { font-size: 12.5px; line-height: 1.45; margin: 3px 0 0; }
 .rivalc b { font-size: 15px; }
+.ending { text-align: center; padding-top: 40px; }
+.ending .end-ico { font-size: 72px; }
+.ending h1 { font-size: 34px; margin: 6px 0; }
+.ending .kv { text-align: left; }
+.crisisc { border-color: rgba(255,90,90,.55); background: linear-gradient(180deg, rgba(255,80,80,.12), transparent); }

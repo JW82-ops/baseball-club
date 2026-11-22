@@ -10,6 +10,7 @@ export function todoItems() {
   const t = U();
   const out = [];
   const mails = (state.inbox || []).filter((m) => !m.resolved);
+  if (state.crisis) out.push({ icon: '🚨', text: `위기: ${({ bankrupt: '파산 위기', board: '모기업 지원 축소', relocate: '연고지 이전 압박' })[state.crisis.kind]}`, act: 'nGo', go: 'home' });
   if (mails.length) out.push({ icon: '✉️', text: `답장을 기다리는 메일 ${mails.length}통`, act: 'nGo', go: 'mail' });
   if (state.pendingEvent) out.push({ icon: '📢', text: `결정이 필요한 이슈: ${state.pendingEvent.title}`, act: 'nGo', go: 'home' });
   if (meetingPending(state) && state.phase === 'regular') out.push({ icon: '🗣️', text: `코치 회의 건의 ${meetingPending(state)}건`, act: 'nGo', go: 'meeting' });

@@ -37,6 +37,7 @@ import { rehabWeek, mechProgress, planCondBonus, workloadWeek, settleWinter } fr
 import { ensureRegion, regionWeek, regionSeasonStart, regionSeasonEnd, perkSum } from './region.js';
 import { makeGoals, settleGoals } from './goals.js';
 import { characterWeek, potentialDrift } from './character.js';
+import { crisisWeek, crisisSeasonStart } from './crisis.js';
 import { rivalsWeek, rivalGame, rivalFA, rivalsSeasonEnd } from './rivals.js';
 import { homecomingStory, checkTitles, cheerEff, cheerWeekly } from './fandom.js';
 import { CAMP_LOCS, campGrow, payCamp, finishCampPlan, markHomegrown, checkFranchise } from './camp.js';
@@ -271,6 +272,7 @@ export function weeklyCycle(state, opts = {}) {
   for (const n of mentorWeek(state)) addNews(state, n.text, n.t);
   for (const n of injuryWeek(state)) addNews(state, n.text, n.t);
   if (!opts.camp) for (const n of rivalsWeek(state)) addNews(state, n.text, n.t);
+  for (const n of crisisWeek(state)) addNews(state, n.text, n.t);
   if (!opts.camp) { for (const n of deadlineWeek(state)) addNews(state, n.text, n.t); if (state.phase === 'regular' && state.day < state.schedule.length) makeMeeting(state); }
   for (const d of tickConstruction(user)) {
     addNews(state, `🏗️ ${d.name} 공사 완료! ${d.title}${d.kind === 'b' ? ` (Lv.${d.lv})` : ''}`, 'big');
@@ -905,6 +907,8 @@ export function runCampAndStartSeason(state) {
   {
     const sup = startBoardSeason(state);
     if (sup) addNews(state, `🏢 모기업 지원금 ${formatMoney(sup)} 입금. 올 시즌 이사회 목표: ${state.board.goals.map((g) => g.ko).join(', ')}`, 'big');
+    const cn = crisisSeasonStart(state, sup);
+    if (cn) addNews(state, cn, 'bad');
   }
   state.schedule = makeSchedule(state.teamOrder, state.settings.seasonLength);
   state.day = 0;

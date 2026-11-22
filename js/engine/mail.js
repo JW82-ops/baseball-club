@@ -14,6 +14,7 @@ import { resolvePartnerMail, resolveCityEvent } from './region.js';
 import { resolveIncident } from './character.js';
 import { resolveBigInjury, tradeOpinions, tradeOpinionEffect } from './clubhouse.js';
 import { resolveTaunt, rivalTradeNote } from './rivals.js';
+import { resolveCrisisMail } from './crisis.js';
 import { resolveMgrReq, resolveMgrQuit, resolveMgrPoach, resolveMgrRenew } from './manager.js';
 
 export const weekAbs = (state) => state.season * 100 + Math.floor(state.day / 6);
@@ -318,6 +319,7 @@ export function resolveMail(state, id, idx) {
     case 'incident': return resolveIncident(state, m, idx);
     case 'bigInjury': return resolveBigInjury(state, m, idx);
     case 'rivalTaunt': return resolveTaunt(state, m, idx);
+    case 'crisis': return resolveCrisisMail(state, m, idx);
     case 'mgrQuit': return resolveMgrQuit(state, m, idx);
     case 'mgrPoach': return resolveMgrPoach(state, m, idx);
     case 'mgrRenew': return resolveMgrRenew(state, m, idx);

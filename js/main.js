@@ -26,6 +26,7 @@ import { slotSheetHtml, subSheetHtml, staffMarketHtml, petitionSheetHtml, titleS
 import { upgradeCheer, makeSong } from './engine/fandom.js';
 import { notifCount } from './ui/screens/notify.js';
 import { initPWA, promptInstall } from './ui/pwa.js';
+import { endingHtml } from './ui/screens/ending.js';
 import { renderMail } from './ui/screens/mail.js';
 import { resolveMail, unreadCount } from './engine/mail.js';
 import { signSponsor, cancelSponsor } from './engine/sponsor.js';
@@ -101,6 +102,7 @@ function render() {
   $('#hud').hidden = false;
   $('#tabs').hidden = !!ui.live;
   renderHud();
+  if (state.ending) { $('#tabs').hidden = true; main.innerHTML = endingHtml(); return; }
   if (ui.live) {
     ensureGuard();
     setScene(null);
@@ -246,7 +248,7 @@ function simDays(n) {
   let last = null;
   let wins = 0, losses = 0;
   for (let i = 0; i < n && state.phase === 'regular'; i++) {
-    if (i > 0 && state.pendingEvent) break;
+    if (i > 0 && (state.pendingEvent || state.ending)) break;
     const r = simDay(state);
     if (r) {
       last = r;
