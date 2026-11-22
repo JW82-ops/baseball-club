@@ -198,6 +198,11 @@ function dailyRecovery(state) {
 // ───────── 주간 사이클: 훈련·성장·부상회복·재정 ─────────
 export function weeklyCycle(state, opts = {}) {
   const ts = tickScale(state);
+  // 순위 추이 기록(주마다)
+  if (state.phase === 'regular' && !opts.camp) {
+    state.rankLog = state.rankLog?.season === state.season ? state.rankLog : { season: state.season, weeks: [] };
+    state.rankLog.weeks.push(standings(state).map((x) => x.team.id));
+  }
   const report = { week: Math.ceil(state.day / GAMES_PER_WEEK), risers: [], events: [], season: state.season, camp: !!opts.camp };
   const ws = state.weekStats || emptyWeekStats();
   for (const tid of state.teamOrder) {

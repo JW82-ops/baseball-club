@@ -1084,3 +1084,49 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .guidebar p { font-size: 12.5px; line-height: 1.4; margin-top: 2px; }
 .guidebar p b { color: #c0471f; font-size: inherit; }
 .guidebar .btn { flex: none; }
+
+/* 리그: 순위 카드 · 기록 카드 · 일정 · 팀 정보 */
+.rankchart svg { width: 100%; height: auto; display: block; margin-top: 4px; }
+.rankchart .gl { font-size: 9px; fill: var(--muted); }
+.stlist { display: flex; flex-direction: column; gap: 6px; }
+.strow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px; background: var(--glass); border: 1px solid rgba(255, 255, 255, .1); text-align: left; }
+.strow.me { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255, 197, 61, .25); }
+.strow .rk { width: 24px; text-align: center; font-family: var(--display); font-size: 20px; color: var(--muted); }
+.strow .rk.in { color: var(--gold); }
+.strow b { font-size: 15px; }
+.sk { font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 99px; margin-left: 4px; }
+.sk.w { background: rgba(99, 212, 143, .2); color: #7ee2a0; } .sk.l { background: rgba(255, 111, 97, .2); color: #ff9d92; }
+.l10 { display: flex; gap: 2px; margin-top: 4px; }
+.l10 i { width: 7px; height: 7px; border-radius: 50%; background: #3a4a42; }
+.l10 i.w { background: #63d48f; } .l10 i.l { background: #ff6f61; }
+.kv .l10 { margin-top: 2px; }
+.strow .rec { display: flex; flex-direction: column; align-items: flex-end; min-width: 86px; }
+.strow .rec b { font-family: var(--display); font-weight: 400; font-size: 17px; }
+.strow .rec small { font-size: 10.5px; color: var(--muted); }
+.pbar { display: block; width: 80px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, .08); margin-top: 3px; overflow: hidden; }
+.pbar em { display: block; height: 100%; background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi)); }
+.cutline { position: relative; text-align: center; margin: 4px 0; }
+.cutline::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1.5px dashed rgba(255, 111, 97, .6); }
+.cutline span { position: relative; font-size: 10.5px; font-weight: 800; color: #ff9d92; background: var(--board); padding: 0 8px; }
+.ldgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.ldcard { padding: 10px; border-radius: 16px; background: var(--glass); border: 1px solid rgba(255, 255, 255, .1); }
+.ld-h { font-size: 12px; font-weight: 900; color: var(--gold); margin-bottom: 6px; }
+.ld-top { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding-bottom: 6px; border-bottom: 1px dashed rgba(255, 255, 255, .12); }
+.ld-top b { display: block; font-size: 13.5px; } .ld-top small { font-size: 10.5px; color: var(--muted); }
+.ld-v { font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--gold); }
+.ld-row { display: flex; gap: 6px; width: 100%; text-align: left; font-size: 12px; padding: 3px 0; }
+.ld-row span:first-child { width: 14px; color: var(--muted); }
+.ld-row small { color: var(--muted); font-size: 10.5px; }
+.ld-top.me b, .ld-row.me { color: var(--gold-hi); }
+.sclist { display: flex; flex-direction: column; gap: 5px; }
+.scrow { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 14px; background: var(--glass); border: 1px solid rgba(255, 255, 255, .08); text-align: left; font-size: 13px; }
+.scrow.today { border-color: var(--gold); }
+.scrow.done { opacity: .85; }
+.sc-n { width: 22px; color: var(--muted); font-size: 11px; }
+.sc-ha { font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 6px; }
+.sc-ha.h { background: rgba(255, 197, 61, .2); color: var(--gold); } .sc-ha.a { background: rgba(255, 255, 255, .08); color: var(--muted); }
+.ts-hero { display: flex; align-items: flex-end; gap: 12px; height: 150px; margin: -16px -16px 0; padding: 14px; border-radius: 18px 18px 0 0; background-size: cover; background-position: center; }
+.ts-hero h2 { font-size: 22px; }
+.tsgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tsp { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 12px; background: rgba(255, 255, 255, .05); text-align: left; }
+.tsp b { display: block; font-size: 12.5px; } .tsp small { font-size: 10.5px; color: var(--muted); }

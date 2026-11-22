@@ -10,17 +10,77 @@ import { SEASON_KEYS, careerLeaders } from '../../engine/records.js';
 import { LEAGUES } from '../../data/club.js';
 import { batWar, pitWar, wrcPlus, fip } from '../../engine/sabr.js';
 import { GLOSSARY, LEARN_CATS, learnKeysOf } from '../../data/glossary.js';
+import { avatar, artBg, stadiumArt } from '../components.js';
+import { calcOvr } from '../../engine/player.js';
+import { teamPlayers } from '../../engine/roster.js';
+import { registerActions, openModal } from '../dom.js';
+import { MANAGER_STYLES } from '../../data/club.js';
+import { probableStarter } from '../../engine/analysis.js';
+
+const dots = (t) => (t.last10 || []).slice(-10).map((r) => `<i class="${r === 'W' ? 'w' : r === 'L' ? 'l' : 'd'}"></i>`).join('');
+// 순위 추이: 우리 팀(굵게)과 1위 팀
+function rankChart() {
+  const lg = state.rankLog;
+  if (!lg || lg.season !== state.season || lg.weeks.length < 2) return '';
+  const n = state.teamOrder.length, W = lg.weeks.length;
+  const w = 320, h = 120, px = 14, py = 12;
+  const X = (i) => px + (i / (W - 1)) * (w - px * 2), Y = (r) => py + ((r - 1) / (n - 1)) * (h - py * 2);
+  const line = (tid) => lg.weeks.map((arr, i) => `${X(i).toFixed(1)},${Y(arr.indexOf(tid) + 1).toFixed(1)}`).join(' ');
+  const uid = state.userTeamId, lead = standings(state)[0].team.id;
+  const cut = Y(5.5);
+  return `<div class="panel rankchart"><div class="row between"><b class="small">순위 추이</b><span class="tiny muted">${W}주 · 점선 아래는 탈락권</span></div>
+    <svg viewBox="0 0 ${w} ${h}" role="img" aria-label="순위 추이"><line x1="${px}" x2="${w - px}" y1="${cut}" y2="${cut}" stroke="rgba(255,111,97,.5)" stroke-dasharray="4 4"/>
+    ${lead !== uid ? `<polyline points="${line(lead)}" fill="none" stroke="${state.teams[lead].color}" stroke-width="2" opacity=".7"/>` : ''}
+    <polyline points="${line(uid)}" fill="none" stroke="var(--gold)" stroke-width="3.5" stroke-linejoin="round"/>
+    <text x="${px}" y="${py - 2}" class="gl">1위</text><text x="${px}" y="${h - 1}" class="gl">${n}위</text></svg>
+    <p class="tiny muted"><b class="amber">━</b> 우리 팀${lead !== uid ? ` · <b style="color:${state.teams[lead].color}">━</b> ${esc(state.teams[lead].short)}(1위)` : ''}</p></div>`;
+}
+
+export function teamSheet(tid) {
+  const t = state.teams[tid];
+  const user = userTeam(state);
+  const st = standings(state);
+  const me = st.find((x) => x.team.id === tid);
+  const ps = teamPlayers(state, t).filter((p) => p.level === 1).sort((a, b) => calcOvr(b) - calcOvr(a));
+  const bats = ps.filter((p) => p.type === 'B').slice(0, 4), pits = ps.filter((p) => p.type === 'P').slice(0, 3);
+  let hw = 0, hl = 0;
+  for (const day of state.schedule) for (const g of day) {
+    if (!g.played || !((g.home === tid && g.away === user.id) || (g.away === tid && g.home === user.id))) continue;
+    const my = g.home === user.id ? g.hs : g.as, th = g.home === user.id ? g.as : g.hs;
+    if (my > th) hw++; else if (my < th) hl++;
+  }
+  const sp = probableStarter(state, t);
+  const ms = t.staff?.manager?.style && MANAGER_STYLES[t.staff.manager.style];
+  const row = (p) => `<button class="tsp" data-act="openPlayer" data-pid="${p.id}">${avatar(p, t.color, 34)}<span class="grow"><b>${esc(p.name)}</b><small>${p.type === 'P' ? (p.pos === 'SP' ? '선발' : '불펜') : p.pos} · OVR ${calcOvr(p)}</small></span></button>`;
+  return `<div class="tsheet">
+    <div class="ts-hero" style="${artBg(stadiumArt(t, tid === user.id), 'linear-gradient(180deg,rgba(6,16,11,.2),rgba(6,16,11,.92))')}">${emblem(t, 64)}<div><h2 class="disp">${esc(t.name)}</h2><p class="small">${me ? `${me.rank}위 · ${t.w}승 ${t.l}패${t.t ? ` ${t.t}무` : ''}` : ''} · 전력 ${teamOvr(state, t)}</p></div></div>
+    <div class="kv mt">
+      <div><span>득점 / 실점</span><b>${t.rs || 0} / ${t.ra || 0}</b></div>
+      <div><span>최근 10경기</span><b class="l10">${dots(t) || '-'}</b></div>
+      ${tid !== user.id ? `<div><span>우리와 상대전적</span><b>${hw}승 ${hl}패</b></div>` : ''}
+      <div><span>다음 선발</span><b>${sp ? esc(sp.name) : '-'}</b></div>
+      ${ms ? `<div><span>감독 스타일</span><b>${ms.icon} ${ms.ko}</b></div>` : ''}
+      ${t.rivalId === user.id || user.rivalId === tid ? '<div><span>관계</span><b class="bad">⚔️ 라이벌</b></div>' : ''}
+    </div>
+    <div class="sec-h mt"><h2 style="font-size:15px">핵심 타자</h2></div><div class="tsgrid">${bats.map(row).join('')}</div>
+    <div class="sec-h mt"><h2 style="font-size:15px">핵심 투수</h2></div><div class="tsgrid">${pits.map(row).join('')}</div>
+  </div>`;
+}
+registerActions({ openTeam: (d) => openModal(teamSheet(d.id)) });
 
 function standingsView() {
   const user = userTeam(state);
-  return `<div class="panel scroll-x"><table class="tbl">
-    <tr><th>팀</th><th>경기</th><th>승</th><th>패</th><th>무</th><th>승률</th><th>차</th><th>연속</th><th>전력</th></tr>
-    ${standings(state).map((s) => {
-      const t = s.team;
-      const st = t.streak > 0 ? `${t.streak}승` : t.streak < 0 ? `${-t.streak}패` : '-';
-      return `<tr class="${t.id === user.id ? 'me' : ''} ${s.rank === 5 ? 'cut' : ''}"><td class="tn">${s.rank}. ${emblem(t, 20)} ${esc(t.short)}</td><td>${t.w + t.l + t.t}</td><td>${t.w}</td><td>${t.l}</td><td>${t.t}</td><td>${pct(t).toFixed(3).replace(/^0/, '')}</td><td>${s.gb ? s.gb.toFixed(1) : '-'}</td><td>${st}</td><td>${teamOvr(state, t)}</td></tr>`;
-    }).join('')}
-  </table></div>`;
+  const st = standings(state);
+  const maxP = Math.max(0.001, ...st.map((x) => pct(x.team)));
+  return `${rankChart()}<div class="stlist mt">${st.map((x) => {
+    const t = x.team;
+    const sk = t.streak > 0 ? `<span class="sk w">${t.streak}연승</span>` : t.streak < 0 ? `<span class="sk l">${-t.streak}연패</span>` : '';
+    return `${x.rank === 6 ? '<div class="cutline"><span>가을야구 커트라인</span></div>' : ''}<button class="strow ${t.id === user.id ? 'me' : ''}" data-act="openTeam" data-id="${t.id}">
+      <span class="rk ${x.rank <= 5 ? 'in' : ''}">${x.rank}</span>${emblem(t, 36)}
+      <span class="grow"><b>${esc(t.short)}</b> ${sk}<span class="l10">${dots(t)}</span></span>
+      <span class="rec"><b>${t.w}-${t.l}${t.t ? `-${t.t}` : ''}</b><small>${pct(t).toFixed(3).replace(/^0/, '')} · ${x.gb ? `${x.gb.toFixed(1)}차` : '선두'}</small><i class="pbar"><em style="width:${Math.round((pct(t) / maxP) * 100)}%"></em></i></span>
+    </button>`;
+  }).join('')}</div><p class="tiny faint mt center">팀을 누르면 전력·상대전적·핵심 선수를 볼 수 있어요.</p>`;
 }
 
 function leadersView() {
@@ -31,12 +91,16 @@ function leadersView() {
   const qualP = ps.filter((p) => p.type === 'P' && p.cur.pit.outs >= games * 3);
   const board = (title, arr, val, fmt, asc = false) => {
     const top = arr.slice().sort((a, b) => (asc ? val(a) - val(b) : val(b) - val(a))).slice(0, 5);
-    return `<div class="panel"><div class="sec-h"><h2 style="font-size:15px">${title}</h2></div><table class="tbl">${top.map((p, i) => `<tr class="${p.team === user.id ? 'me' : ''}"><td><button data-act="openPlayer" data-pid="${p.id}" style="text-align:left">${i + 1}. ${esc(p.name)} <span class="muted">${esc(state.teams[p.team].short)}</span></button></td><td><b>${fmt(val(p))}</b></td></tr>`).join('') || '<tr><td class="muted">기록 없음</td></tr>'}</table></div>`;
+    if (!top.length) return `<div class="ldcard"><div class="ld-h">${title}</div><p class="muted small">기록 없음</p></div>`;
+    const [f, ...rest] = top;
+    return `<div class="ldcard"><div class="ld-h">${title}</div>
+      <button class="ld-top ${f.team === user.id ? 'me' : ''}" data-act="openPlayer" data-pid="${f.id}">${avatar(f, state.teams[f.team].color, 52)}<span class="grow"><b>${esc(f.name)}</b><small>${esc(state.teams[f.team].short)}</small></span><b class="ld-v">${fmt(val(f))}</b></button>
+      ${rest.map((p, i) => `<button class="ld-row ${p.team === user.id ? 'me' : ''}" data-act="openPlayer" data-pid="${p.id}"><span>${i + 2}</span><span class="grow">${esc(p.name)} <small>${esc(state.teams[p.team].short)}</small></span><b>${fmt(val(p))}</b></button>`).join('')}</div>`;
   };
   const isB = ui.leadersType === 'B';
   return `
     <div class="seg">${[['B', '타자'], ['P', '투수']].map(([k, l]) => `<button class="${ui.leadersType === k ? 'on' : ''}" data-act="leadersType" data-v="${k}">${l}</button>`).join('')}</div>
-    <div class="mt">${isB ? [
+    <div class="ldgrid mt">${isB ? [
       board('타율', qualB, (p) => batLine(p.cur.bat).avg, fmtAvg),
       board('홈런', ps, (p) => p.cur.bat.hr, (v) => v),
       board('타점', ps, (p) => p.cur.bat.rbi, (v) => v),
@@ -74,10 +138,10 @@ function scheduleView() {
       const my = home ? g.hs : g.as, th = home ? g.as : g.hs;
       res = `<span class="${my > th ? 'good' : my < th ? 'bad' : 'muted'}">${my > th ? '승' : my < th ? '패' : '무'} ${my}:${th}</span>`;
     }
-    rows.push(`<tr class="${i === state.day ? 'me' : ''}"><td>${i + 1}</td><td class="tn">${home ? 'vs' : '@'} ${emblem(opp, 18)} ${esc(opp.short)}</td><td>${res || (i === state.day ? '오늘' : '')}</td></tr>`);
+    rows.push(`<button class="scrow ${i === state.day ? 'today' : ''} ${g.played ? 'done' : ''}" data-act="openTeam" data-id="${opp.id}"><span class="sc-n">${i + 1}</span><span class="sc-ha ${home ? 'h' : 'a'}">${home ? '홈' : '원정'}</span>${emblem(opp, 26)}<b class="grow">${esc(opp.short)}</b><span>${res || (i === state.day ? '<b class="amber">오늘</b>' : '')}</span></button>`);
   });
   const start = Math.max(0, state.day - 6);
-  return `<div class="panel"><table class="tbl"><tr><th>#</th><th>상대</th><th>결과</th></tr>${rows.slice(start, start + 20).join('')}</table></div>`;
+  return `<div class="sclist">${rows.slice(start, start + 20).join('')}</div>`;
 }
 
 function historyView() {
