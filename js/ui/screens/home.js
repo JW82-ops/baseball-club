@@ -1,5 +1,5 @@
 import { state } from '../../core/store.js';
-import { ui } from '../ui-state.js';
+import { ui, rerender } from '../ui-state.js';
 import { artBg, artHero, stadiumArt, esc, emblem, gradeTag, avatar, posShort, potTag } from '../components.js';
 import { standings, pct } from '../../engine/league.js';
 import { userTeam, userGameToday, currentPostGame, seasonProgress, draftOnClock, DRAFT_ROUNDS, CAMP_WEEKS } from '../../engine/season.js';
@@ -14,7 +14,9 @@ import { moodLabel } from '../../engine/mood.js';
 import { calcOvr as ovrOf } from '../../engine/player.js';
 import { sangmuChance, milLabel } from '../../engine/military.js';
 import { teamPlayers as tps } from '../../engine/roster.js';
-import { icon } from '../portraits.js';
+import { icon, staffImg, ownerImg } from '../portraits.js';
+import { openModal, closeModal, registerActions } from '../dom.js';
+import { MANAGER_STYLES } from '../../data/club.js';
 import { satLabel, goalProgress } from '../../engine/front.js';
 import { devCandidates, secondDraftYear, secondDraftPool, SECOND_FEES } from '../../engine/kborules.js';
 import { scoutLevelOf } from '../../engine/club.js';
@@ -36,26 +38,6 @@ function spLine(p) {
 }
 
 function recordStr(t) { return `${t.w}승 ${t.l}패${t.t ? ` ${t.t}무` : ''}`; }
-
-function matchupCard(sg, title, art) {
-  const home = state.teams[sg.home], away = state.teams[sg.away];
-  const hp = probable(home), ap = probable(away);
-  const bg = art || stadiumArt(home, home.id === state.userTeamId);
-  return `
-  <div class="matchup has-art" style="${artBg(bg, 'linear-gradient(180deg,rgba(6,16,11,.62) 0%,rgba(6,16,11,.2) 34%,rgba(12,30,21,.88) 62%,rgba(16,38,28,.98) 100%)')}">
-    <div class="mh"><span>${title}</span><span>${userTeam(state).rivalId && (sg.home === userTeam(state).rivalId || sg.away === userTeam(state).rivalId) ? '<b class="amber">⚔️ 라이벌전</b> · ' : ''}${esc(home.city || '')} 홈</span></div>
-    <div class="teams">
-      <div class="tm">${emblem(away, 46)}<b>${esc(away.short || away.name)}</b><small>${recordStr(away)}</small></div>
-      <div class="vs">VS</div>
-      <div class="tm">${emblem(home, 46)}<b>${esc(home.short || home.name)}</b><small>${recordStr(home)}</small></div>
-    </div>
-    <div class="sp"><div><span class="faint tiny">선발</span><br>${spLine(ap)}</div><div><span class="faint tiny">선발</span><br>${spLine(hp)}</div></div>
-    <div class="acts">
-      <button class="btn team big" data-act="watchGame">${icon('play', 26)}경기 보기</button>
-      <button class="btn big" data-act="simGame">${icon('quick', 26)}결과만 보기</button>
-    </div>
-  </div>`;
-}
 
 export function lineScore(box) {
   if (!box) return '';
@@ -179,32 +161,108 @@ function boardCard() {
     <div class="goalrow mt">${b.goals.map((g) => `<span>${g.ko}<b>${goalProgress(state, g)}</b></span>`).join('')}</div></div></section>`;
 }
 
+// ───────── 로비 ─────────
+function spBlock(p, side) {
+  if (!p) return `<div class="lb-sp ${side}"><span class="muted">미정</span></div>`;
+  const pl = pitLine(p.cur.pit);
+  return `<button class="lb-sp ${side}" data-act="openPlayer" data-pid="${p.id}">${avatar(p, '#5f6f66', 34)}<span><b>${esc(p.name)}</b><small>${p.cur.pit.w}승 ${p.cur.pit.l}패 ${fmtEra(pl.era)}</small></span></button>`;
+}
+function lobbyMatch(sg, title) {
+  const user = userTeam(state);
+  const home = state.teams[sg.home], away = state.teams[sg.away];
+  const atHome = home.id === user.id;
+  const rival = user.rivalId && (sg.home === user.rivalId || sg.away === user.rivalId);
+  return `<div class="lb-match">
+    <div class="lb-mh"><span>${title}</span><span>${rival ? '<b class="amber">⚔️ 라이벌전</b>' : atHome ? '<b class="gold">홈</b>' : `<b>원정</b> · ${esc(home.city || '')}`}</span></div>
+    <button class="lb-vs" data-act="watchGame" aria-label="경기 보기">
+      <span class="t">${emblem(away, 62)}<b>${esc(away.short || away.name)}</b><small>${recordStr(away)}</small></span>
+      <span class="x">VS</span>
+      <span class="t">${emblem(home, 62)}<b>${esc(home.short || home.name)}</b><small>${recordStr(home)}</small></span>
+    </button>
+    <div class="lb-sps">${spBlock(probable(away), 'l')}${spBlock(probable(home), 'r')}</div>
+  </div>`;
+}
+function railBtn(act, ico, label, dot, extra = '') {
+  return `<button class="lb-r" data-act="${act}" ${extra}><span class="ibtn">${icon(ico, 34)}${dot ? `<em>${dot}</em>` : ''}</span>${label}</button>`;
+}
+function coachLine(sg) {
+  const user = userTeam(state);
+  const ev = state.pendingEvent;
+  if (ev) return { act: 'lobbyEvent', html: `📢 <b>${esc(ev.title)}</b><br>감독님 결정이 필요해요.`, cta: '눌러서 확인' };
+  const mails = (state.inbox || []).filter((m) => !m.resolved).length;
+  if (mails) return { act: 'tab', tab: 'mail', html: `✉️ 답장을 기다리는 메일이 <b>${mails}통</b> 있어요.`, cta: '메일함 열기' };
+  if (!state.mission && (state.missionOffers || []).length) return { act: 'lobbyMission', html: `🎯 스폰서 미션 제안이 <b>${state.missionOffers.length}건</b> 왔어요.`, cta: '미션 고르기' };
+  if (!user.staff?.manager) return { act: 'lobbyStaff', html: '아직 <b>감독</b>이 없어요. 감독이 있어야 선수 기용과 성장이 안정돼요.', cta: '감독 뽑으러 가기' };
+  if (!sg) return { html: '오늘은 쉬어 가는 날이에요. 선수들 컨디션을 챙기죠.' };
+  const mine = sg.home === user.id ? state.teams[sg.home] : state.teams[sg.away];
+  const opp = sg.home === user.id ? state.teams[sg.away] : state.teams[sg.home];
+  const sp = probable(mine);
+  if (user.rivalId === opp.id) return { html: `오늘은 <b>${esc(opp.short)}</b>와 라이벌전이에요. 팬들 기대가 커요!`, cta: '가운데 ⚾를 눌러 중계 시작' };
+  if (user.streak >= 3) return { html: `<b>${user.streak}연승</b> 중이에요! 이 흐름 그대로 가죠.`, cta: '가운데 ⚾를 눌러 중계 시작' };
+  if (user.streak <= -3) return { html: `${-user.streak}연패라 분위기가 무거워요. 오늘은 꼭 끊어야 해요.`, cta: '가운데 ⚾를 눌러 중계 시작' };
+  if (sp && sp.cond >= 80) return { html: `선발 <b>${esc(sp.name)}</b> 컨디션이 좋아요. 초반부터 밀어붙이죠!`, cta: '가운데 ⚾를 눌러 중계 시작' };
+  if (sp && sp.cond < 65) return { html: `선발 <b>${esc(sp.name)}</b>이 지쳐 보여요. 불펜을 일찍 준비할게요.`, cta: '가운데 ⚾를 눌러 중계 시작' };
+  return { html: `오늘 상대는 <b>${esc(opp.short)}</b>(${recordStr(opp)})예요. 준비는 끝났어요.`, cta: '가운데 ⚾를 눌러 중계 시작' };
+}
+function lobby(sg, title, opts = {}) {
+  const user = userTeam(state);
+  const mgr = user.staff?.manager;
+  const line = coachLine(sg);
+  const ms = mgr?.style && MANAGER_STYLES[mgr.style];
+  const offers = (state.missionOffers || []).length;
+  const unread = (state.inbox || []).filter((m) => !m.resolved).length;
+  const sat = state.board?.sat;
+  const news = state.news.slice(0, 6).map((n) => esc(n.text)).join('<i>⚾</i>');
+  const bubbleAttrs = line.act ? `data-act="${line.act}"${line.tab ? ` data-tab="${line.tab}"` : ''} role="button"` : '';
+  return `<section class="lobby">
+    <div class="lb-top">
+      ${sg ? lobbyMatch(sg, title) : `<div class="lb-match"><div class="lb-mh"><span>${title}</span></div><p class="lb-off">오늘은 경기가 없어요.</p></div>`}
+      <div class="lb-rail">
+        ${railBtn('lobbyMission', 'sponsor', '미션', state.mission ? `${state.mission.progress}/${state.mission.target}` : offers ? offers : '')}
+        ${railBtn('lobbyBoard', 'club', '이사회', sat != null && sat < 40 ? '!' : '')}
+        ${railBtn('tab', 'mail', '메일', unread || '', 'data-tab="mail"')}
+        ${railBtn('lobbyBrief', 'league', '순위', '')}
+      </div>
+    </div>
+    <div class="lb-bottom">
+      <div class="lb-coach">
+        <img src="${mgr ? staffImg({ ...mgr, role: 'manager' }) : ownerImg(user.owner || 0)}" alt="" loading="lazy">
+        <div class="lb-bubble ${line.act ? 'tap' : ''}" ${bubbleAttrs}>${line.html}${line.cta ? `<span class="cta">${line.cta}</span>` : ''}<small>${mgr ? `${esc(mgr.name)} 감독${ms ? ` · ${ms.icon} ${ms.ko}` : ''}` : '구단주'}</small></div>
+      </div>
+      <div class="lb-quick">
+        ${opts.quick || `<button class="qbtn" data-act="simGame">${icon('quick', 30)}결과만</button>
+        <button class="qbtn" data-act="simDays" data-n="6">${icon('week', 30)}1주 진행</button>
+        <button class="qbtn sm" data-act="lobbyFast">⏩ 더 빨리</button>`}
+      </div>
+    </div>
+    ${news ? `<div class="lb-ticker" aria-label="구단 소식"><div><span>${news}</span><span aria-hidden="true">${news}</span></div></div>` : ''}
+  </section>`;
+}
+function fastSheet() {
+  const prog = seasonProgress(state);
+  const remain = prog.total - prog.day;
+  return `<div class="sheet-h"><h2>빠르게 진행</h2></div>
+    <p class="small muted">이슈가 생기면 중간에 멈춰요.</p>
+    <div class="simbar mt"><button class="btn" data-act="simDays" data-n="6">1주</button><button class="btn" data-act="simDays" data-n="${Math.min(remain, 18)}">3주</button><button class="btn" data-act="simDays" data-n="${remain}">시즌 끝까지</button></div>`;
+}
+registerActions({
+  lobbyEvent: () => openModal(eventCard()),
+  lobbyMission: () => openModal(missionCard() || '<div class="panel empty">지금은 스폰서 미션이 없어요.</div>'),
+  lobbyBrief: () => openModal(`${miniStandings()}${lastGameCard()}`),
+  lobbyStaff: () => { ui.tab = 'club'; ui.clubView = 'staff'; rerender(); window.scrollTo(0, 0); },
+  lobbyFast: () => openModal(fastSheet()),
+  lobbyBoard: () => { ui.tab = 'club'; ui.clubView = 'front'; closeModal(); rerender(); window.scrollTo(0, 0); },
+});
+
+function briefing() {
+  const body = `${natCard()}${allStarCard()}${boardCard()}${state.mission ? missionCard() : ''}${lastGameCard()}${snsCard()}${paperCard()}${weekCard()}${synergyCard()}`;
+  return `<div class="lb-more"><div class="lb-grip"><span></span>구단 브리핑</div>${body}${newsCard()}</div>`;
+}
+
 function regularView() {
   const sg = userGameToday(state);
   const prog = seasonProgress(state);
-  const remain = prog.total - prog.day;
-  return `
-  ${eventCard()}
-  ${natCard()}
-  ${allStarCard()}
-  ${mailCard()}
-  <section class="sec">
-    ${sg ? matchupCard(sg, `${state.season} 정규시즌 · ${prog.day + 1}/${prog.total}경기`) : '<div class="panel empty">오늘은 경기가 없어요.</div>'}
-    <div class="simbar">
-      <button class="btn sm" data-act="simDays" data-n="6">${icon('week', 20)}1주 진행</button>
-      <button class="btn sm" data-act="simDays" data-n="${Math.min(remain, 18)}">3주 진행</button>
-      <button class="btn sm" data-act="simDays" data-n="${remain}">시즌 끝까지</button>
-    </div>
-  </section>
-  ${boardCard()}
-  ${missionCard()}
-  ${lastGameCard()}
-  ${snsCard()}
-  ${paperCard()}
-  ${weekCard()}
-  ${synergyCard()}
-  ${miniStandings()}
-  ${newsCard()}`;
+  return `${lobby(sg, `${state.season} 정규시즌 · ${prog.day + 1}/${prog.total}경기`)}${briefing()}`;
 }
 
 function postView() {
@@ -218,12 +276,12 @@ function postView() {
     const status = rd.winner ? `${esc(state.teams[rd.winner].short)} 진출` : i === post.cur ? '진행 중' : '대기';
     return `<tr class="${(rd.high === user.id || rd.low === user.id) ? 'me' : ''}"><td>${rd.name}</td><td class="tn" style="justify-content:flex-end">${esc(hi.short)} ${rd.hw}${lo ? ` : ${rd.lw} ${esc(lo.short)}` : ' : ? '}</td><td>${status}</td></tr>`;
   }).join('');
+  const quick = `<button class="qbtn" data-act="simGame">${icon('quick', 30)}결과만</button>`;
   return `
-  ${eventCard()}
-  ${mailCard()}
+  ${userIn ? lobby(sg, `${r.name} ${r.games.length + 1}차전 · ${r.need}선승`, { quick }) : `${eventCard()}${mailCard()}`}
   <section class="sec">
     <div class="sec-h"><h2>${state.season} 포스트시즌</h2><span class="sub">${r.name} ${r.need}선승</span></div>
-    ${userIn ? matchupCard(sg, `${r.name} ${r.games.length + 1}차전`, 'crowd') : `<div class="panel"><p>${esc(state.teams[sg.away].short)} vs ${esc(state.teams[sg.home].short)} — ${r.name} ${r.games.length + 1}차전</p><div class="simbar" style="grid-template-columns:1fr 1fr"><button class="btn" data-act="simPost" data-all="0">다음 경기</button><button class="btn" data-act="simPost" data-all="1">끝까지 진행</button></div></div>`}
+    ${userIn ? '' : `<div class="panel"><p>${esc(state.teams[sg.away].short)} vs ${esc(state.teams[sg.home].short)} — ${r.name} ${r.games.length + 1}차전</p><div class="simbar" style="grid-template-columns:1fr 1fr"><button class="btn" data-act="simPost" data-all="0">다음 경기</button><button class="btn" data-act="simPost" data-all="1">끝까지 진행</button></div></div>`}
     <div class="panel mt"><table class="tbl">${bracket}</table></div>
   </section>
   ${lastGameCard()}

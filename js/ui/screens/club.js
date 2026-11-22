@@ -335,18 +335,53 @@ function achvView() {
     <div class="achv-grid mt">${ACHV.map((a) => `<div class="achv ${got[a.id] ? 'on' : ''}"><span>${got[a.id] ? a.icon : '🔒'}</span><b>${a.ko}</b><small>${got[a.id] ? `${got[a.id]} 달성` : a.desc}</small></div>`).join('')}</div>`;
 }
 
+// ───────── 구단 캠퍼스 지도 ─────────
+const SPOTS = [
+  // [보기, 아이콘, 이름, x%, y%]
+  ['facility', 'home', '홈 구장', 50, 17],
+  ['staff', 'roster', '클럽하우스', 23, 41],
+  ['front', 'club', '프런트', 74, 37],
+  ['sponsor', 'sponsor', '스폰서 광장', 46, 54.5],
+  ['develop', 'develop', '훈련장', 20, 68.7],
+  ['hof', 'league', '명예의 전당', 76, 68.7],
+  ['market', 'scout', '공항', 45, 82.8],
+];
+function spotInfo(t, k) {
+  const sb = t.buildings?.stadium;
+  switch (k) {
+    case 'facility': return { sub: sb?.build ? `🏗️ ${sb.build.weeks}주` : `Lv.${bLv(t, 'stadium')}`, cls: sb?.build ? 'build' : '' };
+    case 'staff': return { sub: t.staff?.manager ? '코치진' : '감독 공석', alert: !t.staff?.manager };
+    case 'front': return { sub: '이사회', alert: (state.board?.sat ?? 60) < 40 };
+    case 'sponsor': { const open = Object.keys(SPONSOR_SLOTS).filter((sl) => !t.sponsors[sl]).length; return { sub: open ? `빈 자리 ${open}` : '계약 완료', alert: open > 0 && (state.sponsorOffers || []).length > 0 }; }
+    case 'develop': { const fb = t.buildings?.futures; return { sub: fb?.build ? `🏗️ ${fb.build.weeks}주` : '육성', cls: fb?.build ? 'build' : '' }; }
+    case 'hof': return { sub: '', alert: (state.hofCandidates || []).length > 0 };
+    case 'market': return { sub: '외국인·FA' };
+    default: return {};
+  }
+}
+function mapView(t) {
+  return `<section class="campus" style="background-image:url(img/art/campus.webp)">
+    ${SPOTS.map(([k, ico, ko, x, y]) => { const inf = spotInfo(t, k); return `<button class="hot ${inf.cls || ''} ${inf.alert ? 'alert' : ''}" style="left:${x}%;top:${y}%" ${k === 'develop' ? 'data-act="tab" data-tab="develop"' : `data-act="clubView" data-v="${k}"`}>${icon(ico, 28)}${ko}${inf.sub ? `<small>${inf.sub}</small>` : ''}</button>`; }).join('')}
+  </section>
+  <div class="campus-more">
+    <button class="btn sm" data-act="clubView" data-v="finance">${icon('money', 22)}재정·설정</button>
+    <button class="btn sm" data-act="clubView" data-v="trade">${icon('roster', 22)}트레이드</button>
+    <button class="btn sm" data-act="clubView" data-v="achv">${icon('fans', 22)}업적</button>
+  </div>`;
+}
+
 export function renderClub() {
   const t = userTeam(state);
   const phil = PHILOSOPHIES[t.philosophy];
   const titles = state.history.filter((h) => h.champion === t.id).length;
-  const view = ui.clubView || 'facility';
+  const view = ui.clubView || 'map';
+  const head = `<div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>`;
+  if (view === 'map') return `<section class="sec">${head}</section>${mapView(t)}`;
   const body = { front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
   return `
   <section class="sec">
-    <div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>
-  </section>
-  <section class="sec">
-    <div class="seg scrollseg icoseg">${TABS.map(([k, l]) => `<button class="${view === k ? 'on' : ''}" data-act="clubView" data-v="${k}">${icon(TAB_ICO[k], 22)}${l}${k === 'hof' && (state.hofCandidates || []).length ? ' •' : ''}</button>`).join('')}</div>
+    <div class="row gap"><button class="btn sm ghost backmap" data-act="clubView" data-v="map">${icon('club', 22)}캠퍼스</button><h2 class="disp grow" style="font-size:19px">${TABS.find(([k]) => k === view)?.[1] || ''}</h2></div>
+    <div class="seg scrollseg icoseg mt">${TABS.map(([k, l]) => `<button class="${view === k ? 'on' : ''}" data-act="clubView" data-v="${k}">${icon(TAB_ICO[k], 22)}${l}${k === 'hof' && (state.hofCandidates || []).length ? ' •' : ''}</button>`).join('')}</div>
     <div class="mt">${body}</div>
   </section>`;
 }

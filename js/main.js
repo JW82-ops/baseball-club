@@ -17,7 +17,10 @@ import {
   userTeam, simDay, prepareUserLiveGame, runOffseasonStart, advanceDraftToUser, draftPick, aiDraftChoice,
   finishDraft, runCampAndStartSeason, releasePlayer, fillUserFirstTeam,
 } from './engine/season.js';
-import { simToEnd, stepPA } from './engine/match.js';
+import { simToEnd, stepPA, currentBatter, currentPitcher, userBatting } from './engine/match.js';
+import { playerImg } from './ui/portraits.js';
+import { velocityKmh, batLine, pitLine } from './engine/player.js';
+import { fmtAvg, fmtEra } from './core/util.js';
 import { isClutch, clutchOptions, clutchSituation } from './engine/clutch.js';
 import { upgradeBuilding, buildSub, hireStaff, fireStaff, bNext } from './engine/club.js';
 import { slotSheetHtml, subSheetHtml, staffMarketHtml } from './ui/screens/club.js';
@@ -66,7 +69,7 @@ function renderHud() {
       <div class="led"><div><b>${t.w}</b><span>승</span></div><div><b>${t.l}</b><span>패</span></div><div><b>${rank}</b><span>위</span></div></div>
     </div>
     <div class="hud-meta"><span class="hm">${icon('money', 18)}<b>${formatMoney(t.cash)}</b></span><span class="hm">${icon('fans', 18)}<b>${formatFans(t.fans)}</b></span><span class="hm">⚾<b>${teamOvr(state, t)}</b></span><span class="grow"></span><button class="iconbtn hud-badge mailbtn" data-act="tab" data-tab="mail" aria-label="메일함">${icon('mail', 26)}${unreadCount(state) ? `<em>${unreadCount(state)}</em>` : ''}</button><button class="iconbtn" style="width:28px;height:28px;font-size:13px" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>
-    ${syn.length ? `<div class="hud-syn">${syn.map((k) => `<span>${SYNERGIES[k].icon} ${SYNERGIES[k].ko}</span>`).join('')}</div>` : ''}`;
+    ${syn.length && ui.tab !== 'home' ? `<div class="hud-syn">${syn.map((k) => `<span>${SYNERGIES[k].icon} ${SYNERGIES[k].ko}</span>`).join('')}</div>` : ''}`;
 }
 
 function render() {
@@ -90,14 +93,28 @@ function render() {
     return;
   }
   $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === ui.tab));
+  const cg = centerGame();
+  const cb = $('#tabs .tab-play');
+  if (cb) {
+    cb.classList.toggle('live', !!cg && ui.tab === 'home');
+    cb.querySelector('span').textContent = cg ? (ui.tab === 'home' ? '경기 시작' : '경기') : '홈';
+    cb.querySelector('img').src = `img/ui/${cg ? 'play' : 'home'}.webp`;
+  }
   const screens = { home: renderHome, roster: renderRoster, develop: renderDevelop, league: renderLeague, club: renderClub, mail: renderMail };
   main.innerHTML = (screens[ui.tab] || renderHome)();
+  document.documentElement.style.setProperty('--hudH', `${$('#hud').offsetHeight}px`);
   setScene(sceneFor(ui.tab));
   setSeason(gameDate(state).season);
   if (ui.tab === 'home' && lastPhase !== state.phase) window.scrollTo(0, 0);
   lastPhase = state.phase;
 }
 let lastPhase = null;
+// 가운데 경기 버튼: 오늘 우리 경기가 있으면 경기, 없으면 홈
+function centerGame() {
+  if (state.phase === 'regular') return userGameToday(state);
+  if (state.phase === 'post') { const sg = currentPostGame(state); const u = state.userTeamId; return sg && (sg.home === u || sg.away === u) ? sg : null; }
+  return null;
+}
 
 // 탭마다 장소 배경: 홈=우리 구장, 선수단=클럽하우스, 육성=2군 훈련장, 리그=관중석, 구단=구단주실, 메일=계약 책상
 function sceneFor(tab) {
@@ -116,7 +133,7 @@ function sceneFor(tab) {
     if (ph === 'post') return 'crowd';
     return `stadium${Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1))}`;
   }
-  if (tab === 'club') return { front: 'office', facility: 'stadium' + Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1)), staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'facility'] || 'office';
+  if (tab === 'club') return { map: 'campus', front: 'office', facility: 'stadium' + Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1)), staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'map'] || 'office';
   if (tab === 'roster' && ui.rosterView === 'futures') return 'futures';
   return { roster: 'clubhouse', develop: 'gym', league: 'crowd', mail: 'contract' }[tab] || 'stadium1';
 }
@@ -217,6 +234,25 @@ function continueQuick() {
   userResultToast(res);
   if (state.phase === 'post' && !state.post?.champion) toast('포스트시즌 진행 중', 'big');
 }
+// 승부처 VS 컷인: 투수(왼쪽) vs 타자(오른쪽)
+function vsCut(g) {
+  const b = currentBatter(state, g), p = currentPitcher(state, g);
+  if (!b || !p) return '';
+  const dsd = g.top ? g.home : g.away;
+  const pt = state.teams[g.top ? g.homeId : g.awayId], bt = state.teams[g.top ? g.awayId : g.homeId];
+  const slot = (g.top ? g.away : g.home).idx % 9 + 1;
+  const tb = g.stats?.[b.id]?.bat;
+  const today = tb && tb.ab ? `오늘 ${tb.ab}타수 ${tb.h}안타` : '';
+  const bl = batLine(b.cur.bat);
+  const hot = b.form?.streak === 'hot' ? ' 🔥' : b.form?.streak === 'cold' ? ' 🧊' : '';
+  const role = p.pos === 'SP' ? '선발' : pt.closer === p.id ? '마무리' : '불펜';
+  const mine = userBatting(state, g) ? 'r' : 'l';
+  return `<div class="vscut" aria-hidden="false">
+    <div class="vc l ${mine === 'l' ? 'mine' : ''}" style="--vc:${pt.color}"><img src="${playerImg(p)}" alt=""><span class="tag">${role} · ${esc(pt.short)}<b>${esc(p.name)}</b>${velocityKmh(p.r.velo)}km · 투구 ${dsd.pc}</span></div>
+    <div class="vc r ${mine === 'r' ? 'mine' : ''}" style="--vc:${bt.color}"><img src="${playerImg(b)}" alt=""><span class="tag">${slot}번 타자 · ${esc(bt.short)}<b>${esc(b.name)}${hot}</b>${b.cur.bat.pa ? `${fmtAvg(bl.avg)} · ${b.cur.bat.hr}홈런` : '기록 없음'}${today ? `<br>${today}` : ''}</span></div>
+    <b class="vsbig">VS</b>
+  </div>`;
+}
 export function showClutch(g, cb) {
   const opts = clutchOptions(state, g);
   ui.clutchOpts = opts;
@@ -225,6 +261,7 @@ export function showClutch(g, cb) {
   const recent = g.log.slice(-4).filter((e) => !['half', 'info'].includes(e.type)).map((e) => `<li>${esc(e.text)}</li>`).join('');
   const home = state.teams[g.homeId], away = state.teams[g.awayId];
   openModal(`<div class="clutch">
+    ${vsCut(g)}
     <span class="small amber">⚡ 승부처</span>
     <h2 class="disp">${esc(away.short)} ${g.away.runs} : ${g.home.runs} ${esc(home.short)}</h2>
     <p class="small">${esc(clutchSituation(state, g))}</p>
@@ -250,8 +287,17 @@ function finishLive() {
 }
 
 // ───────── 액션 ─────────
+function startWatch() {
+  const g = prepareUserLiveGame(state);
+  if (!g) return;
+  ui.live = g;
+  sfx.click();
+  render();
+  window.scrollTo(0, 0);
+}
 registerActions({
   closeModal: () => closeModal(),
+  centerTab: () => { if (ui.tab === 'home' && centerGame()) return startWatch(); ui.tab = 'home'; ui.lineupSel = null; render(); window.scrollTo(0, 0); },
   tab: (d) => { ui.tab = d.tab; ui.lineupSel = null; render(); window.scrollTo(0, 0); },
   continueGame: () => { load(); upgradeSave(state); fillUserFirstTeam(state); save(); render(); },
   loadSlot: (d) => { setSlot(Number(d.n)); if (load()) { upgradeSave(state); fillUserFirstTeam(state); save(); ui.tab = 'home'; render(); window.scrollTo(0, 0); } else toast('세이브를 불러오지 못했어요', 'bad'); },
@@ -277,29 +323,23 @@ registerActions({
     const cb = ui.clutchCb; ui.clutchCb = null;
     if (cb) setTimeout(cb, 60);
   },
-  simDays: (d) => simDays(Number(d.n)),
-  watchGame: () => {
-    const g = prepareUserLiveGame(state);
-    if (!g) return;
-    ui.live = g;
-    sfx.click();
-    render();
-    window.scrollTo(0, 0);
-  },
+  simDays: (d) => { if (isModalOpen()) closeModal(); simDays(Number(d.n)); },
+  watchGame: () => startWatch(),
   liveFinish: () => finishLive(),
   leaveLive: () => confirmBox('중계를 끝내고 이 경기를 끝까지 자동으로 진행할까요?', '자동 진행', () => finishLive()),
   toggleSound: () => { toggleSound(); sfx.click(); renderHud(); },
   resolveEvent: (d) => {
     const msg = resolveEvent(state, Number(d.i));
     sfx.click();
+    if (isModalOpen()) closeModal();
     commit(msg, 'big');
   },
   acceptMission: (d) => {
     const m = acceptMission(state, d.id);
-    if (m) { sfx.coin(); commit(`미션 수락: ${m.title}`, 'good'); }
+    if (m) { sfx.coin(); if (isModalOpen()) closeModal(); commit(`미션 수락: ${m.title}`, 'good'); }
   },
   synInfo: (d) => toast(`${SYNERGIES[d.k].icon} ${SYNERGIES[d.k].ko}: ${SYNERGIES[d.k].desc}`),
-  clubView: (d) => { ui.clubView = d.v; render(); },
+  clubView: (d) => { ui.clubView = d.v; render(); window.scrollTo(0, 0); },
   upgradeBld: (d) => {
     const t = userTeam(state);
     const next = bNext(t, d.k);
@@ -527,6 +567,7 @@ registerActions({
   // 선수단
   rosterView: (d) => { ui.rosterView = d.v; ui.lineupSel = null; render(); },
   rosterType: (d) => { ui.rosterType = d.v; render(); },
+  rosterLayout: (d) => { ui.rosterLayout = d.v; render(); },
   autoLineup: () => { autoLineup(state, userTeam(state)); ui.lineupSel = null; commit('라인업 자동 편성'); },
   autoPitching: () => { autoPitching(state, userTeam(state)); ui.lineupSel = null; commit('투수진 자동 편성'); },
   luSlot: (d) => {

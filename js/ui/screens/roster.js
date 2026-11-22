@@ -12,6 +12,8 @@ import { formIcon } from '../../engine/form.js';
 import { militaryList } from '../../engine/military.js';
 import { REHAB } from '../../engine/dev2.js';
 import { teamPlayers } from '../../engine/roster.js';
+import { playerImg } from '../portraits.js';
+import { gradeFromOvr } from '../../engine/player.js';
 
 export function statSnippet(p) {
   if (p.level === 2 && p.cur?.fut && ((p.cur.fut.pa || 0) > 0 || (p.cur.fut.outs || 0) > 0) && !(p.cur.bat.pa || p.cur.pit.g)) {
@@ -40,6 +42,31 @@ export function playerRow(p, color, opts = {}) {
   </button>`;
 }
 
+// 선수 카드: 전신 SD + OVR·등급 + 포지션 + 상태
+function cardTone(p, team) {
+  if (p.injury) return 'inj';
+  if (p.foreign) return 'fx';
+  if (p.age <= 23) return 'yg';
+  return 'tm';
+}
+export function playerCard(p, team) {
+  const ovr = calcOvr(p);
+  const g = gradeFromOvr(ovr);
+  const cond = Math.max(0, Math.min(100, p.cond || 0));
+  const bars = Math.round(cond / 20);
+  const ml = moodLabel(p.morale);
+  const sn = statSnippet(p);
+  const status = p.injury ? '🚑' : formIcon(p) || ml.e;
+  return `<button class="pcard ${cardTone(p, team)} ${ovr >= 80 ? 'elite' : ''}" data-act="openPlayer" data-pid="${p.id}" aria-label="${esc(p.name)} ${posShort(p)} OVR ${ovr}">
+    <img class="pc-body" src="${playerImg(p)}" alt="" loading="lazy" decoding="async">
+    <span class="pc-ovr"><b>${ovr}</b><i>${g}</i></span>
+    <span class="pc-pos">${posShort(p)}</span>
+    <span class="pc-st">${status}${p.foreign ? '<em>🌏</em>' : ''}${p.devContract ? '<em class="gem">육성</em>' : ''}</span>
+    <span class="pc-nm"><span class="grow"><b>${esc(p.name)}</b><small>${p.num != null ? `#${p.num} · ` : ''}${p.injury ? `<span class="bad">${esc(p.injury.name)} ${p.injury.weeks}주</span>` : sn || `${p.age}세`}</small></span>
+      <span class="pc-cond" title="컨디션 ${Math.round(cond)}">${Array.from({ length: 5 }, (_, i) => `<i class="${i < bars ? 'on' : ''}"></i>`).join('')}</span></span>
+  </button>`;
+}
+
 function listView() {
   const team = userTeam(state);
   const c = rosterCounts(state, team);
@@ -50,9 +77,10 @@ function listView() {
     ? potentialEstimate(b, scoutLevel()).hi - potentialEstimate(a, scoutLevel()).hi
     : order.indexOf(a.pos) - order.indexOf(b.pos) || calcOvr(b) - calcOvr(a)));
   return `
-    <div class="row gap mt"><div class="seg grow">${[['B', `타자`], ['P', `투수`]].map(([k, l]) => `<button class="${ui.rosterType === k ? 'on' : ''}" data-act="rosterType" data-v="${k}">${l} ${src.filter((p) => p.type === k).length}</button>`).join('')}</div></div>
+    <div class="row gap mt"><div class="seg grow">${[['B', `타자`], ['P', `투수`]].map(([k, l]) => `<button class="${ui.rosterType === k ? 'on' : ''}" data-act="rosterType" data-v="${k}">${l} ${src.filter((p) => p.type === k).length}</button>`).join('')}</div>
+      <div class="seg laytog" role="group" aria-label="보기 방식">${[['card', '▦', '카드로 보기'], ['list', '☰', '목록으로 보기']].map(([k, l, a]) => `<button class="${(ui.rosterLayout || 'card') === k ? 'on' : ''}" data-act="rosterLayout" data-v="${k}" aria-label="${a}">${l}</button>`).join('')}</div></div>
     <p class="tiny faint mt">${ui.rosterView === 'first' ? `1군 ${c.first}/${ROSTER.FIRST_MAX}명 (투수 ${c.firstP} · 야수 ${c.firstB})` : `2군 ${c.total - c.first}명 · 잠재력 높은 순`} · 전체 ${c.total}/${ROSTER.TOTAL_MAX}</p>
-    <div class="panel plist mt">${list.map((p) => playerRow(p, team.color, { pot: ui.rosterView === 'futures' })).join('') || '<div class="empty">선수가 없어요.</div>'}</div>
+    ${!list.length ? '<div class="panel empty mt">선수가 없어요.</div>' : (ui.rosterLayout || 'card') === 'card' ? `<div class="pcgrid mt">${list.map((p) => playerCard(p, team)).join('')}</div>` : `<div class="panel plist mt">${list.map((p) => playerRow(p, team.color, { pot: ui.rosterView === 'futures' })).join('')}</div>`}
     ${ui.rosterView === 'futures' && militaryList(state, team).length ? `<div class="sec-h mt-l"><h2>🪖 군 복무 중</h2></div><div class="panel plist">${militaryList(state, team).map((p) => `<button class="prow" data-act="openPlayer" data-pid="${p.id}"><div class="grow"><div class="nm">${esc(p.name)}</div><div class="meta">${p.milType === 'sangmu' ? '상무' : '현역'} · ${p.returnSeason} 시즌 복귀</div></div>${gradeTag(calcOvr(p))}</button>`).join('')}</div>` : ''}`;
 }
 
