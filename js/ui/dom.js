@@ -4,6 +4,8 @@ export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 // 클릭 액션 위임: data-act="name" data-*="..."
 const actions = {};
 export function registerActions(map) { Object.assign(actions, map); }
+// iOS 사파리에서 :active 눌림 효과가 보이게
+document.addEventListener('touchstart', () => {}, { passive: true });
 export function initActions() {
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');

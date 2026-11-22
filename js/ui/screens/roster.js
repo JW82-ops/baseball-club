@@ -1,5 +1,6 @@
-import { state } from '../../core/store.js';
-import { ui } from '../ui-state.js';
+import { state, save } from '../../core/store.js';
+import { ui, rerender } from '../ui-state.js';
+import { registerActions, toast } from '../dom.js';
 import { esc, gradeTag, potTag, avatar, posShort, condDot } from '../components.js';
 import { userTeam } from '../../engine/season.js';
 import { calcOvr, batLine, pitLine, potentialEstimate } from '../../engine/player.js';
@@ -84,6 +85,117 @@ function listView() {
     ${ui.rosterView === 'futures' && militaryList(state, team).length ? `<div class="sec-h mt-l"><h2>🪖 군 복무 중</h2></div><div class="panel plist">${militaryList(state, team).map((p) => `<button class="prow" data-act="openPlayer" data-pid="${p.id}"><div class="grow"><div class="nm">${esc(p.name)}</div><div class="meta">${p.milType === 'sangmu' ? '상무' : '현역'} · ${p.returnSeason} 시즌 복귀</div></div>${gradeTag(calcOvr(p))}</button>`).join('')}</div>` : ''}`;
 }
 
+// ───────── 야구장 라인업 편집: 탭 또는 끌어다 놓기 ─────────
+const FIELD_XY = { C: [50, 85], '1B': [76, 62], '2B': [63, 44], SS: [37, 44], '3B': [24, 62], LF: [16, 28], CF: [50, 15], RF: [84, 28], DH: [87, 85] };
+function fitCls(p, pos) {
+  if (pos === 'DH') return '';
+  const f = fieldAt(p, pos);
+  return f >= 65 ? 'fit-g' : f >= 48 ? 'fit-o' : 'fit-b';
+}
+function fieldView(team) {
+  const sel = ui.fieldSel;
+  const used = new Set((team.lineup || []).map((x) => x.pid));
+  const bench = firstTeam(state, team).filter((p) => p.type === 'B' && !used.has(p.id) && !p.injury);
+  const marks = (team.lineup || []).map((sl, i) => {
+    const p = state.players[sl.pid];
+    const [x, y] = FIELD_XY[sl.pos] || [50, 50];
+    const on = sel?.kind === 'slot' && sel.idx === i;
+    const f = sl.pos === 'DH' ? '' : Math.round(fieldAt(p, sl.pos));
+    return `<button class="fm ${on ? 'sel' : ''} ${fitCls(p, sl.pos)}" style="left:${x}%;top:${y}%" data-act="fTap" data-k="slot" data-i="${i}" data-fdrag="slot:${i}" data-fdrop="slot:${i}" aria-label="${i + 1}번 ${POS_KO[sl.pos]} ${esc(p.name)}">
+      <span class="fo">${i + 1}</span>${avatar(p, team.color, 42)}<span class="fn">${esc(p.name)}</span><span class="fp">${sl.pos === 'DH' ? '지명' : `${sl.pos} ${f}`}</span>${p.cond < 55 ? '<span class="fw">😮‍💨</span>' : ''}</button>`;
+  }).join('');
+  const hint = !sel ? '선수를 끌어서 다른 자리에 놓거나, 두 선수를 차례로 눌러 자리를 바꿔요. 벤치 선수를 필드로 끌면 교체돼요.'
+    : sel.kind === 'slot' ? `<b class="amber">${esc(state.players[team.lineup[sel.idx].pid].name)}</b> 선택됨 — 바꿀 자리나 벤치 선수를 누르세요.`
+      : `<b class="amber">${esc(state.players[sel.pid]?.name || '')}</b> 선택됨 — 들어갈 자리를 누르세요.`;
+  return `<div class="lufield">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M50 98 L3 46 Q50 -12 97 46 Z" fill="#2f8a4a"/>
+        <path d="M50 98 L3 46 Q50 -12 97 46 Z" fill="url(#mow)" opacity=".35"/>
+        <defs><pattern id="mow" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="5" height="10" fill="#fff" opacity=".18"/></pattern></defs>
+        <path d="M50 96 L24 64 L50 36 L76 64 Z" fill="#b5713d"/>
+        <path d="M50 88 L31 64 L50 44 L69 64 Z" fill="#3f9e57"/>
+        <circle cx="50" cy="64" r="3.4" fill="#c98a53"/>
+      </svg>
+      ${marks}
+    </div>
+    <p class="tiny ${sel ? '' : 'faint'} mt">${hint}</p>
+    <div class="fbench">${bench.map((p) => `<button class="fb ${sel?.kind === 'bench' && sel.pid === p.id ? 'sel' : ''}" data-act="fTap" data-k="bench" data-pid="${p.id}" data-fdrag="bench:${p.id}" data-fdrop="bench:${p.id}">${avatar(p, team.color, 32)}<span><b>${esc(p.name)}</b><small>${posShort(p)} · ${gradeFromOvr(calcOvr(p))}</small></span></button>`).join('') || '<span class="tiny faint">벤치 야수가 없어요.</span>'}</div>
+    <p class="tiny faint mt">초록 테두리는 잘 맞는 자리, 빨강은 수비가 서툰 자리예요. 숫자는 그 자리 수비력이에요.</p>`;
+}
+function fieldDo(from, to) {
+  const t = userTeam(state);
+  const [fk, fv] = from.split(':'), [tk, tv] = to.split(':');
+  if (from === to) return;
+  if (fk === 'slot' && tk === 'slot') {
+    const a = t.lineup[+fv], b = t.lineup[+tv];
+    [a.pos, b.pos] = [b.pos, a.pos];
+    toast(`${state.players[a.pid].name} ↔ ${state.players[b.pid].name} 자리 교체`, 'good');
+  } else if (fk !== tk) {
+    const slot = fk === 'slot' ? +fv : +tv, pid = fk === 'bench' ? fv : tv;
+    const out = state.players[t.lineup[slot].pid];
+    t.lineup[slot] = { pid, pos: t.lineup[slot].pos };
+    toast(`${state.players[pid].name} 투입, ${out.name} 벤치로`, 'good');
+  } else return;
+  ui.fieldSel = null;
+  save();
+  rerender();
+}
+registerActions({
+  fTap: (d) => {
+    if (fieldDrag.justDropped) return;
+    const sel = ui.fieldSel;
+    const me = d.k === 'slot' ? `slot:${d.i}` : `bench:${d.pid}`;
+    const cur = sel ? (sel.kind === 'slot' ? `slot:${sel.idx}` : `bench:${sel.pid}`) : null;
+    if (cur === me) { ui.fieldSel = null; return rerender(); }
+    if (cur && !(cur.startsWith('bench') && me.startsWith('bench'))) return fieldDo(cur, me);
+    ui.fieldSel = d.k === 'slot' ? { kind: 'slot', idx: +d.i } : { kind: 'bench', pid: d.pid };
+    rerender();
+  },
+});
+// 끌어다 놓기(터치·마우스 공용)
+const fieldDrag = { el: null, from: null, x0: 0, y0: 0, ghost: null, over: null, justDropped: false };
+function dropTarget(x, y) {
+  const el = document.elementFromPoint(x, y)?.closest('[data-fdrop]');
+  return el && el.dataset.fdrop !== fieldDrag.from ? el : null;
+}
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('[data-fdrag]');
+  if (!el || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  Object.assign(fieldDrag, { el, from: el.dataset.fdrag, x0: e.clientX, y0: e.clientY, ghost: null, over: null });
+});
+document.addEventListener('pointermove', (e) => {
+  const d = fieldDrag;
+  if (!d.el) return;
+  if (!d.ghost) {
+    if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 8) return;
+    const face = d.el.querySelector('.sdface');
+    d.ghost = document.createElement('div');
+    d.ghost.className = 'fghost';
+    d.ghost.innerHTML = face ? face.outerHTML : '';
+    document.body.appendChild(d.ghost);
+    d.el.classList.add('dragging');
+  }
+  d.ghost.style.transform = `translate(${e.clientX - 28}px, ${e.clientY - 44}px)`;
+  const over = dropTarget(e.clientX, e.clientY);
+  if (over !== d.over) { d.over?.classList.remove('dropon'); over?.classList.add('dropon'); d.over = over; }
+  e.preventDefault();
+}, { passive: false });
+function endDrag(e, cancel) {
+  const d = fieldDrag;
+  if (!d.el) return;
+  const wasDrag = !!d.ghost;
+  d.ghost?.remove();
+  d.el.classList.remove('dragging');
+  d.over?.classList.remove('dropon');
+  const target = !cancel && wasDrag ? dropTarget(e.clientX, e.clientY) : null;
+  const from = d.from;
+  d.el = null; d.ghost = null; d.over = null;
+  if (wasDrag) { d.justDropped = true; setTimeout(() => { d.justDropped = false; }, 250); }
+  if (target) fieldDo(from, target.dataset.fdrop);
+}
+document.addEventListener('pointerup', (e) => endDrag(e, false));
+document.addEventListener('pointercancel', (e) => endDrag(e, true));
+
 function lineupView() {
   const team = userTeam(state);
   const sel = ui.lineupSel;
@@ -109,9 +221,11 @@ function lineupView() {
   const roleOf = (p) => (team.closer === p.id ? '마무리' : (team.setup || []).includes(p.id) ? '셋업' : '');
   const selSlot = sel && sel.kind === 'slot' ? team.lineup[sel.idx] : null;
   return `
-    <p class="small muted mt">${selSlot ? `<span class="amber">${sel.idx + 1}번 ${POS_KO[selSlot.pos]}</span> 선택됨 — 다른 타순을 누르면 순서를 바꾸고, 아래 벤치 선수를 누르면 교체해요.` : '타순을 누르면 순서를 바꾸거나 벤치 선수와 교체할 수 있어요.'}</p>
+    <div class="sec-h mt-l"><h2>수비 배치</h2><button class="btn sm" data-act="autoLineup">자동 편성</button></div>
+    ${fieldView(team)}
+    <div class="sec-h mt-l"><h2>타순</h2></div>
+    <p class="small muted">${selSlot ? `<span class="amber">${sel.idx + 1}번 ${POS_KO[selSlot.pos]}</span> 선택됨 — 다른 타순을 누르면 순서를 바꾸고, 아래 벤치 선수를 누르면 교체해요.` : '타순을 누르면 순서를 바꾸거나 벤치 선수와 교체할 수 있어요.'}</p>
     ${selSlot ? `<div class="row gap mt"><span class="small muted">수비 위치</span><select data-change="luPos" style="width:auto">${['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'].map((x) => `<option value="${x}" ${x === selSlot.pos ? 'selected' : ''}>${POS_KO[x]}</option>`).join('')}</select></div>` : ''}
-    <div class="sec-h mt-l"><h2>선발 라인업</h2><button class="btn sm" data-act="autoLineup">자동 편성</button></div>
     <div class="panel" style="padding:4px 10px">${slots}</div>
     <div class="sec-h mt-l"><h2>벤치</h2></div>
     <div class="panel plist">${bench.map((p) => `<button class="prow" data-act="luBench" data-pid="${p.id}">${avatar(p, team.color, 34)}<div class="grow"><div class="nm">${esc(p.name)} ${condDot(p)}</div><div class="meta">${posShort(p)} · ${statSnippet(p) || '기록 없음'}</div></div>${gradeTag(calcOvr(p))}</button>`).join('') || '<div class="empty">벤치 야수가 없어요.</div>'}</div>

@@ -289,7 +289,7 @@ function finishLive() {
 // ───────── 액션 ─────────
 function startWatch() {
   const g = prepareUserLiveGame(state);
-  if (!g) return;
+  if (!g) { toast('지금은 경기를 시작할 수 없어요', 'bad'); return; }
   ui.live = g;
   sfx.click();
   render();
@@ -297,7 +297,15 @@ function startWatch() {
 }
 registerActions({
   closeModal: () => closeModal(),
-  centerTab: () => { if (ui.tab === 'home' && centerGame()) return startWatch(); ui.tab = 'home'; ui.lineupSel = null; render(); window.scrollTo(0, 0); },
+  centerTab: () => {
+    try { navigator.vibrate?.(12); } catch (e) { /* 진동 미지원 */ }
+    sfx.click();
+    if (ui.tab === 'home') {
+      if (centerGame()) return startWatch();
+      return toast(state.phase === 'post' ? '우리 팀 경기가 없어요. 포스트시즌은 아래 버튼으로 진행해요' : '오늘은 우리 경기가 없어요', 'info');
+    }
+    ui.tab = 'home'; ui.lineupSel = null; render(); window.scrollTo(0, 0);
+  },
   tab: (d) => { ui.tab = d.tab; ui.lineupSel = null; render(); window.scrollTo(0, 0); },
   continueGame: () => { load(); upgradeSave(state); fillUserFirstTeam(state); save(); render(); },
   loadSlot: (d) => { setSlot(Number(d.n)); if (load()) { upgradeSave(state); fillUserFirstTeam(state); save(); ui.tab = 'home'; render(); window.scrollTo(0, 0); } else toast('세이브를 불러오지 못했어요', 'bad'); },
@@ -568,7 +576,7 @@ registerActions({
   rosterView: (d) => { ui.rosterView = d.v; ui.lineupSel = null; render(); },
   rosterType: (d) => { ui.rosterType = d.v; render(); },
   rosterLayout: (d) => { ui.rosterLayout = d.v; render(); },
-  autoLineup: () => { autoLineup(state, userTeam(state)); ui.lineupSel = null; commit('라인업 자동 편성'); },
+  autoLineup: () => { autoLineup(state, userTeam(state)); ui.lineupSel = null; ui.fieldSel = null; commit('라인업 자동 편성'); },
   autoPitching: () => { autoPitching(state, userTeam(state)); ui.lineupSel = null; commit('투수진 자동 편성'); },
   luSlot: (d) => {
     const t = userTeam(state);

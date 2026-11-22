@@ -738,9 +738,10 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 
 /* ═════════ v6 로비 홈 · 가운데 경기 버튼 ═════════ */
 #tabs { overflow: visible; }
-#tabs .tab-play { position: relative; padding: 0; background: none !important; }
+#tabs .tab-play { position: relative; padding: 0; background: none !important; align-self: stretch; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+#tabs .tab-play::before { content: ''; position: absolute; left: 50%; top: -40px; width: 84px; height: calc(100% + 40px); transform: translateX(-50%); }
 #tabs .tab-play .ball {
-  width: 70px; height: 70px; margin-top: -30px; border-radius: 50%; font-style: normal;
+  width: 72px; height: 72px; margin: -36px auto 0; border-radius: 50%; font-style: normal; position: relative; pointer-events: none;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: radial-gradient(circle at 50% 30%, var(--gold-hi), var(--gold) 52%, var(--gold-lo));
   border: 4px solid #fff3c8; color: #3d2300; font-family: var(--display); font-size: 12.5px; line-height: 1;
@@ -859,3 +860,29 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 @keyframes vcinR { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes vsstamp { from { transform: translate(-50%, -50%) rotate(-6deg) scale(2.4); opacity: 0; } to { transform: translate(-50%, -50%) rotate(-6deg) scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .vscut .vc, .vscut .vsbig { animation: none; } }
+
+/* 야구장 라인업 편집 */
+.lufield { position: relative; aspect-ratio: 1 / .96; margin-top: 8px; border-radius: 20px; overflow: hidden; background: radial-gradient(ellipse at 50% 120%, #1d4a31, #0d2418 70%); border: 1px solid rgba(255, 255, 255, .12); }
+.lufield svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fm { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; width: 74px; touch-action: none; -webkit-user-select: none; user-select: none; text-shadow: none !important; z-index: 1; transition: transform .12s; }
+.fm .sdface { border: 3px solid rgba(255, 255, 255, .85); border-radius: 50%; box-shadow: 0 4px 8px rgba(0, 0, 0, .4); }
+.fm.fit-g .sdface { border-color: #63d48f; }
+.fm.fit-o .sdface { border-color: #ffc53d; }
+.fm.fit-b .sdface { border-color: #ff6f61; }
+.fm .fo { position: absolute; top: -4px; left: 10px; z-index: 2; width: 19px; height: 19px; border-radius: 50%; background: #0b1d14; border: 1.5px solid var(--gold); color: var(--gold); font-size: 10.5px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+.fm .fn { margin-top: 2px; max-width: 74px; padding: 1px 6px; border-radius: 99px; background: rgba(3, 10, 6, .82); font-size: 11px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fm .fp { font-size: 9.5px; font-weight: 800; color: #e9f3ea; text-shadow: 0 1px 2px rgba(0, 0, 0, .9) !important; }
+.fm .fw { position: absolute; top: -4px; right: 12px; font-size: 13px; }
+.fm.sel, .fb.sel { z-index: 3; }
+.fm.sel .sdface { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(255, 197, 61, .45), 0 4px 8px rgba(0, 0, 0, .4); }
+.fm.sel { transform: translate(-50%, -50%) scale(1.1); }
+.fm.dragging, .fb.dragging { opacity: .35; }
+.fm.dropon { transform: translate(-50%, -50%) scale(1.15); }
+.fm.dropon .sdface, .fb.dropon { box-shadow: 0 0 0 4px rgba(126, 226, 160, .7); }
+.fbench { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.fb { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 99px; background: var(--glass); border: 1px solid rgba(255, 255, 255, .14); touch-action: none; -webkit-user-select: none; user-select: none; text-align: left; }
+.fb b { display: block; font-size: 12px; }
+.fb small { display: block; font-size: 10px; color: var(--muted); }
+.fb.sel { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255, 197, 61, .35); }
+.fghost { position: fixed; left: 0; top: 0; z-index: 90; pointer-events: none; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .5)); }
+.fghost .sdface { width: 56px !important; height: 56px !important; border: 3px solid var(--gold); border-radius: 50%; }
