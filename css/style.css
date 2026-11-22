@@ -1221,3 +1221,51 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .alb-b { position: absolute; left: 14px; right: 14px; bottom: 10px; }
 .alb-b b { display: block; font-size: 15px; }
 .alb-b small { font-size: 11px; color: #e9f3ea; }
+
+/* 지역 상생 · 시청 */
+.rhero { position: relative; height: 170px; border-radius: 18px; background-size: cover; background-position: center 40%; overflow: hidden; margin-bottom: 10px; }
+.rhero.sm { height: 120px; margin: -6px 0 0; }
+.rhero-t { position: absolute; inset: auto 0 0 0; padding: 40px 14px 12px; background: linear-gradient(180deg, transparent, rgba(8, 20, 14, .92)); display: flex; flex-direction: column; gap: 3px; }
+.rhero-t b { font-size: 20px; }
+.rhero-t small { font-size: 11.5px; color: #d9e6dd; line-height: 1.45; }
+.rgs { display: flex; flex-direction: column; gap: 12px; }
+.rg > .row span { font-size: 13px; font-weight: 700; }
+.rg > .row b { font-size: 16px; }
+.rg small { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+.rg-bar { height: 9px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; margin-top: 4px; }
+.rg-bar i { display: block; height: 100%; border-radius: inherit; transition: width .5s; }
+.rg-bar.hype i { background: linear-gradient(90deg, #ffb347, #ffe066); }
+.rg-bar.trust i { background: linear-gradient(90deg, #ff7aa8, #ffb3cf); }
+.rg-bar.city i { background: linear-gradient(90deg, #4fa3ff, #9fd0ff); }
+.ract .pr-art { width: 104px; }
+.pets { display: flex; flex-direction: column; gap: 2px; padding: 6px; }
+.pet { display: flex; align-items: center; gap: 10px; text-align: left; padding: 9px 8px; border-radius: 12px; }
+.pet:active { background: rgba(255, 255, 255, .06); }
+.pet .grow { display: flex; flex-direction: column; }
+.pet b { font-size: 13.5px; }
+.pet small { font-size: 11px; color: var(--muted); }
+.pet-s { font-size: 11.5px; font-weight: 800; color: var(--gold); white-space: nowrap; }
+.pet.lock .pet-s { color: var(--faint, #8a9a90); font-weight: 600; }
+.pet.done .pet-s { color: var(--good, #5ee08f); }
+.pet.done { opacity: .8; }
+.pet-now { display: flex; gap: 10px; align-items: center; border-color: rgba(79, 163, 255, .5); }
+.petsheet .opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 12px; background: var(--glass); margin-top: 6px; }
+.petsheet .opt span { display: flex; flex-direction: column; }
+.petsheet .opt small { font-size: 11.5px; color: var(--muted); }
+.petsheet .odds { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; padding: 10px 14px; border-radius: 14px; background: rgba(79, 163, 255, .14); }
+.petsheet .odds b { font-size: 26px; color: #9fd0ff; }
+.cm-region { grid-column: 1 / -1; display: flex !important; align-items: center; gap: 10px; text-align: left; padding: 6px 10px 6px 6px !important; }
+.cm-region img { width: 64px; height: 44px; object-fit: cover; border-radius: 10px; flex: none; }
+.cm-region span { display: flex; flex-direction: column; gap: 1px; }
+.cm-region small { font-size: 11px; color: var(--muted); font-weight: 600; }
+.petsheet .kv { grid-template-columns: 1fr 1fr; }
+.goalsc .gl-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.gl-who { display: flex; flex-direction: column; text-align: left; width: 96px; flex: none; }
+.gl-who b { font-size: 13px; }
+.gl-who small { font-size: 10.5px; color: var(--muted); }
+.gl-bar { position: relative; flex: 1; height: 18px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.gl-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #4fa3ff, #7fd0ff); border-radius: inherit; }
+.gl-bar.done i { background: linear-gradient(90deg, #ffb347, #ffe066); }
+.gl-bar span { position: relative; display: block; text-align: right; padding-right: 8px; font-size: 11px; font-weight: 800; line-height: 18px; }
+.gl-cheer { padding: 3px 10px !important; font-size: 11.5px !important; }
+.gl-b { width: 44px; text-align: center; }

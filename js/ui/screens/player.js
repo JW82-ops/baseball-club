@@ -3,6 +3,7 @@ import { esc, gradeTag, avatar, ratingBar, traitChips, condDot, spark, pitchList
 import { BAT_ATTRS, PIT_ATTRS, TRAINING_FOCUS, GROWTH_TYPES, POS_KO } from '../../data/constants.js';
 import { calcOvr, potentialEstimate, velocityKmh, batLine, pitLine, ageCurveLabel, unpackBat, unpackPit } from '../../engine/player.js';
 import { careerTotals, userTeam, draftOnClock } from '../../engine/season.js';
+import { goalStatus } from '../../engine/goals.js';
 import { canPromote, canDemote } from '../../engine/roster.js';
 import { fmtAvg, fmtEra, fmtIP, formatMoney } from '../../core/util.js';
 import { scoutLevel } from './draft.js';
@@ -171,7 +172,7 @@ export function renderPlayer(pid, opts = {}) {
     <div><span>충성도</span><b>${Math.round(p.loyalty ?? 40)}</b></div><div><span>계약</span><b>${p.contract ? `${Math.max(0, p.contract.years)}년 남음` : '-'}</b></div>
     <div><span>연차</span><b>${p.service ?? 0}년${(p.service ?? 0) >= FA_SERVICE ? ' (FA)' : ''}</b></div><div><span>적정 연봉</span><b>${formatMoney(fairSalary(state, p))}</b></div>
     <div><span>병역</span><b>${milLabel(p)}</b></div><div><span>국가대표</span><b>${p.national?.length ? `${p.national.length}회${p.national.some((x) => x.medal === 'gold') ? ' 🥇' : ''}` : '-'}</b></div>
-  </div>${moodSection(p)}` : '';
+  </div>${(() => { const g = state.goals?.season === state.season && state.goals.list.find((x) => x.pid === p.id); const st = g && goalStatus(state, g); return st ? `<div class="panel mt goalsc"><b class="small">🎯 시즌 목표: ${st.text}${g.backed ? ' 📣' : ''}</b><div class="gl-bar mt ${st.done ? 'done' : ''}"><i style="width:${Math.round(st.pct * 100)}%"></i><span>${st.now}</span></div><p class="tiny faint mt">${st.done ? '목표 달성! 시즌이 끝나면 기분과 충성도가 올라요.' : '달성하면 시즌 끝에 기분·충성도 상승, 실패하면 조금 실망해요.'}</p></div>` : ''; })()}${moodSection(p)}` : '';
   const body = { ab: abTab, rec: recTab, grow: growTab, care: careTab }[tab];
 
   return `

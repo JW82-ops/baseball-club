@@ -4,11 +4,13 @@ import { PERSONALITIES, SUBS, SPONSOR_TIERS } from '../data/club.js';
 import { POS_FLEX, POS_KO } from '../data/constants.js';
 import { calcOvr, potOvr, salaryFor } from './player.js';
 import { teamPlayers, firstTeam, canPromote, ensureLineupValid } from './roster.js';
+const teamPlayersOf = (state, t) => teamPlayers(state, t);
 import { addMoodEvent, addRel, getRel, relsOf } from './mood.js';
 import { subLv, activeBuilds } from './club.js';
 import { aiTradeOffer, evaluateTrade, executeTrade, playerValue } from './trade.js';
 import { brandValue, tierFor, genSponsorOffers } from './sponsor.js';
 import { resolvePress } from './story.js';
+import { resolvePartnerMail, resolveCityEvent } from './region.js';
 
 export const weekAbs = (state) => state.season * 100 + Math.floor(state.day / 6);
 const mine = (state) => state.teams[state.userTeamId];
@@ -136,12 +138,13 @@ const GEN = {
     };
   },
   tradeReq(state, t) {
-    const c = teamPlayers(state, t).filter((p) => (p.morale ?? 70) < 32 && !p.tradeBlock);
+    const c = teamPlayers(state, t).filter((p) => !p.tradeBlock && ((p.morale ?? 70) < 32 || ((p.brokenPromise || 0) > 0 && (p.morale ?? 70) < 48) || ((p.loyalty ?? 40) < 15 && (p.morale ?? 70) < 50)));
     if (!c.length) return null;
     const p = pick(c);
+    const why = (p.brokenPromise || 0) > 0 ? '약속을 지키지 않으셨으니 저도 더는 믿기 어렵습니다' : (p.loyalty ?? 40) < 15 ? '이 팀에 정이 남아 있지 않습니다' : '솔직히 지금 팀에서는 더 이상 동기부여가 안 됩니다';
     return {
       from: p.id, kind: 'tradeReq', subject: '트레이드를 요청합니다',
-      body: `${p.name}입니다. 솔직히 지금 팀에서는 더 이상 동기부여가 안 됩니다. 저를 원하는 팀으로 보내주세요.`,
+      body: `${p.name}입니다. ${why}. 저를 원하는 팀으로 보내주세요.`,
       choices: [{ label: '트레이드 블록에 올린다', sub: '기분 +6' }, { label: '면담으로 설득한다', sub: '성공하면 기분 크게 상승' }],
     };
   },
@@ -301,6 +304,8 @@ export function resolveMail(state, id, idx) {
       return `트레이드 성사! ${o.get.map((id) => P(state, id).name).join(', ')} 영입`;
     }
     case 'press': return resolvePress(state, m, idx);
+    case 'partner': return resolvePartnerMail(state, m, idx);
+    case 'cityEv': return resolveCityEvent(state, m, idx);
     default: return '';
   }
 }
@@ -321,6 +326,20 @@ export function weeklyMailUpkeep(state) {
     if (msg) notes.push(msg);
   }
   const t = mine(state);
+  // 주전 보장 약속: 2주 연속 라인업·선발 로테이션·마무리에서 빠지면 약속 위반
+  if (state.phase === 'regular') for (const p of teamPlayersOf(state, t)) {
+    const sp = p.starterPromise;
+    if (!sp || sp.season !== state.season || p.injury) continue;
+    const on = (t.lineup || []).some((x) => x.pid === p.id) || (t.rotation || []).includes(p.id) || t.closer === p.id;
+    if (on) { sp.miss = 0; continue; }
+    sp.miss = (sp.miss || 0) + 1;
+    if (sp.miss === 1) notes.push(`${p.name}: "주전을 약속하셨잖아요…" (한 주 더 빼면 약속 위반)`);
+    else {
+      addMoodEvent(p, '주전 약속을 어김', -16, 6); p.loyalty = clamp((p.loyalty ?? 40) - 15, 0, 100);
+      p.starterPromise = null; p.brokenPromise = (p.brokenPromise || 0) + 1;
+      notes.push(`약속 불이행: ${p.name}이(가) 주전 약속을 어긴 데 크게 실망했어요`);
+    }
+  }
   for (const pr of [...(state.promises || [])]) {
     const p = state.players[pr.pid];
     if (!p || p.team !== t.id) { state.promises = state.promises.filter((x) => x !== pr); continue; }

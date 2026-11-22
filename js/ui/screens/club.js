@@ -6,7 +6,7 @@ import { teamPlayers } from '../../engine/roster.js';
 import { formatMoney, formatFans } from '../../core/util.js';
 import { PHILOSOPHIES, SEASON_LENGTHS } from '../../data/constants.js';
 import { BUILDINGS, SUBS, STAFF_ROLES, MANAGER_STYLES, SPONSOR_SLOTS, SPONSOR_TIERS, LEAGUES, MAX_CONCURRENT_BUILDS } from '../../data/club.js';
-import { UPKEEP, bLv, bInfo, bNext, subLv, slotsUsed, slotsTotal, activeBuilds, canUpgradeBuilding, canBuildSub, subNextLevel, staffOvr, staffWeeklyOf, staffSignOf, staffWeekly, scoutLevelOf } from '../../engine/club.js';
+import { UPKEEP, bLv, bInfo, bNext, subLv, slotsUsed, slotsTotal, activeBuilds, canUpgradeBuilding, canBuildSub, subNextLevel, buildingCost, staffOvr, staffWeeklyOf, staffSignOf, staffWeekly, scoutLevelOf } from '../../engine/club.js';
 import { foreignCount, foreignMax, signingFee } from '../../engine/market.js';
 import { calcOvr } from '../../engine/player.js';
 import { HOF_BAR } from '../../engine/hof.js';
@@ -19,6 +19,8 @@ import { avatar as av } from '../components.js';
 import { sponsorLogo } from '../../data/brandArt.js';
 import { recordsView } from './league.js';
 import { playerImg } from '../portraits.js';
+import { ensureRegion, ACTS, actState, apMax, partnerMax, partnerWeekly, PETITIONS, petitionState, petitionOdds, electionYear, PRESS_COST } from '../../engine/region.js';
+import { weekAbs } from '../../engine/mail.js';
 
 // ───────── 구단 역사관: 연표 · 우승 앨범 · 명예의 전당 · 기록 ─────────
 const LG_FLAG = (k) => LEAGUES[k || 'KBO']?.flag || '';
@@ -97,8 +99,8 @@ import { ensureFront, frontLv, DEPTS, DEPT_COST, DEPT_UPKEEP, REGIONS, satLabel,
 import { flagOf } from '../../data/nations.js';
 import { capInfo } from '../../engine/kborules.js';
 
-const TAB_ICO = { museum: 'league', biz: 'fans', front: 'club', facility: 'build', staff: 'staff', sponsor: 'sponsor', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
-const TABS = [['front', '프런트'], ['biz', '관중·수익'], ['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['museum', '역사관'], ['achv', '업적'], ['finance', '재정·설정']];
+const TAB_ICO = { museum: 'league', biz: 'fans', front: 'club', facility: 'build', staff: 'staff', sponsor: 'sponsor', region: 'home', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
+const TABS = [['front', '프런트'], ['biz', '관중·수익'], ['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['region', '지역·시청'], ['market', '영입'], ['trade', '트레이드'], ['museum', '역사관'], ['achv', '업적'], ['finance', '재정·설정']];
 
 // ───────── 프런트 ─────────
 function frontView(t) {
@@ -162,7 +164,7 @@ function buildingCard(t, k) {
         <p class="small">${esc(info.title)} · <b>${eff}</b> · 칸 ${used}/${total}</p>${UPKEEP[k]?.[lv - 1] ? `<p class="tiny muted">유지비 주 ${formatMoney(UPKEEP[k][lv - 1])}</p>` : ''}</div>
     </div>
     ${b ? progress(`${esc(B.levels[b.to - 1].title)} 증축 중`, b) : next ? `<div class="row gap mt"><span class="tiny muted grow">다음: ${esc(next.title)} · 칸 ${next.slots}개 · ${next.weeks}주</span>
-      <button class="btn sm ${err ? '' : 'primary'}" data-act="upgradeBld" data-k="${k}" ${err ? 'disabled' : ''}>${formatMoney(next.cost)}</button></div>${err && err !== '자금이 부족해요' ? `<p class="tiny faint">${err}</p>` : ''}` : '<p class="small good mt">최고 레벨</p>'}
+      <button class="btn sm ${err ? '' : 'primary'}" data-act="upgradeBld" data-k="${k}" ${err ? 'disabled' : ''}>${buildingCost(t, k) < next.cost ? `<s class="faint">${formatMoney(next.cost)}</s> ` : ''}${formatMoney(buildingCost(t, k))}</button></div>${buildingCost(t, k) < next.cost ? '<p class="tiny good">🏛️ 시청 공동 투자로 공사비가 줄었어요</p>' : ''}${err && err !== '자금이 부족해요' ? `<p class="tiny faint">${err}</p>` : ''}` : '<p class="small good mt">최고 레벨</p>'}
     <div class="slots">
       ${built.map(([sk, s]) => {
         const sl = subLv(t, sk);
@@ -260,6 +262,7 @@ function sponsorView(t) {
     <div class="panel">
       <div class="row between"><span class="small muted">구단 브랜드 가치</span><b class="disp amber" style="font-size:24px">${brand}</b></div>
       <div class="tierbar">${SPONSOR_TIERS.map((x, i) => `<div class="${i <= tier ? 'on' : ''}"><b>${x.ko}</b><small>${x.brand}+</small></div>`).join('')}</div>
+      ${(() => { const R = ensureRegion(state); return R.hype > 0 ? `<p class="small mt">✨ 창단 기대감 <b class="amber">+${Math.round(R.hype * 0.75)}</b> 포함 · 실력만으로는 ${brandValue(state, { organic: true })}점</p><p class="tiny muted">기대감은 시즌마다 식어요. 기대감 덕에 온 큰 기업은 1~2년 단기 계약이고 재계약을 잘 안 해요. 빈자리는 지역 상생 파트너와 성적으로 채워야 해요.</p>` : ''; })()}
       <p class="tiny faint mt">${next ? `${next.brand}점이 되면 ${next.ko}급 기업이 찾아와요.` : '최고 등급 기업들이 줄을 서요.'} 팬 수, 순위, 우승, 스타 선수, 구장 규모, 리그가 브랜드 가치를 올려요.</p>
     </div>
     <div class="sec-h mt-l"><h2>계약 중</h2></div>
@@ -270,9 +273,70 @@ function sponsorView(t) {
     }).join('')}</div>
     <div class="sec-h mt-l"><h2>들어온 제안</h2><span class="sub">시즌마다 갱신</span></div>
     <div class="panel">${offers.map((o) => `<div class="subrow"><img class="splogo" src="${sponsorLogo(o.name)}" alt="">
-      <div class="grow"><b>${esc(o.name)}</b> <span class="tier t${o.tier}">${SPONSOR_TIERS[o.tier].ko}</span><div class="tiny muted">${SPONSOR_SLOTS[o.slot].ko} · ${o.years}년 · 가을야구 +${formatMoney(o.postBonus)} · 우승 +${formatMoney(o.titleBonus)}${o.cond ? ` · <span class="bad">${o.cond.v}위 밖이면 해지</span>` : ''}</div></div>
+      <div class="grow"><b>${esc(o.name)}</b> <span class="tier t${o.tier}">${SPONSOR_TIERS[o.tier].ko}</span>${o.hype ? ' <span class="chip tiny">✨ 창단 효과</span>' : ''}${o.local ? ' <span class="chip tiny good">🌱 우리 동네 출신</span>' : ''}<div class="tiny muted">${SPONSOR_SLOTS[o.slot].ko} · ${o.years}년 · 가을야구 +${formatMoney(o.postBonus)} · 우승 +${formatMoney(o.titleBonus)}${o.cond ? ` · <span class="bad">${o.cond.v}위 밖이면 해지</span>` : ''}</div></div>
       <div class="right"><b class="amber">${formatMoney(o.perSeason)}</b><button class="btn sm primary" data-act="signSponsor" data-id="${o.id}" ${t.sponsors[o.slot] ? 'disabled' : ''}>계약</button></div></div>`).join('') || '<div class="empty">지금은 제안이 없어요. 성적을 올려 브랜드 가치를 키워보세요.</div>'}</div>
     <p class="tiny faint mt">후원금은 시즌 동안 매주 나눠 들어오고, 주간 스폰서 미션 보상도 계약사 등급에 따라 커져요.</p>`;
+}
+
+// ───────── 지역 상생 · 시청 ─────────
+const gauge = (ko, v, cls, sub) => `<div class="rg"><div class="row between"><span>${ko}</span><b>${Math.round(v)}</b></div><div class="rg-bar ${cls}"><i style="width:${Math.max(2, Math.min(100, v))}%"></i></div>${sub ? `<small>${sub}</small>` : ''}</div>`;
+function regionView(t) {
+  const R = ensureRegion(state);
+  const now = weekAbs(state);
+  const pmax = partnerMax(R);
+  const lgM = LEAGUES[state.league || 'KBO'].ticketMult;
+  const pending = R.petitions[0];
+  const perks = Object.entries(PETITIONS).filter(([k]) => R.perks[k]);
+  const hypeTxt = R.hype >= 70 ? '새 구단이라 기업들이 관심을 보여요. 큰 스폰서를 잡을 기회!' : R.hype >= 30 ? '기대감이 식고 있어요. 큰 기업은 재계약을 망설여요.' : R.hype > 0 ? '창단 효과가 거의 끝났어요.' : '창단 효과 끝. 이제 성적과 지역 신뢰가 브랜드예요.';
+  return `
+    <div class="rhero" style="background-image:url(img/region/r_city.webp)">
+      <div class="rhero-t"><b class="disp">${esc(t.city)}와 함께 크는 구단</b><small>돈 없는 신생 구단은 지역과 함께 자라요. 시민이 믿어주면 동네 가게가 후원하고, 시청이 구장을 도와줘요.</small></div>
+    </div>
+    <div class="panel rgs">
+      ${gauge('✨ 창단 기대감', R.hype, 'hype', hypeTxt)}
+      ${gauge('💗 시민 신뢰', R.trust, 'trust', `관중 ${R.trust >= 20 ? '+' : ''}${Math.round((R.trust - 20) * 0.15)}% · 팬 유입 · 브랜드 +${Math.round(R.trust * 0.25)} · 가만히 두면 조금씩 식어요`)}
+      ${gauge('🏛️ 시청 관계', R.city, 'city', `시즌 시작 지원금 약 ${formatMoney(Math.round((2500 + R.city * 110 + R.trust * 70) * lgM / 100) * 100)} · 건의 통과 확률↑`)}
+    </div>
+
+    <div class="sec-h mt-l"><h2>지역 활동</h2><span class="sub">이번 주 남은 횟수 ${R.ap}/${apMax(t)}</span></div>
+    <p class="tiny faint">한 주에 한 번(마케팅 부서 Lv.3부터 두 번). 같은 활동만 반복하면 감동이 줄어요.</p>
+    <div class="promos mt">${Object.entries(ACTS).map(([k, A]) => { const st = actState(state, k); return `<button class="promo ract ${st.ok ? '' : 'lock'}" data-act="regionAct" data-k="${k}" ${st.ok ? '' : 'disabled'}>
+      <span class="pr-art" style="background-image:url(img/region/${A.img}.webp)"></span>
+      <span class="pr-b"><b>${A.icon} ${A.ko}</b><small>${A.desc}</small><em>${formatMoney(Math.round(A.cost * lgM / 100) * 100)} · 신뢰 +${A.trust}${A.city ? ` · 시청 +${A.city}` : ''}${st.ok ? '' : ` · <span class="faint">${st.why}</span>`}</em></span></button>`; }).join('')}</div>
+
+    <div class="sec-h mt-l"><h2>상생 파트너</h2><span class="sub">${R.partners.length}/${pmax}곳 · 주 ${formatMoney(R.partners.reduce((a, p) => a + partnerWeekly(state, p), 0))}</span></div>
+    <div class="panel">${R.partners.map((p) => `<div class="subrow"><span class="si">${p.icon}</span><div class="grow"><b>${esc(p.name)}</b><div class="tiny muted">${p.since}년부터 · ${p.years || 0}년째 함께${p.grown ? ' · 🌱 전국 브랜드로 성장' : ''}</div></div><b class="amber small">주 ${formatMoney(partnerWeekly(state, p))}</b></div>`).join('') || '<div class="empty">아직 파트너가 없어요. 전통시장 상생 데이를 열거나 시민 신뢰를 쌓으면 동네 가게들이 먼저 연락해 와요.</div>'}
+      <p class="tiny faint mt">시민 신뢰 15마다 자리가 하나씩 늘어요(최대 8곳). 오래 함께할수록 후원금이 커지고, 3년 넘게 함께한 가게가 전국 브랜드로 크면 정식 스폰서를 제안해요. 신뢰가 바닥이면 떠나요.</p></div>
+
+    <div class="sec-h mt-l"><h2>시청 건의</h2><span class="sub">${electionYear(state) ? '🗳️ 선거의 해 · 통과 확률↑' : '한 번에 하나씩'}</span></div>
+    ${pending ? `<div class="panel pet-now"><span class="si">${PETITIONS[pending.k].icon}</span><div class="grow"><b>${PETITIONS[pending.k].ko}</b> <span class="tiny muted">심의 중</span>
+      <div class="rg-bar city mt"><i style="width:${Math.round(((now - pending.at) / Math.max(1, pending.due - pending.at)) * 100)}%"></i></div><div class="tiny muted">${Math.max(0, pending.due - now)}주 뒤 결과 · 예상 통과 ${Math.round(pending.odds * 100)}%${pending.sign ? ' · 서명 첨부' : ''}${pending.press ? ' · 언론 홍보' : ''}</div></div></div>` : ''}
+    <div class="panel pets">${Object.entries(PETITIONS).map(([k, P]) => { const st = petitionState(state, k); return `<button class="pet ${st.done ? 'done' : st.ok ? '' : 'lock'}" data-act="petSheet" data-k="${k}">
+      <span class="si">${P.icon}</span><span class="grow"><b>${P.ko}</b><small>${P.eff}</small></span><span class="pet-s">${st.done ? '✅ ' + st.why : st.ok ? `${Math.round(petitionOdds(state, k) * 100)}%` : st.why}</span></button>`; }).join('')}</div>
+    ${perks.length ? `<div class="chips mt">${perks.map(([, P]) => `<span class="chip good">${P.icon} ${P.eff}</span>`).join('')}</div>` : ''}
+
+    ${R.grants.length ? `<div class="sec-h mt-l"><h2>시 지원금 기록</h2></div><div class="panel"><div class="kv" style="margin-top:0">${R.grants.slice(-5).reverse().map((g) => `<div><span>${g.season} 시즌</span><b>${formatMoney(g.v)}</b></div>`).join('')}</div></div>` : ''}`;
+}
+export function petitionSheetHtml(k) {
+  const P = PETITIONS[k];
+  const R = ensureRegion(state);
+  const st = petitionState(state, k);
+  const o = ui.petOpt || {};
+  const odds = petitionOdds(state, k, o);
+  const pc = Math.round(PRESS_COST * LEAGUES[state.league || 'KBO'].ticketMult / 100) * 100;
+  return `<div class="petsheet">
+    <div class="rhero sm" style="background-image:url(img/region/r_city.webp)"></div>
+    <h2 class="disp mt">${P.icon} ${P.ko}</h2>
+    <p class="small muted">${P.desc}</p>
+    <div class="kv"><div><span>효과</span><b class="good">${P.eff}</b></div><div><span>필요</span><b>시청 관계 ${P.city}${P.trust ? ` · 신뢰 ${P.trust}` : ''}${P.needStad ? ` · 구장 Lv.${P.needStad}` : ''}</b></div><div><span>심의 기간</span><b>${P.weeks}주</b></div><div><span>지금</span><b>시청 ${Math.round(R.city)} · 신뢰 ${Math.round(R.trust)}</b></div></div>
+    ${st.ok ? `<div class="sec-h mt"><h2>설득 자료 더하기</h2></div>
+    <label class="opt"><input type="checkbox" data-change="petOpt" data-k="sign" ${o.sign ? 'checked' : ''} ${R.trust < 25 ? 'disabled' : ''}><span><b>시민 서명운동</b><small>통과 +15% · 시민 신뢰 -8 (신뢰 25 이상)</small></span></label>
+    <label class="opt"><input type="checkbox" data-change="petOpt" data-k="press" ${o.press ? 'checked' : ''}><span><b>지역 언론 홍보</b><small>통과 +10% · ${formatMoney(pc)}</small></span></label>
+    <div class="odds"><span>예상 통과 확률</span><b class="disp">${Math.round(odds * 100)}%</b></div>
+    <p class="tiny faint">수용되면 시 예산이 들어간 만큼 시청 관계가 10 줄어요. 거절되면 4 줄고 8주 동안 다시 못 내요. 보류면 2주 뒤 다시 낼 수 있어요.</p>
+    <button class="btn primary block mt" data-act="petSubmit" data-k="${k}">건의서 제출</button>`
+    : `<p class="center ${st.done ? 'good' : 'bad'} mt">${st.done ? '이미 반영된 건의예요' : st.why}</p>`}
+  </div>`;
 }
 
 // ───────── 영입 ─────────
@@ -468,6 +532,7 @@ function mapView(t) {
     ${SPOTS.map(([k, ico, ko, x, y]) => { const inf = spotInfo(t, k); return `<button class="hot ${inf.cls || ''} ${inf.alert ? 'alert' : ''}" style="left:${x}%;top:${y}%" ${k === 'develop' ? 'data-act="tab" data-tab="develop"' : `data-act="clubView" data-v="${k}"`}>${icon(ico, 28)}${ko}${inf.sub ? `<small>${inf.sub}</small>` : ''}</button>`; }).join('')}
   </section>
   <div class="campus-more">
+    ${(() => { const R = ensureRegion(state); return `<button class="btn sm cm-region" data-act="clubView" data-v="region"><img src="img/region/r_city.webp" alt=""><span><b>🏛️ 지역 상생 · 시청</b><small>신뢰 ${Math.round(R.trust)} · 시청 ${Math.round(R.city)} · 파트너 ${R.partners.length}곳${R.ap > 0 && state.phase === 'regular' ? ' · 이번 주 활동 가능' : ''}</small></span></button>`; })()}
     <button class="btn sm" data-act="clubView" data-v="biz">${icon('fans', 22)}관중·수익</button>
     <button class="btn sm" data-act="clubView" data-v="finance">${icon('money', 22)}재정·설정</button>
     <button class="btn sm" data-act="clubView" data-v="trade">${icon('roster', 22)}트레이드</button>
@@ -482,7 +547,7 @@ export function renderClub() {
   const view = ui.clubView || 'map';
   const head = `<div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>`;
   if (view === 'map') return `<section class="sec">${head}</section>${mapView(t)}`;
-  const body = { museum: museumView, biz: bizView, front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
+  const body = { museum: museumView, biz: bizView, front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, region: regionView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
   return `
   <section class="sec">
     <div class="row gap"><button class="btn sm ghost backmap" data-act="clubView" data-v="map">${icon('club', 22)}캠퍼스</button><h2 class="disp grow" style="font-size:19px">${TABS.find(([k]) => k === view)?.[1] || ''}</h2></div>

@@ -88,13 +88,20 @@ export function annualOffer(state, pid, mode) {
   return msg;
 }
 
+// 성적 옵션·주전 보장 약속은 선수 마음을 움직여요
+const incM = (opts) => (opts.incentive ? 1.05 : 1) * (opts.starter ? 1.07 : 1);
+function promiseStarter(state, p, opts) {
+  if (!opts.starter) return '';
+  p.starterPromise = { season: state.season + (state.phase === 'regular' ? 0 : 1), miss: 0 };
+  return ' · 주전 보장 약속';
+}
 // FA·잔류·외국인 재계약 협상
 export function multiOffer(state, pid, salary, years, opts = {}) {
   const it = state.nego.items.find((x) => x.pid === pid);
   const p = state.players[pid];
   const t = state.teams[state.userTeamId];
   if (!it || it.status !== 'pending') return { ok: false, msg: '' };
-  const ratio = (salary * (opts.incentive ? 1.05 : 1)) / it.demand;
+  const ratio = (salary * incM(opts)) / it.demand;
   const yrFit = it.years ? 1 - Math.abs((years || 1) - it.years) * 0.06 : 1;
   const mood = (p.morale ?? 60) / 100, loyal = (p.loyalty ?? 40) / 100, brand = Math.min(1, brandValue(state) / 200);
   const score = ratio * 0.8 + yrFit * 0.1 + (mood - 0.55) * 0.12 + (loyal - 0.4) * 0.1 + brand * 0.05 - (it.tries || 0) * 0.015;
@@ -110,7 +117,8 @@ export function multiOffer(state, pid, salary, years, opts = {}) {
     addMoodEvent(p, '구단에 남게 됨', 8, 5);
     p.loyalty = clamp((p.loyalty ?? 40) + 15, 0, 100);
     checkRaisePromise(state, p, true);
-    return { ok: true, msg: `${p.name}와(과) ${years || 1}년 계약 성공!${fee ? ` (계약금 ${fee.toLocaleString()}만)` : ''}` };
+    const sp = promiseStarter(state, p, opts);
+    return { ok: true, msg: `${p.name}와(과) ${years || 1}년 계약 성공!${fee ? ` (계약금 ${fee.toLocaleString()}만)` : ''}${sp}` };
   }
   if (it.tries >= 3) {
     it.status = 'left';
@@ -184,7 +192,7 @@ export function faMarketOffer(state, pid, salary, years, opts = {}) {
   const comp = 1 + ((p.faTries || 0) * 0.02); // 시간이 지날수록 경쟁 제안이 붙음
   const brand = Math.min(1, brandValue(state) / 200);
   const returning = p.prevTeam === t.id ? ((p.loyalty ?? 40) - 50) / 400 : 0;
-  const score = ((salary * (opts.incentive ? 1.05 : 1)) / ask) * (1 - Math.abs(years - yrs) * 0.05) + brand * 0.06 + returning;
+  const score = ((salary * incM(opts)) / ask) * (1 - Math.abs(years - yrs) * 0.05) + brand * 0.06 + returning;
   p.faTries = (p.faTries || 0) + 1;
   const fee = Math.round(salary * years * 0.2 / 100) * 100 + (opts.incentive ? Math.round(salary * 0.06 / 100) * 100 : 0);
   if (score >= 0.97 * comp) {
@@ -199,7 +207,8 @@ export function faMarketOffer(state, pid, salary, years, opts = {}) {
       if (c) compMsg = ` · ${c.grade}등급 FA 보상: ${state.teams[p.prevTeam].short || state.teams[p.prevTeam].name}에 ${c.player ? `보상선수 ${c.player.name} + ` : ''}보상금 ${c.cash.toLocaleString()}만`;
       p.team = null;
     }
-    return { ok: true, fee, msg: `${p.name} FA 계약 성공! ${years}년 · 연봉 ${p.salary.toLocaleString()}만 · 계약금 ${fee.toLocaleString()}만${compMsg}` };
+    const sp = promiseStarter(state, p, opts);
+    return { ok: true, fee, msg: `${p.name} FA 계약 성공!${sp} ${years}년 · 연봉 ${p.salary.toLocaleString()}만 · 계약금 ${fee.toLocaleString()}만${compMsg}` };
   }
   if (p.faTries >= 4) return { ok: false, gone: true, msg: `${p.name}: "다른 구단과 계약하기로 했어요."` };
   return { ok: false, msg: score >= 0.9 * comp ? `${p.name}: "조금만 더 올려주시면 사인할게요."` : `${p.name}: "다른 구단 제안이 더 좋네요."` };
@@ -208,7 +217,7 @@ export function faMarketOffer(state, pid, salary, years, opts = {}) {
 // 협상 미리보기: 지금 조건의 점수와 사인에 필요한 연봉(에이전트 역제안)
 export function negoPreview(state, pid, mode, salary, years, opts = {}) {
   const p = state.players[pid];
-  const inc = opts.incentive ? 1.05 : 1;
+  const inc = incM(opts);
   if (mode === 'fa') {
     const ask = p.askSalary || fairSalary(state, p);
     const yrs = p.askYears || 1;

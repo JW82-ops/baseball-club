@@ -3,6 +3,7 @@ import { GAMES_PER_WEEK } from '../data/constants.js';
 import { gameDate } from './calendar.js';
 import { calcOvr } from './player.js';
 import { firstTeam } from './roster.js';
+import { perkSum } from './region.js';
 
 export const PROMOS = {
   fireworks: { ko: '불꽃놀이 나이트', icon: '🎆', img: 'p_fire', cost: 3000, att: 0.15, fan: 0.004, desc: '경기가 끝나면 불꽃놀이. 관중 +15%' },
@@ -68,7 +69,7 @@ export function gateFactors(state, team) {
 export function merchMult(state, team) {
   const lv = Math.max(0, Math.min(MERCH_LV.length - 1, (team.merchLv || 1) - 1));
   const stars = firstTeam(state, team).filter((p) => calcOvr(p) >= 75).length;
-  return MERCH_LV[lv].mult * (1 + Math.min(4, stars) * 0.05);
+  return MERCH_LV[lv].mult * (1 + Math.min(4, stars) * 0.05) * (1 + perkSum(team, 'merch'));
 }
 export function upgradeMerch(team) {
   const lv = team.merchLv || 1;

@@ -22,10 +22,11 @@ import { velocityKmh, batLine, pitLine } from './engine/player.js';
 import { fmtAvg, fmtEra } from './core/util.js';
 import { isClutch, clutchOptions, clutchSituation } from './engine/clutch.js';
 import { upgradeBuilding, buildSub, hireStaff, fireStaff, bNext } from './engine/club.js';
-import { slotSheetHtml, subSheetHtml, staffMarketHtml } from './ui/screens/club.js';
+import { slotSheetHtml, subSheetHtml, staffMarketHtml, petitionSheetHtml } from './ui/screens/club.js';
 import { renderMail } from './ui/screens/mail.js';
 import { resolveMail, unreadCount } from './engine/mail.js';
 import { signSponsor, cancelSponsor } from './engine/sponsor.js';
+import { doAct, submitPetition } from './engine/region.js';
 import { annualOffer, multiOffer, releaseNego, faMarketOffer, fairSalary, negoPreview } from './engine/contracts.js';
 import { npcImg, playerImg } from './ui/portraits.js';
 import { evaluateTrade, executeTrade } from './engine/trade.js';
@@ -440,6 +441,7 @@ registerActions({
   offerYears: (d) => { ui.neg.yrs = Number(d.v); openModal(offerSheet(), { keepScroll: true }); },
   negStep: (d) => { const n = ui.neg; n.sal = Math.max(100, Math.round((n.sal + n.ask * Number(d.d)) / 100) * 100); openModal(offerSheet(), { keepScroll: true }); },
   negIncChk: (d) => { ui.neg.inc = !!d.checked; openModal(offerSheet(), { keepScroll: true }); },
+  negStartChk: (d) => { ui.neg.starter = !!d.checked; openModal(offerSheet(), { keepScroll: true }); },
   negCounter: () => { if (ui.neg.counter) { ui.neg.sal = ui.neg.counter; doOffer(true); } },
   makeOffer: () => doOffer(false),
   nego: (d) => { const msg = annualOffer(state, d.pid, d.m); commit(msg); },
@@ -692,6 +694,10 @@ registerActions({
     commit();
   },
   setPromo: (d) => { const err = setPromo(state, d.k); if (err) return toast(err, 'bad'); commit(d.k ? `${PROMOS[d.k].icon} ${PROMOS[d.k].ko} 준비 완료` : '이벤트를 취소했어요', 'good'); },
+  regionAct: (d) => { const r = doAct(state, d.k); if (!r.ok) return toast(r.msg, 'bad'); sfx.coin?.(); commit(r.msg, 'good'); },
+  petSheet: (d) => { ui.petOpt = {}; ui.petK = d.k; openModal(petitionSheetHtml(d.k), { sheet: true }); },
+  petOpt: (d) => { ui.petOpt = { ...(ui.petOpt || {}), [d.k]: !!d.checked }; openModal(petitionSheetHtml(ui.petK), { sheet: true, keepScroll: true }); },
+  petSubmit: (d) => { const r = submitPetition(state, d.k, ui.petOpt || {}); if (!r.ok) return toast(r.msg, 'bad'); closeModal(); commit(r.msg, 'good'); },
   upgradeMerch: () => { const err = upgradeMerch(userTeam(state)); if (err) return toast(err, 'bad'); sfx.coin?.(); commit('굿즈 스토어 확장!', 'good'); },
   seasonLen: (d) => { state.settings.seasonLength = Number(d.v); commit('다음 시즌부터 적용돼요'); },
   guideGo: () => {
@@ -755,8 +761,8 @@ function doOffer(fromCounter) {
   const n = ui.neg;
   const p = state.players[n.pid];
   const sal = n.sal, yrs = n.yrs;
-  n.log.push({ who: 'me', text: `연봉 ${formatMoney(sal)} · ${yrs}년${n.inc ? ' · 성적 옵션 포함' : ''}${fromCounter ? ' (역제안 수락)' : ''}` });
-  const r = n.mode === 'fa' ? faMarketOffer(state, n.pid, sal, yrs, { incentive: n.inc }) : multiOffer(state, n.pid, sal, yrs, { incentive: n.inc });
+  n.log.push({ who: 'me', text: `연봉 ${formatMoney(sal)} · ${yrs}년${n.inc ? ' · 성적 옵션 포함' : ''}${n.starter ? ' · 주전 보장' : ''}${fromCounter ? ' (역제안 수락)' : ''}` });
+  const r = n.mode === 'fa' ? faMarketOffer(state, n.pid, sal, yrs, { incentive: n.inc, starter: n.starter }) : multiOffer(state, n.pid, sal, yrs, { incentive: n.inc, starter: n.starter });
   if (r.ok) {
     sfx.levelup();
     if (n.mode === 'fa') {
@@ -779,7 +785,7 @@ function doOffer(fromCounter) {
     r.msg += ` → ${state.teams[tid].name}`;
   } else if (r.left) { ui.neg = null; closeModal(); }
   else {
-    const pv = negoPreview(state, n.pid, n.mode, sal, yrs, { incentive: n.inc });
+    const pv = negoPreview(state, n.pid, n.mode, sal, yrs, { incentive: n.inc, starter: n.starter });
     n.counter = Math.max(pv.counter, sal + 100);
     const gap = pv.need - pv.score;
     n.log.push({ who: 'ag', text: `${r.msg.replace(/^[^:]+:\s*/, '')} ${gap < 0.12 ? `${formatMoney(n.counter)}${n.yrs !== n.askYrs ? '' : ''}이면 바로 사인할게요.` : `최소 ${formatMoney(n.counter)}은 돼야 이야기가 됩니다.`}` });
@@ -790,7 +796,7 @@ function doOffer(fromCounter) {
 function offerSheet() {
   const n = ui.neg;
   const p = state.players[n.pid];
-  const pv = negoPreview(state, n.pid, n.mode, n.sal, n.yrs, { incentive: n.inc });
+  const pv = negoPreview(state, n.pid, n.mode, n.sal, n.yrs, { incentive: n.inc, starter: n.starter });
   const ratio = pv.score / pv.need;
   const mood = ratio >= 1 ? ['good', '사인할 것 같아요'] : ratio >= 0.95 ? ['warn', '조금만 더'] : ratio >= 0.85 ? ['warn', '부족해요'] : ['bad', '많이 부족해요'];
   const fee = (n.mode === 'fa' || state.nego?.items.find((x) => x.pid === n.pid)?.kind === 'fa' ? Math.round(n.sal * n.yrs * 0.2 / 100) * 100 : state.nego?.items.find((x) => x.pid === n.pid)?.kind === 'foreign' ? Math.round(n.sal * 0.15 / 100) * 100 : 0) + (n.inc ? Math.round(n.sal * 0.06 / 100) * 100 : 0);
@@ -810,6 +816,7 @@ function offerSheet() {
       <p class="small mt">계약 기간</p>
       <div class="seg mt">${[1, 2, 3, 4].map((y) => `<button class="${n.yrs === y ? 'on' : ''}" data-act="offerYears" data-v="${y}">${y}년</button>`).join('')}</div>
       <label class="row gap small mt"><input type="checkbox" data-change="negIncChk" ${n.inc ? 'checked' : ''}><span class="grow">성적 옵션 추가<br><span class="tiny muted">연봉 대신 보너스로 마음을 얻어요 (계약금 +6%)</span></span></label>
+      <label class="row gap small mt"><input type="checkbox" data-change="negStartChk" ${n.starter ? 'checked' : ''}><span class="grow">주전 보장 약속<br><span class="tiny muted">돈 안 드는 약속이지만, 시즌 중 2주 연속 주전에서 빼면 크게 실망해요</span></span></label>
       <p class="tiny muted mt">계약금 ${formatMoney(fee)}${(() => { const ci = capInfo(state); const after = ci.used + n.sal; return ` · 샐러리캡 ${formatMoney(after)} / ${formatMoney(ci.limit)}${after > ci.limit ? ' <b class="bad">초과</b>' : ''}`; })()}</p>
       <button class="btn primary block mt" data-act="makeOffer">이 조건으로 제안</button>
       ${n.counter ? `<button class="btn block mt" data-act="negCounter">에이전트 역제안 수락 · ${formatMoney(n.counter)}</button>` : ''}

@@ -13,6 +13,8 @@ import { signSponsor } from '../js/engine/sponsor.js';
 import { resolveEvent, acceptMission } from '../js/engine/events.js';
 import { prepKey } from '../js/engine/analysis.js';
 import { BUILDINGS } from '../js/data/club.js';
+import { ACTS, actState, doAct, PETITIONS, petitionState, submitPetition, ensureRegion } from '../js/engine/region.js';
+const REGION = process.argv[4] !== 'noregion';
 
 setSeed(Number(process.argv[2] || 7));
 const seasons = Number(process.argv[3] || 10);
@@ -38,6 +40,11 @@ function manage() {
   if (s.pendingEvent) resolveEvent(s, 0);
   for (const m of (s.inbox || []).filter((m) => !m.resolved)) resolveMail(s, m.id, 0);
   s.prep = { key: prepKey(s), focus: 'bal' };
+  if (REGION) {
+    ensureRegion(s);
+    for (const k of Object.keys(ACTS).reverse()) if (actState(s, k).ok) { doAct(s, k); break; }
+    for (const k of Object.keys(PETITIONS)) if (petitionState(s, k).ok) { submitPetition(s, k, {}); break; }
+  }
 }
 for (let y = 0; y < seasons; y++) {
   while (s.phase === 'regular') { manage(); simDay(s); }
@@ -53,7 +60,8 @@ for (let y = 0; y < seasons; y++) {
   out.push({ season: s.season, rank, w: t.w, l: t.l, champ: s.teams[s.post.champion].short, cash: t.cash, fans: t.fans, att: t.lastAttendance, cap: t.capacity, stad: t.buildings.stadium.lv,
     userOvr: teamOvr(s, t), lgOvr: Math.round(tOvr.reduce((a, b) => a + b, 0) / tOvr.length), maxOvr: Math.max(...tOvr), minOvr: Math.min(...tOvr),
     top10: Math.round(ovrs.slice(0, 10).reduce((a, b) => a + b, 0) / 10), n80: ovrs.filter((o) => o >= 80).length, players: Object.keys(s.players).length, avgSal: Math.round(sal),
-    avg: (L.h / Math.max(1, L.ab)).toFixed(3), hrPerTeam: Math.round(L.hr / s.teamOrder.length), kb: Math.round(JSON.stringify(s).length / 1024) });
+    avg: (L.h / Math.max(1, L.ab)).toFixed(3), hrPerTeam: Math.round(L.hr / s.teamOrder.length), kb: Math.round(JSON.stringify(s).length / 1024),
+    hype: t.region?.hype, trust: Math.round(t.region?.trust || 0), city: Math.round(t.region?.city || 0), lp: (t.region?.partners || []).length, perks: Object.keys(t.region?.perks || {}).filter((k) => t.region.perks[k]).join(','), sp: Object.values(t.sponsors).map((x) => x.tier).join(''), spPay: t.ledger.sponsorPay || 0, lpPay: t.ledger.partner || 0, city$: t.ledger.city || 0 });
   runOffseasonStart(s);
   for (const it of s.nego.items) { if (it.kind === 'annual') annualOffer(s, it.pid, 'fair'); else multiOffer(s, it.pid, it.demand, it.years || 1); }
   proceedToDraft(s);
@@ -61,7 +69,8 @@ for (let y = 0; y < seasons; y++) {
   finishDraft(s);
   runCampAndStartSeason(s);
 }
-console.table(out.map((o) => ({ season: o.season, rank: o.rank, wl: o.w + '-' + o.l, cash: o.cash, fans: o.fans, att: o.att, userOvr: o.userOvr, lgOvr: o.lgOvr, n80: o.n80, players: o.players, avgSal: o.avgSal, avg: o.avg, kb: o.kb })));
+console.table(out.map((o) => ({ season: o.season, rank: o.rank, wl: o.w + '-' + o.l, cash: o.cash, fans: o.fans, att: o.att, userOvr: o.userOvr, lgOvr: o.lgOvr, n80: o.n80, kb: o.kb })));
+console.table(out.map((o) => ({ season: o.season, rank: o.rank, hype: o.hype, trust: o.trust, city: o.city, lp: o.lp, lpPay: o.lpPay, sp: o.sp, spPay: o.spPay, city$: o.city$, perks: o.perks })));
 const sizes = {}; for (const k in s) sizes[k] = Math.round(JSON.stringify(s[k] ?? null).length / 1024);
 console.log('sizes', JSON.stringify(Object.entries(sizes).sort((a, b) => b[1] - a[1]).slice(0, 10)));
 const agg = {}; for (const p of Object.values(s.players)) for (const k in p) agg[k] = (agg[k] || 0) + JSON.stringify(p[k] ?? null).length;

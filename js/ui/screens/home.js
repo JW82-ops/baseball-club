@@ -1,4 +1,5 @@
-import { state } from '../../core/store.js';
+import { state, save } from '../../core/store.js';
+import { makeGoals, goalStatus, backGoal } from '../../engine/goals.js';
 import { ui, rerender } from '../ui-state.js';
 import { artBg, artHero, stadiumArt, esc, emblem, gradeTag, avatar, posShort, potTag } from '../components.js';
 import { standings, pct } from '../../engine/league.js';
@@ -15,7 +16,7 @@ import { calcOvr as ovrOf } from '../../engine/player.js';
 import { sangmuChance, milLabel } from '../../engine/military.js';
 import { teamPlayers as tps } from '../../engine/roster.js';
 import { icon, staffImg, ownerImg } from '../portraits.js';
-import { openModal, closeModal, registerActions } from '../dom.js';
+import { openModal, closeModal, registerActions, toast } from '../dom.js';
 import { MANAGER_STYLES } from '../../data/club.js';
 import { satLabel, goalProgress } from '../../engine/front.js';
 import { devCandidates, secondDraftYear, secondDraftPool, SECOND_FEES } from '../../engine/kborules.js';
@@ -161,6 +162,17 @@ function natCard() {
     <button class="btn sm mt" data-act="natSeen">확인</button>`, 'tall')}</section>`;
 }
 
+function goalsCard() {
+  if (state.phase !== 'regular') return '';
+  if (state.goals?.season !== state.season) makeGoals(state);
+  const L = (state.goals?.list || []).map((g) => ({ g, st: goalStatus(state, g) })).filter((x) => x.st && x.st.p.team === state.userTeamId);
+  if (!L.length) return '';
+  return `<section class="sec"><div class="panel goalsc"><div class="row between"><b class="small">🎯 선수들의 시즌 목표</b><span class="tiny muted">${L.filter((x) => x.st.done).length}/${L.length} 달성</span></div>
+    ${L.map(({ g, st }) => `<div class="gl-row"><button class="gl-who" data-act="openPlayer" data-pid="${st.p.id}"><b>${esc(st.p.name)}</b><small>${st.text}</small></button>
+      <div class="gl-bar ${st.done ? 'done' : ''}"><i style="width:${Math.round(st.pct * 100)}%"></i><span>${st.now}</span></div>
+      ${g.backed ? '<span class="gl-b">📣</span>' : `<button class="btn sm ghost gl-cheer" data-act="backGoal" data-pid="${st.p.id}">응원</button>`}</div>`).join('')}
+    <p class="tiny faint mt">시즌이 끝나면 달성한 선수는 기분·충성도가 올라요. 감독이 공개 응원하면 지금 기분이 오르지만, 실패했을 때 더 크게 실망해요.</p></div></section>`;
+}
 function boardCard() {
   const b = state.board;
   if (!b?.goals?.length) return '';
@@ -260,6 +272,7 @@ function fastSheet() {
 registerActions({
   lobbyEvent: () => openModal(eventCard()),
   lobbyMission: () => openModal(missionCard() || '<div class="panel empty">지금은 스폰서 미션이 없어요.</div>'),
+  backGoal: (d) => { const g = backGoal(state, d.pid); if (!g) return; toast(`${state.players[d.pid]?.name}의 목표를 공개 응원했어요 📣`, 'good'); save(); rerender(); },
   lobbyBrief: () => openModal(`${miniStandings()}${lastGameCard()}`),
   lobbyStaff: () => { ui.tab = 'club'; ui.clubView = 'staff'; rerender(); window.scrollTo(0, 0); },
   lobbyFast: () => openModal(fastSheet()),
@@ -267,7 +280,7 @@ registerActions({
 });
 
 function briefing() {
-  const body = `${natCard()}${allStarCard()}${boardCard()}${state.mission ? missionCard() : ''}${lastGameCard()}${snsCard()}${paperCard()}${weekCard()}${synergyCard()}`;
+  const body = `${natCard()}${allStarCard()}${boardCard()}${goalsCard()}${state.mission ? missionCard() : ''}${lastGameCard()}${snsCard()}${paperCard()}${weekCard()}${synergyCard()}`;
   return `<div class="lb-more"><div class="lb-grip"><span></span>구단 브리핑</div>${body}${newsCard()}</div>`;
 }
 

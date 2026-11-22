@@ -5,17 +5,20 @@ import { standings } from './league.js';
 import { firstTeam } from './roster.js';
 import { calcOvr } from './player.js';
 import { bLv } from './club.js';
+import { ensureRegion } from './region.js';
 
 // 브랜드 가치: 팬·순위·우승·스타·리그·구장
-export function brandValue(state) {
+export function brandValue(state, opts = {}) {
   const t = state.teams[state.userTeamId];
+  const R = t.region;
   const st = standings(state);
   const rank = st.findIndex((s) => s.team.id === t.id) + 1;
   const last = state.history.length ? state.history[state.history.length - 1].userRank : 6;
   const titles = state.history.filter((h) => h.champion === t.id).length;
   const stars = firstTeam(state, t).filter((p) => calcOvr(p) >= 80).length;
   const lg = LEAGUES[state.league || 'KBO'];
-  const v = t.fans / 1200 + (11 - rank) * 2.5 + (11 - last) * 3 + titles * 18 + stars * 5 + bLv(t, 'stadium') * 5 + lg.brand;
+  const v = t.fans / 1200 + (11 - rank) * 2.5 + (11 - last) * 3 + titles * 18 + stars * 5 + bLv(t, 'stadium') * 5 + lg.brand
+    + (R ? R.trust * 0.25 : 0) + (R && !opts.organic ? R.hype * 0.75 : 0);
   return Math.round(clamp(v, 0, 400));
 }
 export function tierFor(brand) {
@@ -26,11 +29,14 @@ export function tierFor(brand) {
 
 // 제안 생성: 슬롯마다 현재 브랜드 기준 1~2개
 export function genSponsorOffers(state) {
+  ensureRegion(state);
   const brand = brandValue(state);
   const top = tierFor(brand);
+  const real = tierFor(brandValue(state, { organic: true }));
   const t = state.teams[state.userTeamId];
   const lgMult = LEAGUES[state.league || 'KBO'].ticketMult;
-  const offers = [];
+  // 지역 파트너가 성장해서 낸 제안은 유지
+  const offers = (state.sponsorOffers || []).filter((o) => o.local && !t.sponsors[o.slot]);
   for (const [slot, def] of Object.entries(SPONSOR_SLOTS)) {
     if (def.needStadium && bLv(t, 'stadium') < def.needStadium) continue;
     if (t.sponsors[slot]) continue;
@@ -40,13 +46,15 @@ export function genSponsorOffers(state) {
       const T = SPONSOR_TIERS[tier];
       const fit = 0.85 + Math.random() * 0.3 + (brand - T.brand) / 400;
       const per = Math.round(T.base * def.mult * fit * lgMult / 100) * 100;
-      const years = randInt(1, 3);
-      const cond = chance(0.4) ? { kind: 'rank', v: tier >= 2 ? 5 : 7 } : null;
+      // 창단 기대감 덕에 온 큰 기업: 1~2년 단기, 성적 조건이 붙기 쉬워요
+      const hype = tier > real;
+      const years = hype ? randInt(1, 2) : randInt(1, 3);
+      const cond = chance(hype ? 0.6 : 0.4) ? { kind: 'rank', v: tier >= 2 ? 5 : 7 } : null;
       offers.push({
         id: uid('sp'), slot, tier, name: pick(T.names), perSeason: per, years,
         postBonus: Math.round(per * (0.1 + tier * 0.05) / 100) * 100,
         titleBonus: Math.round(per * (0.25 + tier * 0.1) / 100) * 100,
-        cond,
+        cond, hype,
       });
     }
   }
@@ -99,7 +107,11 @@ export function settleSponsorsSeason(state, rank, madePost, champion) {
       continue;
     }
     s.left -= 1;
-    if (s.left <= 0) { notes.push(`${s.name} 계약 만료`); delete t.sponsors[slot]; }
+    if (s.left <= 0) {
+      const real = tierFor(brandValue(state, { organic: true }));
+      notes.push(s.hype && s.tier > real ? `${s.name} 계약 만료 — 창단 효과가 식어 재계약하지 않았어요` : `${s.name} 계약 만료`);
+      delete t.sponsors[slot];
+    }
   }
   return notes;
 }

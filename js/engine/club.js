@@ -5,6 +5,7 @@ import { koreanName } from '../data/names.js';
 import { nameFor, ethFor, pickStaffImportNat } from '../data/nations.js';
 import { frontLv, scoutRegionBonus } from './front.js';
 import { planAttrMult, planInjuryMult, affMult, coachFor } from './dev2.js';
+import { stadiumDiscount, useStadiumDiscount } from './region.js';
 
 // ───────── 구조 보장 ─────────
 export function ensureClub(team) {
@@ -51,14 +52,23 @@ export function canUpgradeBuilding(team, k) {
   const next = bNext(team, k);
   if (!next) return '최고 레벨이에요';
   if (activeBuilds(team) >= MAX_CONCURRENT_BUILDS) return `동시 공사는 ${MAX_CONCURRENT_BUILDS}곳까지예요`;
-  if (team.cash < next.cost) return '자금이 부족해요';
+  if (team.cash < buildingCost(team, k)) return '자금이 부족해요';
   return null;
+}
+// 시청 공동 투자가 있으면 홈 구장 공사비가 깎여요
+export function buildingCost(team, k) {
+  const next = bNext(team, k);
+  if (!next) return 0;
+  const d = k === 'stadium' ? stadiumDiscount(team, bLv(team, k) + 1) : 0;
+  return Math.round(next.cost * (1 - d) / 100) * 100;
 }
 export function upgradeBuilding(state, team, k) {
   const err = canUpgradeBuilding(team, k);
   if (err) return { ok: false, msg: err };
   const next = bNext(team, k);
-  pay(team, next.cost);
+  const cost = buildingCost(team, k);
+  if (cost < next.cost) useStadiumDiscount(team, bLv(team, k) + 1);
+  pay(team, cost);
   team.buildings[k].build = { to: bLv(team, k) + 1, weeks: next.weeks, total: next.weeks };
   return { ok: true, msg: `${BUILDINGS[k].ko} 증축 착공! (${next.weeks}주)` };
 }
@@ -208,6 +218,7 @@ export function clubEffects(team) {
     else e[eff] += v;
   }
   if (e.roof) e.injury *= 1 - e.roof * 0.04;
+  if (team.region?.perks?.youthField) e.futGrowth *= 1.05;
   // 프런트 부서
   const med = frontLv(team, 'medical'), mkt = frontLv(team, 'marketing');
   e.injury *= 1 - (med - 1) * 0.05; e.heal += (med - 1) * 0.06; e.recovery += (med - 1) * 0.6;

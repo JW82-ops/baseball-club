@@ -34,6 +34,8 @@ import { frontWeekly, REGIONS, evaluateBoard, startBoardSeason, satLabel, draftG
 import { regCount } from './roster.js';
 import { settleCap, updateCapLimit, secondDraftYear, finishSecondDraft, waiverWeek, runAllStar, goldenGloves } from './kborules.js';
 import { rehabWeek, mechProgress, planCondBonus, workloadWeek, settleWinter } from './dev2.js';
+import { ensureRegion, regionWeek, regionSeasonStart, regionSeasonEnd, perkSum } from './region.js';
+import { makeGoals, settleGoals } from './goals.js';
 
 export const CAMP_WEEKS = 6;
 export function weeksInSeason(state) { return Math.ceil(state.schedule.length / GAMES_PER_WEEK); }
@@ -252,6 +254,8 @@ export function weeklyCycle(state, opts = {}) {
   }
   militaryWeek(state, developWeek, ts);
   const user = userTeam(state);
+  ensureRegion(state);
+  for (const n of regionWeek(state, { camp: !!opts.camp })) addNews(state, n.text, n.t);
   for (const d of tickConstruction(user)) {
     addNews(state, `🏗️ ${d.name} 공사 완료! ${d.title}${d.kind === 'b' ? ` (Lv.${d.lv})` : ''}`, 'big');
     report.events.push({ type: 'build', text: `${d.name} 완공` });
@@ -376,7 +380,9 @@ function userFinanceGame(state, sg) {
   const pk = activePromo(state);
   const P = pk ? PROMOS[pk] : null;
   const gateF = 1 + gf.reduce((a, f) => a + f.v, 0) + (P ? P.att : 0);
-  const demand = (4600 + team.fans * 0.12) * winF * priceF * rivalF * diffF * gateF * (0.9 + Math.random() * 0.2);
+  const R = team.region;
+  const localF = 1 + perkSum(team, 'att') + (R ? (R.trust - 20) * 0.0015 : 0);
+  const demand = (4600 + team.fans * 0.12) * winF * priceF * rivalF * diffF * gateF * localF * (0.9 + Math.random() * 0.2);
   const att = Math.round(Math.min(team.capacity, demand));
   const ticket = Math.round(att * team.ticket * (1 + (P?.ticket || 0)));
   const merch = Math.round(att * 0.35 * (1 + eff.merch) * merchMult(state, team) * (1 + (P?.merch || 0)) * LEAGUES[state.league || 'KBO'].ticketMult) + eff.vip;
@@ -402,7 +408,7 @@ function userFinanceWeek(state) {
   const rank = standings(state).findIndex((x) => x.team.id === team.id) + 1;
   const tv = broadcastWeekly(team, rank, LEAGUES[state.league || 'KBO'].ticketMult);
   team.ledger.broadcast = (team.ledger.broadcast || 0) + tv;
-  const upkeep = upkeepWeekly(team);
+  const upkeep = Math.round(upkeepWeekly(team) * (1 - perkSum(team, 'rent')));
   team.ledger.upkeep = (team.ledger.upkeep || 0) + upkeep;
   team.ledger.expense += upkeep;
   team.cash += sponsor + tv - salary - staff - upkeep;
@@ -415,8 +421,8 @@ function userFinanceWeek(state) {
   const wins = recent.filter((r) => r === 'W').length;
   const stars = firstTeam(state, team).filter((p) => calcOvr(p) >= 80).length;
   // 성적·스타·기본 유입. 지는 팀도 급격히 줄진 않도록 비율 기반
-  const fg = 1 + clubEffects(team).fanGrowth;
-  let delta = Math.round((team.fans * (wins - GAMES_PER_WEEK / 2) * 0.012 + stars * 150 + 250) * (wins >= 3 ? fg : 1));
+  const fg = 1 + clubEffects(team).fanGrowth + perkSum(team, 'fan');
+  let delta = Math.round((team.fans * (wins - GAMES_PER_WEEK / 2) * 0.012 + stars * 150 + 250 + (team.region ? team.region.trust * 3 : 0)) * (wins >= 3 ? fg : 1));
   if (delta > 0) delta = Math.round(delta * fanSat(state, team));
   team.fans = Math.max(5000, team.fans + delta);
   clampFans(state, team);
@@ -560,6 +566,11 @@ function endSeason(state) {
     addNews(state, `🏢 모기업 이사회 평가: 만족도 ${bd.sat}점 ${sl[1]} — 목표 ${bd.goals.filter((g) => g.done).length}/${bd.goals.length} 달성`, 'big');
   }
   for (const n of settleSponsorsSeason(state, userRank, state.post.seeds.includes(user.id), champ === user.id)) addNews(state, `🤝 ${n}`, 'info');
+  for (const n of regionSeasonEnd(state, state.post.seeds.includes(user.id))) addNews(state, n, 'big');
+  {
+    const gs = settleGoals(state);
+    if (gs.length) addNews(state, `🎯 선수 시즌 목표: ${gs.filter((g) => g.done).length}/${gs.length} 달성${gs.filter((g) => g.done).length ? ` — ${gs.filter((g) => g.done).map((g) => `${g.name}(${g.text})`).join(', ')}` : ''}`, 'big');
+  }
   for (const n of updateSeasonRecords(state)) addNews(state, n, 'big');
   for (const a of futuresAwards(state)) { const p = state.players[a.pid]; if (p?.team === user.id) addNews(state, `🌱 ${p.name} ${a.award}`, 'big'); }
   const promo = checkPromotionOffer(state);
@@ -844,6 +855,8 @@ export function runCampAndStartSeason(state) {
   state.faComp = [];
   for (const id of state.devPool || []) if (state.players[id]?.amateur) delete state.players[id];
   state.devPool = [];
+  ensureRegion(state);
+  for (const n of regionSeasonStart(state, !!state.history.at(-1)?.post)) addNews(state, n, 'big');
   {
     const sup = startBoardSeason(state);
     if (sup) addNews(state, `🏢 모기업 지원금 ${formatMoney(sup)} 입금. 올 시즌 이사회 목표: ${state.board.goals.map((g) => g.ko).join(', ')}`, 'big');
@@ -860,6 +873,7 @@ export function runCampAndStartSeason(state) {
   genStaffMarket(state);
   offerMissions(state);
   genSponsorOffers(state);
+  makeGoals(state);
   pruneRels(state);
   for (const id in state.players) { const pl = state.players[id]; if (pl.team) { ensureContract(pl); ensureMil(pl); } }
   for (const n of returnFromService(state)) addNews(state, `🎖️ ${n}`, 'big');
