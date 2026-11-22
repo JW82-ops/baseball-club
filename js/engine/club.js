@@ -259,6 +259,7 @@ export function devCtxFor(state, team, p, synergyList = [], eff = null) {
   let base = p.level === 1 ? bInfo(team, 'clubhouse').growth : bInfo(team, 'futures').growth * eff.futGrowth;
   base *= p.level === 1 ? coachMult(staffStat(team, 'manager', 'develop')) : coachMult(staffStat(team, 'futuresMgr', 'develop')) * 1.05;
   if (mgrStyle(team) === 'youth' && p.age <= 24) base *= 1.08;
+  if (state.trait === 'developer') base *= 1.05;
   if (synergyList.includes('youngGuns')) base *= 1.1;
   const mood = p.morale ?? 70;
   base *= 0.85 + (mood / 100) * 0.3;
@@ -301,7 +302,7 @@ export function scoutLevelOf(state, p = null) {
     const origin = p.foreign ? 'foreign' : /고$|고\(/.test(p.origin || '') ? 'highschool' : 'college';
     stat = staffStat(t, 'headScout', origin) * 0.6 + staffStat(t, 'headScout', p.type === 'P' ? 'pitcherEye' : 'batterEye') * 0.4;
   }
-  return clamp(1 + eff.scout + (stat - 40) / 14 + (p ? scoutRegionBonus(state, p) : 0), 1, 8);
+  return clamp(1 + eff.scout + (stat - 40) / 14 + (p ? scoutRegionBonus(state, p) : 0) + (state.trait === 'scout' ? 1 : 0), 1, 8);
 }
 
 export { MANAGER_STYLES };

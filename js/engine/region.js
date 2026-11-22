@@ -14,7 +14,7 @@ export function ensureRegion(state) {
   const t = U(state);
   if (!t.region) {
     const fresh = !state.history.length;
-    t.region = { hype: fresh ? 100 : 20, trust: 20, city: 30, ap: 1, partners: [], acts: {}, petitions: [], perks: {}, grants: [], cool: {} };
+    t.region = { hype: fresh ? 100 : 20, trust: state.trait === 'local' ? 40 : 20, city: 30, ap: 1, partners: [], acts: {}, petitions: [], perks: {}, grants: [], cool: {} };
   }
   const R = t.region;
   R.partners = R.partners || []; R.acts = R.acts || {}; R.petitions = R.petitions || []; R.perks = R.perks || {}; R.grants = R.grants || []; R.cool = R.cool || {};
@@ -268,7 +268,7 @@ export function regionSeasonStart(state, madePost) {
   if (before > 0) out.push(R.hype > 0 ? `✨ 창단 기대감이 ${before} → ${R.hype}로 식었어요. 큰 기업들의 관심도 줄어들어요. 지역과 함께 브랜드를 키워야 해요.` : '✨ 창단 효과가 완전히 끝났어요. 이제부터는 성적과 지역 신뢰가 브랜드예요.');
   const cut = 1 - (R.grantCut || 0);
   R.grantCut = 0;
-  const grant = r100((2500 + R.city * 110 + R.trust * 70) * lgM(state) * cut);
+  const grant = r100((2500 + R.city * 110 + R.trust * 70) * lgM(state) * cut * (state.trait === 'local' ? 1.2 : 1));
   const promo = R.perks.promo ? r100(PETITIONS.promo.perk.pay * lgM(state)) : 0;
   t.cash += grant + promo; t.ledger.income += grant + promo; t.ledger.city = (t.ledger.city || 0) + grant + promo;
   R.grants.push({ season: state.season, v: grant + promo });

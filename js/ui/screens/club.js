@@ -22,6 +22,7 @@ import { franchiseList, userSeasons } from '../../engine/camp.js';
 import { installCard } from '../pwa.js';
 import { tradeOpinions } from '../../engine/clubhouse.js';
 import { RIVAL_STYLES, grudgeLabel } from '../../engine/rivals.js';
+import { scenarioLabel } from '../../engine/scenario.js';
 import { opinionsHtml } from '../components.js';
 import { CHEER_LV, cheerLv, cheerWeekly, songMax, SONG_COST, jerseyRank, TITLES } from '../../engine/fandom.js';
 import { playerImg } from '../portraits.js';
@@ -625,7 +626,7 @@ export function renderClub() {
   const phil = PHILOSOPHIES[t.philosophy];
   const titles = state.history.filter((h) => h.champion === t.id).length;
   const view = ui.clubView || 'map';
-  const head = `<div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2>${TITLES[state.ownerTitle || 'founder'] ? `<button class="otitle" data-act="titleSheet">${TITLES[state.ownerTitle || 'founder'].icon} ${TITLES[state.ownerTitle || 'founder'].ko} <small>칭호 ${(state.titles || ['founder']).length}/${Object.keys(TITLES).length}</small></button>` : ''}<p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>`;
+  const head = `<div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2>${TITLES[state.ownerTitle || 'founder'] ? `<button class="otitle" data-act="titleSheet">${TITLES[state.ownerTitle || 'founder'].icon} ${TITLES[state.ownerTitle || 'founder'].ko} <small>칭호 ${(state.titles || ['founder']).length}/${Object.keys(TITLES).length}</small></button>` : ''}${scenarioLabel(state) ? `<div class="tiny amber">${scenarioLabel(state)}</div>` : ''}<p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>`;
   if (view === 'map') return `<section class="sec">${head}</section>${mapView(t)}`;
   const body = { museum: museumView, biz: bizView, front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, region: regionView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
   return `

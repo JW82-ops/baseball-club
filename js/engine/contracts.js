@@ -102,7 +102,7 @@ export function multiOffer(state, pid, salary, years, opts = {}) {
   const p = state.players[pid];
   const t = state.teams[state.userTeamId];
   if (!it || it.status !== 'pending') return { ok: false, msg: '' };
-  const ratio = (salary * incM(opts)) / it.demand;
+  const ratio = (salary * incM(opts) * (state.trait === 'negotiator' ? 1.05 : 1)) / it.demand;
   const yrFit = it.years ? 1 - Math.abs((years || 1) - it.years) * 0.06 : 1;
   const mood = (p.morale ?? 60) / 100, loyal = (p.loyalty ?? 40) / 100, brand = Math.min(1, brandValue(state) / 200);
   const score = ratio * 0.8 + yrFit * 0.1 + (mood - 0.55) * 0.12 + (loyal - 0.4) * 0.1 + brand * 0.05 - (it.tries || 0) * 0.015;
@@ -187,13 +187,14 @@ export function faMarketOffer(state, pid, salary, years, opts = {}) {
   const p = state.players[pid];
   const t = state.teams[state.userTeamId];
   if (!p || p.market !== 'fa') return { ok: false, msg: '' };
+  if (state.scenario === 'youth' && !state.scenarioDone) return { ok: false, msg: '유망주만으로 시나리오에선 FA 영입이 금지예요' };
   if (regCount(state, t) >= 65) return { ok: false, msg: '구단 정원(65명)이 꽉 찼어요' };
   const ask = p.askSalary || fairSalary(state, p);
   const yrs = p.askYears || 1;
   const comp = 1 + ((p.faTries || 0) * 0.02); // 시간이 지날수록 경쟁 제안이 붙음
   const brand = Math.min(1, brandValue(state) / 200);
   const returning = p.prevTeam === t.id ? ((p.loyalty ?? 40) - 50) / 400 : 0;
-  const score = ((salary * incM(opts)) / ask) * (1 - Math.abs(years - yrs) * 0.05) + brand * 0.06 + returning;
+  const score = ((salary * incM(opts) * (state.trait === 'negotiator' ? 1.05 : 1)) / ask) * (1 - Math.abs(years - yrs) * 0.05) + brand * 0.06 + returning;
   p.faTries = (p.faTries || 0) + 1;
   const fee = Math.round(salary * years * 0.2 / 100) * 100 + (opts.incentive ? Math.round(salary * 0.06 / 100) * 100 : 0);
   if (score >= 0.97 * comp) {
@@ -218,7 +219,7 @@ export function faMarketOffer(state, pid, salary, years, opts = {}) {
 // 협상 미리보기: 지금 조건의 점수와 사인에 필요한 연봉(에이전트 역제안)
 export function negoPreview(state, pid, mode, salary, years, opts = {}) {
   const p = state.players[pid];
-  const inc = incM(opts);
+  const inc = incM(opts) * (state.trait === 'negotiator' ? 1.05 : 1);
   if (mode === 'fa') {
     const ask = p.askSalary || fairSalary(state, p);
     const yrs = p.askYears || 1;

@@ -8,10 +8,11 @@ import { LEAGUES } from '../../data/club.js';
 import { CITY_EMBLEMS } from '../../data/teams.js';
 import { ownerImg, OWNER_COUNT } from '../portraits.js';
 
-export const draft = { city: '서울', name: '피닉스', colorIdx: 0, emblem: 'flame', emblemImg: 'e0', owner: 0, philosophy: 'develop', seasonLength: 72, difficulty: 'normal' };
+export const draft = { city: '서울', name: '피닉스', colorIdx: 0, emblem: 'flame', emblemImg: 'e0', owner: 0, philosophy: 'develop', seasonLength: 72, difficulty: 'normal', scenario: 'normal', trait: 'none' };
 export const title = { creating: false, slot: 1 };
 
 import { installCard } from '../pwa.js';
+import { SCENARIOS, TRAITS, metaUnlocked } from '../../engine/scenario.js';
 export function renderTitle() {
   if (title.creating) return renderCreate();
   const PH = { regular: '정규시즌', post: '포스트시즌', offseason: '오프시즌', contracts: '계약 협상', draft: '드래프트', camp: '스프링캠프' };
@@ -64,6 +65,14 @@ export function renderCreate() {
       <label>난이도</label>
       <div class="seg">${[['easy', '쉬움'], ['normal', '보통'], ['hard', '어려움']].map(([k, l]) => `<button class="${draft.difficulty === k ? 'on' : ''}" data-act="cPick" data-k="difficulty" data-v="${k}">${l}</button>`).join('')}</div>
       <p class="tiny faint mt">${{ easy: '시작 전력 +3, 자금 ×1.3, 수입 ×1.2. AI 구단 투자 소극적.', normal: '기본 밸런스.', hard: '시작 전력 -2, 자금 ×0.8, 수입 ×0.85. AI 구단 투자 적극적.' }[draft.difficulty]}</p>
+    </div>
+    <div class="field">
+      <label>도전 시나리오</label>
+      <div class="phil">${Object.entries(SCENARIOS).map(([k, sc]) => `<button class="${k === draft.scenario ? 'on' : ''}" data-act="cPick" data-k="scenario" data-v="${k}"><b>${sc.icon} ${sc.ko}</b><p>${sc.desc}${sc.goal ? `<br><b class="amber">목표: ${sc.goal}</b>` : ''}${sc.unlock ? `<br><span class="tiny">클리어 보상: 특성 '${TRAITS[sc.unlock].ko}'</span>` : ''}</p></button>`).join('')}</div>
+    </div>
+    <div class="field">
+      <label>구단주 특성</label>
+      <div class="phil">${Object.entries(TRAITS).map(([k, tr]) => { const open = k === 'none' || metaUnlocked().includes(k); return `<button class="${k === draft.trait ? 'on' : ''} ${open ? '' : 'lock'}" ${open ? `data-act="cPick" data-k="trait" data-v="${k}"` : 'disabled'}><b>${open ? tr.icon : '🔒'} ${tr.ko}</b><p>${open ? tr.desc || '특성 없이 시작해요' : `해금: ${tr.from}`}</p></button>`; }).join('')}</div>
     </div>
     <div class="field">
       <label>시즌 길이</label>

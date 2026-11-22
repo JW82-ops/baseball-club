@@ -1382,3 +1382,4 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .storyline .sl-i { width: 24px; height: 24px; border-radius: 50%; background: #1c3a2a; display: grid; place-items: center; font-size: 13px; flex: none; border: 1.5px solid rgba(255,197,61,.5); }
 .storyline b { display: block; font-size: 13px; }
 .storyline small { font-size: 11px; color: var(--muted); }
+.phil button.lock { opacity: .45; }

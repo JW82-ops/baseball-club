@@ -27,6 +27,7 @@ import { upgradeCheer, makeSong } from './engine/fandom.js';
 import { notifCount } from './ui/screens/notify.js';
 import { initPWA, promptInstall } from './ui/pwa.js';
 import { endingHtml } from './ui/screens/ending.js';
+import { applyScenario } from './engine/scenario.js';
 import { renderMail } from './ui/screens/mail.js';
 import { resolveMail, unreadCount } from './engine/mail.js';
 import { signSponsor, cancelSponsor } from './engine/sponsor.js';
@@ -881,6 +882,7 @@ initCreateActions(render, (opts) => {
   wipe();
   title.creating = false;
   const s = createNewGame(opts);
+  applyScenario(s, opts.scenario, opts.trait);
   startGuide(s);
   setState(s);
   ui.tab = 'home';

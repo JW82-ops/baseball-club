@@ -39,6 +39,7 @@ import { makeGoals, settleGoals } from './goals.js';
 import { characterWeek, potentialDrift } from './character.js';
 import { crisisWeek, crisisSeasonStart } from './crisis.js';
 import { lifeWeek, addStory } from './life.js';
+import { scenarioCheck, metaPostUnlock } from './scenario.js';
 import { rivalsWeek, rivalGame, rivalFA, rivalsSeasonEnd } from './rivals.js';
 import { homecomingStory, checkTitles, cheerEff, cheerWeekly } from './fandom.js';
 import { CAMP_LOCS, campGrow, payCamp, finishCampPlan, markHomegrown, checkFranchise } from './camp.js';
@@ -402,7 +403,7 @@ function userFinanceGame(state, sg) {
   const P = pk ? PROMOS[pk] : null;
   const gateF = 1 + gf.reduce((a, f) => a + f.v, 0) + (P ? P.att : 0);
   const R = team.region;
-  const localF = 1 + perkSum(team, 'att') + (R ? (R.trust - 20) * 0.0015 : 0) + cheerEff(team).att;
+  const localF = 1 + perkSum(team, 'att') + (R ? (R.trust - 20) * 0.0015 : 0) + cheerEff(team).att + (state.trait === 'showman' ? 0.08 : 0);
   const demand = (4600 + team.fans * 0.12) * winF * priceF * rivalF * diffF * gateF * localF * (0.9 + Math.random() * 0.2);
   const att = Math.round(Math.min(team.capacity, demand));
   const ticket = Math.round(att * team.ticket * (1 + (P?.ticket || 0)));
@@ -565,11 +566,13 @@ function endSeason(state) {
     stars: userSeasonStars(state, user),
   });
   const userRank = state.finalStandings.indexOf(user.id) + 1;
+  metaPostUnlock(state);
+  { const e = scenarioCheck(state); if (e) addNews(state, e.kind === 'clear' ? `🏆 시나리오 클리어! ${e.text}` : `⌛ 시나리오 실패: ${e.text}`, e.kind === 'clear' ? 'big' : 'bad'); }
   {
-    // 모기업 환수: 쌓아 둔 돈이 너무 많으면 일부를 모기업이 가져가요
+    // 모기업 환수: 쌓아 둔 돈이 너무 많으면 일부를 모기업이 가져가요 (빚더미 시나리오 진행 중엔 안 가져가요)
     const payroll = teamPlayers(state, user).reduce((a, p) => a + p.salary, 0);
     const keep = Math.max(300000, payroll * 1.5);
-    if (user.cash > keep) {
+    if (user.cash > keep && !(state.scenario === 'debt' && !state.scenarioDone)) {
       const take = Math.round((user.cash - keep) * 0.5 / 100) * 100;
       user.cash -= take;
       user.ledger.dividend = (user.ledger.dividend || 0) + take;
@@ -911,6 +914,7 @@ export function runCampAndStartSeason(state) {
   {
     const sup = startBoardSeason(state);
     if (sup) addNews(state, `🏢 모기업 지원금 ${formatMoney(sup)} 입금. 올 시즌 이사회 목표: ${state.board.goals.map((g) => g.ko).join(', ')}`, 'big');
+    if (state.cheapClub && sup) { const half = Math.round(sup / 2 / 100) * 100; user.cash -= half; user.ledger.income -= half; addNews(state, `🪙 저예산 구단: 모기업 지원금이 절반(${formatMoney(half)} 적게)만 나왔어요`, 'info'); }
     const cn = crisisSeasonStart(state, sup);
     if (cn) addNews(state, cn, 'bad');
   }
