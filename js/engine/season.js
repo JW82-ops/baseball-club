@@ -42,6 +42,7 @@ import { lifeWeek, addStory } from './life.js';
 import { scenarioCheck, metaPostUnlock } from './scenario.js';
 import { dexSeasonEnd, teamBalls, dexUpdate } from './collect.js';
 import { snapshotOvr, recordMoment, buildRecap } from './recap.js';
+import { finishTrip } from './trips.js';
 import { rivalsWeek, rivalGame, rivalFA, rivalsSeasonEnd } from './rivals.js';
 import { homecomingStory, checkTitles, cheerEff, cheerWeekly } from './fandom.js';
 import { CAMP_LOCS, campGrow, payCamp, finishCampPlan, markHomegrown, checkFranchise } from './camp.js';
@@ -279,6 +280,7 @@ export function weeklyCycle(state, opts = {}) {
   for (const n of injuryWeek(state)) addNews(state, n.text, n.t);
   if (!opts.camp) for (const n of rivalsWeek(state)) addNews(state, n.text, n.t);
   for (const n of crisisWeek(state)) addNews(state, n.text, n.t);
+  { const n = finishTrip(state); if (n) addNews(state, n, 'big'); }
   if (!opts.camp) for (const n of lifeWeek(state)) addNews(state, n.text, n.t);
   if (!opts.camp) { for (const n of deadlineWeek(state)) addNews(state, n.text, n.t); if (state.phase === 'regular' && state.day < state.schedule.length) makeMeeting(state); }
   for (const d of tickConstruction(user)) {
@@ -295,6 +297,8 @@ export function weeklyCycle(state, opts = {}) {
     for (const n of workloadWeek(user, teamPlayers(state, user).filter((p) => p.type === 'P'))) addNews(state, n, 'bad');
     if (state.phase === 'regular' && state.day >= Math.floor(state.schedule.length * 0.5) && state.allStar?.season !== state.season) {
       const as = runAllStar(state);
+      state.derby = { season: state.season, done: false };
+      addNews(state, '⭐ 올스타 홈런더비에 우리 구단도 초대됐어요! 홈 화면에서 참가하세요', 'big');
       addNews(state, `⭐ ${state.season} 올스타전: ${as.sides[0].name} ${as.score[0]} : ${as.score[1]} ${as.sides[1].name} — MVP ${state.players[as.mvp]?.name || ''}${as.mine.length ? ` · 우리 구단 ${as.mine.length}명 출전` : ''}`, 'big');
     }
     userFinanceWeek(state);
@@ -776,7 +780,8 @@ function setupDraft(state) {
     pool.push(p.id);
   }
   // 스카우트 리포트로 찾은 숨은 진주 (유저에게만 ⭐ 표시)
-  const gems = draftGemCount(state);
+  const gems = draftGemCount(state) + (state.tripGems || 0);
+  state.tripGems = 0;
   const cand = pool.map((id) => state.players[id]).filter((p) => !p.scoutPick).sort(() => rng() - 0.5);
   for (let i = 0; i < gems && i < cand.length; i++) {
     const p = cand[i];
@@ -830,7 +835,7 @@ export function aiDraftChoice(state, tid) {
   let best = null, bestV = -1;
   for (const pid of d.pool) {
     const p = state.players[pid];
-    const v = potOvr(p) * 0.75 + calcOvr(p) * 0.25 + (p.potNoise || 0) * 4 + gauss(0, 2.5);
+    const v = potOvr(p) * 0.75 + calcOvr(p) * 0.25 + (p.potNoise || 0) * 4 + gauss(0, 2.5) - (p.scoutPick ? 7 : 0); // 우리만 아는 보석은 다른 구단 눈에 덜 띄어요
     if (v > bestV) { bestV = v; best = pid; }
   }
   return best;
@@ -863,6 +868,7 @@ export function finishDraft(state) {
 
 // ───────── 스프링캠프 → 새 시즌 ─────────
 export function runCampAndStartSeason(state) {
+  { const n = finishTrip(state, true); if (n) addNews(state, n, 'big'); }
   settleFA(state, assignNumber);
   { const n = closeOffReq(state, 'faSign'); if (n) addNews(state, n, n.includes('해결') ? 'good' : 'bad'); }
   if (state.pendingPromotion) promote(state, state.pendingPromotion);

@@ -3,6 +3,7 @@ import { makeGoals, goalStatus, backGoal } from '../../engine/goals.js';
 import { CAMP_LOCS, CAMP_THEMES, campPlan, campCost } from '../../engine/camp.js';
 import { CRISES, crisisProgress, strikeCount } from '../../engine/crisis.js';
 import '../screens/recap.js';
+import { derbyOpen } from './derby.js';
 import { answerMeeting, meetingPending, deadlineLeft } from '../../engine/clubhouse.js';
 import { ui, rerender } from '../ui-state.js';
 import { artBg, artHero, stadiumArt, esc, emblem, gradeTag, avatar, posShort, potTag } from '../components.js';
@@ -235,6 +236,7 @@ function coachLine(sg) {
   if (gs) return { act: 'guideGo', html: `<span class="gprog">📘 가이드 ${state.guide.step + 1}/${GUIDE.length} · ${gs.title}</span>${gs.text}`, cta: gs.cta, guide: true };
   const mails = (state.inbox || []).filter((m) => !m.resolved).length;
   if (mails) return { act: 'tab', tab: 'mail', html: `✉️ 답장을 기다리는 메일이 <b>${mails}통</b> 있어요.`, cta: '메일함 열기' };
+  if (derbyOpen() && state.phase === 'regular') return { act: 'openDerby', html: '⭐ <b>올스타 홈런더비</b>에 초대됐어요! 우리 거포를 내보내 직접 쳐 보세요.', cta: '홈런더비 참가' };
   if (state.crisis) { const C = CRISES[state.crisis.kind]; const pr = crisisProgress(state); return { act: 'lobbyBrief3', html: `🚨 <b>${C.icon} ${C.ko}</b> — ${Math.max(0, state.crisis.due - (state.season * 100 + Math.floor(state.day / 6)))}주 남았어요. ${pr.text}`, cta: '위기 상황 보기' }; }
   { const dl = deadlineLeft(state); if (state.dl?.opened && !state.dl.closed && dl > 0) return { act: 'tab', tab: 'mail', html: `📅 <b>트레이드 마감 D-${dl}</b>! 제안이 몰려 있어요. 사든 팔든 지금 결정해야 해요.`, cta: '메일함에서 제안 보기' }; }
   if (meetingPending(state) && state.phase === 'regular') return { act: 'lobbyBrief2', html: `🗣️ 코치진이 이번 주 <b>건의 ${meetingPending(state)}건</b>을 올렸어요.`, cta: '코치 회의 보기' };

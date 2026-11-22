@@ -24,6 +24,7 @@ import { tradeOpinions } from '../../engine/clubhouse.js';
 import { RIVAL_STYLES, grudgeLabel } from '../../engine/rivals.js';
 import { scenarioLabel } from '../../engine/scenario.js';
 import { RARITY } from '../../engine/collect.js';
+import { TRIPS, tripCost } from '../../engine/trips.js';
 import { opinionsHtml } from '../components.js';
 import { CHEER_LV, cheerLv, cheerWeekly, songMax, SONG_COST, jerseyRank, TITLES } from '../../engine/fandom.js';
 import { playerImg } from '../portraits.js';
@@ -438,14 +439,20 @@ function marketRow(p, t, isFA) {
   const price = isFA ? `요구 ${formatMoney(p.askSalary || p.salary)}` : formatMoney(signingFee(p));
   return `<button class="prow" data-act="${isFA ? 'faSheet' : 'openPlayer'}" data-pid="${p.id}">
     ${avatar(p, '#5f6f66', 38)}
-    <div class="grow"><div class="nm">${esc(p.name)} <span class="tiny">${flagOf(p)}</span>${p.scoutPick ? ' <span class="gem">⭐ 리포트</span>' : ''}${p.rivalBid ? ` <span class="chip bad" style="font-size:10px">⚔️ ${esc(state.teams[p.rivalBid]?.short || '')} 경쟁</span>` : ''}</div><div class="meta">${posShort(p)} · ${p.age}세 · ${esc(p.origin)}${isFA && p.prevTeam ? ` · 전 ${esc(state.teams[p.prevTeam]?.short || '')}` : ` · 연봉 ${formatMoney(p.salary)}`}</div></div>
+    <div class="grow"><div class="nm">${esc(p.name)} <span class="tiny">${flagOf(p)}</span>${p.scoutPick ? ' <span class="gem">⭐ 리포트</span>' : ''}${p.tripFind ? ' <span class="gem">🧳 원정 발굴</span>' : ''}${p.rivalBid ? ` <span class="chip bad" style="font-size:10px">⚔️ ${esc(state.teams[p.rivalBid]?.short || '')} 경쟁</span>` : ''}</div><div class="meta">${posShort(p)} · ${p.age}세 · ${esc(p.origin)}${isFA && p.prevTeam ? ` · 전 ${esc(state.teams[p.prevTeam]?.short || '')}` : ` · 연봉 ${formatMoney(p.salary)}`}</div></div>
     <div class="right">${gradeTag(calcOvr(p))}<span class="small amber">${price}</span></div>
   </button>`;
+}
+function tripPanel() {
+  const tr = state.trip;
+  if (tr) { const T = TRIPS[tr.k]; const left = Math.max(0, tr.due - weekAbs(state)); return `<div class="panel trip-now"><b>🧳 ${T.icon} ${T.ko}</b> <span class="tiny muted">원정 중 · ${tr.off ? '캠프 시작 때 귀국' : `${left}주 뒤 귀국`}</span><p class="tiny muted mt">${T.desc}</p></div>`; }
+  return `<div class="sec-h"><h2>🧳 스카우트 원정</h2><span class="sub">스카우트 실력이 좋을수록 많이 찾아요</span></div>
+    <div class="campopts">${Object.entries(TRIPS).map(([k, T]) => `<button class="campopt" data-act="tripGo" data-k="${k}"><b>${T.icon} ${T.ko}</b><small>${T.desc}</small><em>${formatMoney(tripCost(state, k))} · ${T.weeks}주</em></button>`).join('')}</div>`;
 }
 function marketView(t) {
   const fp = (state.foreignPool || []).map((id) => state.players[id]).filter((p) => p && !p.team);
   const fa = (state.faPool || []).map((id) => state.players[id]).filter((p) => p && !p.team);
-  return `
+  return `${tripPanel()}<div class="mt-l"></div>
     <div class="sec-h"><h2>FA 시장</h2><span class="sub">${fa.length ? `${fa.length}명` : '오프시즌에 열려요'}</span></div>
     ${fa.length ? `<p class="tiny faint">연봉과 계약 기간을 제시해 협상해요. 4번 거절당하면 다른 구단으로 가요. 캠프가 시작되면 남은 FA는 다른 구단과 계약해요.</p><div class="panel plist mt">${fa.sort((a, b) => calcOvr(b) - calcOvr(a)).map((p) => marketRow(p, t, true)).join('')}</div>` : '<div class="panel empty">시즌이 끝나고 계약 협상이 마감되면 FA 선수들이 시장에 나와요.</div>'}
     <div class="sec-h mt-l"><h2>외국인 선수</h2><span class="sub">보유 ${foreignCount(state, t)}/${foreignMax(state)}${newClubPerk(state) ? ' · 신생팀 +1' : ''}</span></div>

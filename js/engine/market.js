@@ -48,15 +48,17 @@ export function genForeignPool(state) {
   }
   if (state.scout) decayScout(state, ['lat', 'us', 'asia'], 0.6);
   // 이전 풀 정리
-  for (const id of state.foreignPool || []) if (state.players[id] && !state.players[id].team) delete state.players[id];
-  state.foreignPool = pool;
+  // 스카우트 원정에서 찾은 선수는 다음 시장에도 남겨요
+  const keep = (state.foreignPool || []).filter((id) => state.players[id]?.tripFind && !state.players[id].team);
+  for (const id of state.foreignPool || []) if (state.players[id] && !state.players[id].team && !keep.includes(id)) delete state.players[id];
+  state.foreignPool = [...pool, ...keep];
 }
 
 export function foreignSalary(p) {
   return Math.round((60000 + Math.max(0, calcOvr(p) - 70) * 9000) / 1000) * 1000;
 }
 export function signingFee(p) {
-  return Math.round((p.market === 'fa' ? p.salary * 0.6 : p.salary * 0.25) / 100) * 100;
+  return Math.round((p.market === 'fa' ? p.salary * 0.6 : p.salary * 0.25 * (p.feeDisc || 1)) / 100) * 100;
 }
 
 export function canSign(state, team, p) {

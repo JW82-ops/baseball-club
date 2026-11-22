@@ -29,6 +29,7 @@ import { initPWA, promptInstall } from './ui/pwa.js';
 import { endingHtml } from './ui/screens/ending.js';
 import { applyScenario } from './engine/scenario.js';
 import { snapshotOvr } from './engine/recap.js';
+import { startTrip } from './engine/trips.js';
 import { recapHtml } from './ui/screens/recap.js';
 import { renderMail } from './ui/screens/mail.js';
 import { resolveMail, unreadCount } from './engine/mail.js';
@@ -451,6 +452,7 @@ registerActions({
   upgradeCheer: () => { const err = upgradeCheer(state); if (err) return toast(err, 'bad'); sfx.coin?.(); commit('📣 응원단을 키웠어요!', 'good'); },
   makeSong: (d) => { const r = makeSong(state, d.pid); if (r.msg) commit(r.msg, r.ok ? 'good' : 'bad'); },
   pwaInstall: async () => { const ok = await promptInstall(); toast(ok ? '홈 화면에 설치됐어요! 📲' : '설치를 취소했어요', ok ? 'good' : 'info'); render(); },
+  tripGo: (d) => { const r = startTrip(state, d.k); if (!r.ok) return toast(r.msg, 'bad'); sfx.coin?.(); commit(r.msg, 'good'); },
   dexF: (d) => { ui.dexF = d.v; render(); },
   titleSheet: () => openModal(titleSheetHtml(), { sheet: true }),
   setTitle: (d) => { state.ownerTitle = d.k; save(); closeModal(); render(); },
