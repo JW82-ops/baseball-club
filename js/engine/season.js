@@ -37,6 +37,7 @@ import { rehabWeek, mechProgress, planCondBonus, workloadWeek, settleWinter } fr
 import { ensureRegion, regionWeek, regionSeasonStart, regionSeasonEnd, perkSum } from './region.js';
 import { makeGoals, settleGoals } from './goals.js';
 import { characterWeek, potentialDrift } from './character.js';
+import { homecomingStory, checkTitles, cheerEff, cheerWeekly } from './fandom.js';
 import { CAMP_LOCS, campGrow, payCamp, finishCampPlan, markHomegrown, checkFranchise } from './camp.js';
 import { mentorWeek, injuryWeek, deadlineWeek, makeMeeting } from './clubhouse.js';
 import { managerWeek, managerOffseason, managerContractEnd, offseasonReq, closeOffReq } from './manager.js';
@@ -152,6 +153,7 @@ function userGameStory(state, g, sg) {
   snsAfterGame(state, g, sg, star);
   queueInterview(state, g, sg, star);
   trackRivalry(state, g, sg);
+  homecomingStory(state, g, sg);
   rookieDebut(state, g);
   checkMilestones(state, [...side.lineup.map((l) => l.pid), ...side.used]);
   for (const f of g.formChanges || []) {
@@ -303,6 +305,7 @@ export function weeklyCycle(state, opts = {}) {
     } else state.missionOffers = [];
   }
   fillUserFirstTeam(state);
+  for (const n of checkTitles(state)) addNews(state, n, 'big');
   for (const a of checkAchievements(state)) { addNews(state, `🏆 업적 달성: ${a.icon} ${a.ko}`, 'big'); (state.newAchv = state.newAchv || []).push(a.id); }
   report.risers.sort((a, b) => (b.after - b.before) - (a.after - a.before));
   state.weekLog = report;
@@ -392,7 +395,7 @@ function userFinanceGame(state, sg) {
   const P = pk ? PROMOS[pk] : null;
   const gateF = 1 + gf.reduce((a, f) => a + f.v, 0) + (P ? P.att : 0);
   const R = team.region;
-  const localF = 1 + perkSum(team, 'att') + (R ? (R.trust - 20) * 0.0015 : 0);
+  const localF = 1 + perkSum(team, 'att') + (R ? (R.trust - 20) * 0.0015 : 0) + cheerEff(team).att;
   const demand = (4600 + team.fans * 0.12) * winF * priceF * rivalF * diffF * gateF * localF * (0.9 + Math.random() * 0.2);
   const att = Math.round(Math.min(team.capacity, demand));
   const ticket = Math.round(att * team.ticket * (1 + (P?.ticket || 0)));
@@ -419,7 +422,7 @@ function userFinanceWeek(state) {
   const rank = standings(state).findIndex((x) => x.team.id === team.id) + 1;
   const tv = broadcastWeekly(team, rank, LEAGUES[state.league || 'KBO'].ticketMult);
   team.ledger.broadcast = (team.ledger.broadcast || 0) + tv;
-  const upkeep = Math.round(upkeepWeekly(team) * (1 - perkSum(team, 'rent')));
+  const upkeep = Math.round(upkeepWeekly(team) * (1 - perkSum(team, 'rent'))) + cheerWeekly(state, team);
   team.ledger.upkeep = (team.ledger.upkeep || 0) + upkeep;
   team.ledger.expense += upkeep;
   team.cash += sponsor + tv - salary - staff - upkeep;
@@ -578,6 +581,12 @@ function endSeason(state) {
   }
   for (const n of settleSponsorsSeason(state, userRank, state.post.seeds.includes(user.id), champ === user.id)) addNews(state, `🤝 ${n}`, 'info');
   for (const n of regionSeasonEnd(state, state.post.seeds.includes(user.id))) addNews(state, n, 'big');
+  if (state.openPledge?.season === state.season) {
+    const pg = state.openPledge;
+    if (pg.goal === 'title' && champ !== user.id) { user.fans = Math.max(5000, user.fans - 2500); addNews(state, '🎤 개막 때 "우승"을 외쳤지만 지키지 못했어요. 팬들이 실망했어요', 'bad'); }
+    else if (pg.goal === 'post' && !state.post.seeds.includes(user.id)) { user.fans = Math.max(5000, user.fans - 1000); addNews(state, '🎤 약속한 가을야구에 실패했어요', 'bad'); }
+    else addNews(state, '🎤 개막 때 내건 목표를 지켰어요! 팬들의 믿음이 커졌어요', 'good');
+  }
   {
     const gs = settleGoals(state);
     if (gs.length) addNews(state, `🎯 선수 시즌 목표: ${gs.filter((g) => g.done).length}/${gs.length} 달성${gs.filter((g) => g.done).length ? ` — ${gs.filter((g) => g.done).map((g) => `${g.name}(${g.text})`).join(', ')}` : ''}`, 'big');
@@ -697,7 +706,7 @@ function retirePlayer(state, p) {
   const team = state.teams[p.team];
   if (team) team.roster = team.roster.filter((x) => x !== p.id);
   const car = careerTotals(p);
-  const entry = { id: p.id, name: p.name, type: p.type, pos: p.pos, num: p.num, nat: p.nat, eth: p.eth, foreign: p.foreign, retiredSeason: state.season, quote: p.age >= 37 ? '야구 덕분에 행복했습니다. 이제 팬으로 돌아갈게요.' : '몸은 떠나도 마음은 늘 이 팀에 있을 거예요.', lastTeam: team?.name, age: p.age, peak: Math.max(...p.dev, calcOvr(p)), awards: p.awards, car, wasUser: p.team === state.userTeamId, userSeasons: p.history.filter((h) => h.t === state.userTeamId).length, origin: p.origin, draft: p.draft };
+  const entry = { id: p.id, name: p.name, type: p.type, pos: p.pos, num: p.num, nat: p.nat, eth: p.eth, foreign: p.foreign, retiredSeason: state.season, quote: p.age >= 37 ? '야구 덕분에 행복했습니다. 이제 팬으로 돌아갈게요.' : '몸은 떠나도 마음은 늘 이 팀에 있을 거예요.', lastTeam: team?.name, age: p.age, peak: Math.max(...p.dev, calcOvr(p)), awards: p.awards, car, wasUser: p.team === state.userTeamId, userSeasons: p.history.filter((h) => h.t === state.userTeamId).length, origin: p.origin, draft: p.draft, franchise: p.franchise || null, founder: !!p.founder };
   state.retired.push(entry);
   considerHof(state, entry);
   if (state.retired.length > 400) state.retired.shift();

@@ -22,7 +22,8 @@ import { velocityKmh, batLine, pitLine } from './engine/player.js';
 import { fmtAvg, fmtEra } from './core/util.js';
 import { isClutch, clutchOptions, clutchSituation } from './engine/clutch.js';
 import { upgradeBuilding, buildSub, hireStaff, fireStaff, bNext } from './engine/club.js';
-import { slotSheetHtml, subSheetHtml, staffMarketHtml, petitionSheetHtml } from './ui/screens/club.js';
+import { slotSheetHtml, subSheetHtml, staffMarketHtml, petitionSheetHtml, titleSheetHtml } from './ui/screens/club.js';
+import { upgradeCheer, makeSong } from './engine/fandom.js';
 import { renderMail } from './ui/screens/mail.js';
 import { resolveMail, unreadCount } from './engine/mail.js';
 import { signSponsor, cancelSponsor } from './engine/sponsor.js';
@@ -435,6 +436,10 @@ registerActions({
     if (r.ok) { sfx.levelup(); closeModal(); commit(r.msg, 'good'); return; }
     toast(r.msg, r.refused ? 'bad' : 'info'); save(); openModal(staffMarketHtml('manager'), { keepScroll: true });
   },
+  upgradeCheer: () => { const err = upgradeCheer(state); if (err) return toast(err, 'bad'); sfx.coin?.(); commit('📣 응원단을 키웠어요!', 'good'); },
+  makeSong: (d) => { const r = makeSong(state, d.pid); if (r.msg) commit(r.msg, r.ok ? 'good' : 'bad'); },
+  titleSheet: () => openModal(titleSheetHtml(), { sheet: true }),
+  setTitle: (d) => { state.ownerTitle = d.k; save(); closeModal(); render(); },
   mgrTalk: (d) => { const r = talkMgr(state, d.k); commit(r.msg, r.ok ? 'good' : 'bad'); },
   mgrFire: () => { const m = userTeam(state).staff.manager; if (!m) return; confirmBox(`${m.name} 감독을 해임할까요? 남은 계약에 대한 위약금 ${formatMoney(buyout(m))}을 내야 하고, 감독을 자주 바꾸면 다음 후보들이 꺼려요.`, '해임', () => { const pen = fireManager(state); commit(`감독 해임 (위약금 ${formatMoney(pen)})`, 'bad'); }, 'danger'); },
   signSponsor: (d) => { const r = signSponsor(state, d.id); if (r.ok) sfx.coin(); commit(r.msg, r.ok ? 'good' : 'bad'); },

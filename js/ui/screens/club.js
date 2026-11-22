@@ -19,6 +19,7 @@ import { avatar as av } from '../components.js';
 import { sponsorLogo } from '../../data/brandArt.js';
 import { recordsView } from './league.js';
 import { franchiseList, userSeasons } from '../../engine/camp.js';
+import { CHEER_LV, cheerLv, cheerWeekly, songMax, SONG_COST, jerseyRank, TITLES } from '../../engine/fandom.js';
 import { playerImg } from '../portraits.js';
 import { ensureRegion, ACTS, actState, apMax, partnerMax, partnerWeekly, PETITIONS, petitionState, petitionOdds, electionYear, PRESS_COST } from '../../engine/region.js';
 import { weekAbs } from '../../engine/mail.js';
@@ -95,6 +96,13 @@ function bizView(t) {
     <div class="panel"><p class="small"><b>${MERCH_LV[lv - 1].ko}</b> <span class="tiny muted">(${lv}/${MERCH_LV.length}단계)</span></p>
       <p class="tiny muted">스타 선수(OVR 75+)가 많을수록 유니폼이 잘 팔려요.</p>
       ${next ? `<button class="btn sm primary block mt" data-act="upgradeMerch">${esc(next.ko)}로 확장 · ${formatMoney(next.cost)}</button>` : '<p class="small good mt">최고 단계예요</p>'}</div>
+    <div class="sec-h mt-l"><h2>📣 응원 문화</h2><span class="sub">관중 +${(cheerLv(t) - 1) * 3}% · 홈 어드밴티지↑</span></div>
+    <div class="panel"><p class="small"><b>${CHEER_LV[cheerLv(t) - 1].ko}</b> <span class="tiny muted">(${cheerLv(t)}/${CHEER_LV.length}단계${cheerWeekly(state, t) ? ` · 주 ${formatMoney(cheerWeekly(state, t))}` : ''})</span></p>
+      <p class="tiny muted">응원단이 클수록 관중·팬 증가·홈 경기력이 오르고, 응원가를 더 많이 만들 수 있어요.</p>
+      ${CHEER_LV[cheerLv(t)] ? `<button class="btn sm primary block mt" data-act="upgradeCheer">${esc(CHEER_LV[cheerLv(t)].ko)} · ${formatMoney(Math.round(CHEER_LV[cheerLv(t)].cost * LEAGUES[state.league || 'KBO'].ticketMult / 100) * 100)}</button>` : '<p class="small good mt">최고 단계예요</p>'}</div>
+    <div class="sec-h mt-l"><h2>👕 유니폼 판매 순위</h2><span class="sub">응원가 ${teamPlayers(state, t).filter((p) => p.song).length}/${songMax(t)}</span></div>
+    <div class="panel plist">${jerseyRank(state).map(({ p, v }, i) => `<div class="prow"><b class="jr-n">${i + 1}</b>${avatar(p, t.color, 36)}<button class="grow" style="text-align:left" data-act="openPlayer" data-pid="${p.id}"><div class="nm">${esc(p.name)} ${p.num != null ? `<span class="tiny muted">#${p.num}</span>` : ''}${p.song ? ' 🎵' : ''}${p.franchise ? ' ⭐' : ''}</div><div class="meta">인기 ${v}</div></button>${p.song ? '<span class="tiny good">응원가 있음</span>' : `<button class="btn sm" data-act="makeSong" data-pid="${p.id}">🎵 응원가 ${formatMoney(Math.round(SONG_COST * LEAGUES[state.league || 'KBO'].ticketMult / 100) * 100)}</button>`}</div>`).join('')}</div>
+    <p class="tiny faint mt">인기는 성적·프랜차이즈·응원가·나이로 정해져요. 응원가가 있는 선수는 기분이 오르고 올스타 팬 투표에서도 유리해요.</p>
     <div class="sec-h mt-l"><h2>이번 시즌 수익</h2></div>
     <div class="panel"><div class="kv" style="margin-top:0">
       <div><span>입장 수입</span><b>${formatMoney(L.ticket)}</b></div><div><span>굿즈·식음</span><b>${formatMoney(L.merch)}</b></div>
@@ -378,6 +386,11 @@ function regionView(t) {
 
     ${R.grants.length ? `<div class="sec-h mt-l"><h2>시 지원금 기록</h2></div><div class="panel"><div class="kv" style="margin-top:0">${R.grants.slice(-5).reverse().map((g) => `<div><span>${g.season} 시즌</span><b>${formatMoney(g.v)}</b></div>`).join('')}</div></div>` : ''}`;
 }
+export function titleSheetHtml() {
+  const have = state.titles || ['founder'];
+  return `<h2 class="disp" style="font-size:20px">🎖️ 구단주 칭호</h2><p class="small muted">구단을 운영하며 얻은 칭호예요. 하나를 골라 달 수 있어요.</p>
+    <div class="titles mt">${Object.entries(TITLES).map(([k, T]) => { const on = have.includes(k); return `<button class="ttl ${on ? '' : 'lock'} ${state.ownerTitle === k ? 'cur' : ''}" ${on ? `data-act="setTitle" data-k="${k}"` : 'disabled'}><span>${on ? T.icon : '🔒'}</span><b>${T.ko}</b><small>${T.desc}</small></button>`; }).join('')}</div>`;
+}
 export function petitionSheetHtml(k) {
   const P = PETITIONS[k];
   const R = ensureRegion(state);
@@ -606,7 +619,7 @@ export function renderClub() {
   const phil = PHILOSOPHIES[t.philosophy];
   const titles = state.history.filter((h) => h.champion === t.id).length;
   const view = ui.clubView || 'map';
-  const head = `<div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>`;
+  const head = `<div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2>${TITLES[state.ownerTitle || 'founder'] ? `<button class="otitle" data-act="titleSheet">${TITLES[state.ownerTitle || 'founder'].icon} ${TITLES[state.ownerTitle || 'founder'].ko} <small>칭호 ${(state.titles || ['founder']).length}/${Object.keys(TITLES).length}</small></button>` : ''}<p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>`;
   if (view === 'map') return `<section class="sec">${head}</section>${mapView(t)}`;
   const body = { museum: museumView, biz: bizView, front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, region: regionView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
   return `

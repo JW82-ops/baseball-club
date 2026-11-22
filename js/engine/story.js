@@ -201,6 +201,26 @@ export function pressTriggers(state, push) {
     state.pressFlags[key('first')] = 1;
     q = { kind: 'press', press: 'first', subject: '선두 등극 인터뷰', body: `"드디어 1위로 올라섰습니다. 창단 ${state.history.length + 1}년차에 이뤄낸 성과인데요, 비결이 뭘까요?"`, choices: [{ label: '"육성 시스템의 결실입니다"', sub: '24세 이하 기분 +6' }, { label: '"구단의 투자 덕분입니다"', sub: '팬 +, 스폰서 브랜드 +' }, { label: '"아직 시즌은 깁니다"', sub: '기분 +2' }] };
   }
+  if (!q) {
+    // 개막 미디어데이
+    if (state.day <= 3 && !state.pressFlags[key('open')]) {
+      state.pressFlags[key('open')] = 1;
+      q = { kind: 'press', press: 'open', subject: '개막 미디어데이: 올 시즌 목표는?', body: `"${state.history.length ? `지난 시즌 ${state.history.at(-1).userRank}위` : '창단 첫 시즌'}이었는데요. 올해 목표를 말씀해 주세요."`, choices: [{ label: '"우승입니다"', sub: '팬 ++ · 못 하면 이사회·팬 실망 커짐' }, { label: '"가을야구가 목표입니다"', sub: '현실적인 목표 · 팬 +' }, { label: '"젊은 선수들을 키우는 해입니다"', sub: '유망주 기분 + · 팬 기대 ↓' }] };
+    }
+    // 큰 트레이드 직후
+    const tl = (state.tradeLog || []).at(-1);
+    if (!q && tl && tl.season === state.season && state.day - tl.day <= 3 && !state.pressFlags[key(`tr${tl.day}`)] && Math.max(tl.giveOvr, tl.getOvr) >= 68) {
+      state.pressFlags[key(`tr${tl.day}`)] = 1;
+      q = { kind: 'press', press: 'trade', subject: '트레이드 배경을 설명해 주세요', body: `"이번 트레이드를 두고 팬들 반응이 엇갈립니다. 어떤 계산이 있었나요?"`, choices: [{ label: '"지금 우승하려는 승부수입니다"', sub: '1군 기분 + · 팬 기대 ↑' }, { label: '"미래를 위한 선택입니다"', sub: '유망주 기분 + · 팬 일부 실망' }, { label: '"떠난 선수에게 고맙다는 말을 전합니다"', sub: '선수단 신뢰 + · 여론 무난' }] };
+    }
+    // 선수 사건 직후
+    const inc = (state.inbox || []).find((m) => m.kind === 'incident' && m.season === state.season && m.week >= (state.season * 100 + Math.floor(state.day / 6)) - 1 && !state.pressFlags[key(`inc${m.id}`)]);
+    if (!q && inc) {
+      state.pressFlags[key(`inc${inc.id}`)] = 1;
+      const pn = state.players[inc.from]?.name || '선수';
+      q = { kind: 'press', press: 'scandal', data: { pid: inc.from }, subject: `${pn} 논란, 구단 입장은?`, body: `"${pn} 선수의 최근 논란에 대해 구단의 공식 입장을 듣고 싶습니다."`, choices: [{ label: '"엄중히 책임을 묻겠습니다"', sub: '여론 + · 해당 선수 기분 -' }, { label: '"선수를 보호하겠습니다"', sub: '선수 기분 + · 여론 -' }, { label: '"사실 확인 중입니다"', sub: '무난 · 아무 변화 없음' }] };
+    }
+  }
   if (q) push({ from: null, fromName: '야구 기자단', ...q });
   return q;
 }
@@ -224,6 +244,20 @@ export function resolvePress(state, m, idx) {
       if (idx === 0) { each(all.filter((p) => p.age <= 24), 6, '육성 철학 인정'); return '젊은 선수들의 사기가 올랐어요.'; }
       if (idx === 1) { t.fans += 1500; return '구단 투자에 대한 긍정적 기사가 쏟아져요.'; }
       each(all, 2, '방심 금지'); return '선수단이 고삐를 조였어요.';
+    case 'open':
+      if (idx === 0) { t.fans += 2000; state.openPledge = { season: state.season, goal: 'title' }; return '"우승" 선언에 팬들이 들떴어요. 이제 결과로 보여줘야 해요.'; }
+      if (idx === 1) { t.fans += 800; state.openPledge = { season: state.season, goal: 'post' }; return '현실적인 목표라는 반응이에요.'; }
+      each(all.filter((p) => p.age <= 24), 5, '키워주겠다는 약속'); return '젊은 선수들이 기대에 부풀었어요.';
+    case 'trade':
+      if (idx === 0) { each(fl, 3, '승부수'); t.fans += 600; return '승부수라는 말에 선수단이 결의를 다졌어요.'; }
+      if (idx === 1) { each(all.filter((p) => p.age <= 24), 4, '미래를 본다'); t.fans = Math.max(5000, t.fans - 400); return '유망주들은 힘을 얻었지만 일부 팬은 서운해해요.'; }
+      each(all, 2, '떠난 동료를 챙김'); return '의리 있는 구단이라는 평이에요.';
+    case 'scandal': {
+      const p = state.players[m.data?.pid];
+      if (idx === 0) { if (p) addMoodEvent(p, '공개 질책', -8, 4); if (t.region) t.region.trust = Math.min(100, t.region.trust + 3); return '단호한 대응에 여론이 누그러졌어요.'; }
+      if (idx === 1) { if (p) addMoodEvent(p, '구단이 지켜줌', 6, 4); if (t.region) t.region.trust = Math.max(0, t.region.trust - 3); t.fans = Math.max(5000, t.fans - 500); return '감싸기라는 비판 기사가 나왔어요.'; }
+      return '조용히 지나갔어요.';
+    }
     default: return '';
   }
 }

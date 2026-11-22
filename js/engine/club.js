@@ -230,6 +230,7 @@ export function clubEffects(team) {
   }
   if (e.roof) e.injury *= 1 - e.roof * 0.04;
   if (team.region?.perks?.youthField) e.futGrowth *= 1.05;
+  { const cl = (team.cheerLv || 1) - 1; e.homeAdv += cl * 0.004; e.fanGrowth += cl * 0.03; }
   // 프런트 부서
   const med = frontLv(team, 'medical'), mkt = frontLv(team, 'marketing');
   e.injury *= 1 - (med - 1) * 0.05; e.heal += (med - 1) * 0.06; e.recovery += (med - 1) * 0.6;

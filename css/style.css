@@ -1324,3 +1324,13 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .campopt em { font-style: normal; font-size: 11.5px; font-weight: 800; color: var(--gold); }
 .ph-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .ph-badges span { font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 99px; background: rgba(255,197,61,.2); color: #ffe39a; }
+.otitle { display: inline-flex; align-items: center; gap: 4px; margin: 2px 0; font-size: 12px; font-weight: 800; color: #ffe39a; background: rgba(255,197,61,.15); border: 1px solid rgba(255,197,61,.35); padding: 2px 9px; border-radius: 99px; }
+.otitle small { font-size: 10px; color: var(--muted); font-weight: 600; }
+.titles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ttl { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px; border-radius: 14px; background: var(--glass); border: 1.5px solid rgba(255,255,255,.1); }
+.ttl span { font-size: 22px; }
+.ttl b { font-size: 13px; }
+.ttl small { font-size: 11px; color: var(--muted); }
+.ttl.lock { opacity: .45; }
+.ttl.cur { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255,197,61,.22); }
+.jr-n { width: 18px; text-align: center; font-family: var(--display); color: var(--gold); }

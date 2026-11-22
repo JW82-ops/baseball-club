@@ -237,7 +237,7 @@ export function runAllStar(state) {
   const vote = (p) => {
     const t = state.teams[p.team];
     const perf = p.type === 'B' ? batWar(state, p, p.cur.bat) * 3 + batLine(p.cur.bat).ops * 4 : pitWar(state, p.cur.pit) * 3;
-    return perf + calcOvr(p) / 25 + Math.log10(Math.max(1000, t.fans || 10000)) * 0.6 + rng() * 1.2;
+    return perf + calcOvr(p) / 25 + Math.log10(Math.max(1000, t.fans || 10000)) * 0.6 + rng() * 1.2 + (p.song ? 0.5 : 0) + (p.franchise ? 0.8 : 0);
   };
   const sides = divs.map((ids) => {
     const ps = ids.flatMap((id) => teamPlayers(state, state.teams[id])).filter((p) => p.level === 1 && !p.injury && p.cur);
