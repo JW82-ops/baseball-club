@@ -1,6 +1,7 @@
 import { gauss, pick, chance } from '../core/rng.js';
 import { calcOvr, potOvr } from './player.js';
 import { addStory } from './life.js';
+import { dexUpdate } from './collect.js';
 import { teamPlayers, ensureLineupValid, autoAssignLevels } from './roster.js';
 import { ROSTER } from '../data/constants.js';
 import { assignNumber } from './hof.js';
@@ -69,6 +70,7 @@ function moveTo(state, p, from, to) {
   to.roster.push(p.id);
   p.exTeams = [...new Set([...(p.exTeams || []), from.id])];
   if (to.id === state.userTeamId) addStory(state, p, '🔁', `${from.short || from.name}에서 트레이드로 합류했어요`);
+  if (from.id === state.userTeamId) dexUpdate(state, p, { left: `${state.season} 트레이드 → ${to.short || to.name}` });
   if (from.id === state.userTeamId) addStory(state, p, '👋', `${to.short || to.name}로 트레이드됐어요`);
   p.team = to.id;
   p.level = 2;

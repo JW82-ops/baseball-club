@@ -23,6 +23,7 @@ import { installCard } from '../pwa.js';
 import { tradeOpinions } from '../../engine/clubhouse.js';
 import { RIVAL_STYLES, grudgeLabel } from '../../engine/rivals.js';
 import { scenarioLabel } from '../../engine/scenario.js';
+import { RARITY } from '../../engine/collect.js';
 import { opinionsHtml } from '../components.js';
 import { CHEER_LV, cheerLv, cheerWeekly, songMax, SONG_COST, jerseyRank, TITLES } from '../../engine/fandom.js';
 import { playerImg } from '../portraits.js';
@@ -36,9 +37,23 @@ function museumView(t) {
   const v = ui.musView || 'time';
   const hist = (state.history || []);
   const titles = hist.filter((h) => h.champion === t.id);
-  const tabs = `<div class="seg mt">${[['time', '연표'], ['album', `우승 앨범 ${titles.length ? titles.length : ''}`], ['ours', '우리 선수'], ['hof', '명예의 전당'], ['rec', '기록']].map(([k, l]) => `<button class="${v === k ? 'on' : ''}" data-act="musView" data-v="${k}">${l}</button>`).join('')}</div>`;
+  const tabs = `<div class="seg mt">${[['time', '연표'], ['album', `우승 앨범 ${titles.length ? titles.length : ''}`], ['ours', '우리 선수'], ['dex', '선수 도감'], ['balls', '기념구'], ['hof', '명예의 전당'], ['rec', '기록']].map(([k, l]) => `<button class="${v === k ? 'on' : ''}" data-act="musView" data-v="${k}">${l}</button>`).join('')}</div>`;
   const head = artHero('hof', `<span class="k">${LG_FLAG(state.league)} 창단 ${(hist[0]?.season ?? state.season)}년 · ${hist.length + 1}번째 시즌</span><h2>구단 역사관</h2><p>우승 ${titles.length}회 · 가을야구 ${hist.filter((h) => h.post).length}회 · 명예의 전당 ${(state.hof || []).length}명</p>`);
   if (v === 'hof') return head + tabs + `<div class="mt">${hofView(t, true)}</div>`;
+  if (v === 'dex') {
+    const all = Object.values(state.dex || {});
+    const f = ui.dexF || 'all';
+    const L = all.filter((e) => f === 'all' || e.rarity === f).sort((a, b) => ['legend', 'epic', 'rare', 'common'].indexOf(a.rarity) - ['legend', 'epic', 'rare', 'common'].indexOf(b.rarity) || b.best - a.best);
+    const cnt = (r) => all.filter((e) => e.rarity === r).length;
+    return head + tabs + `<p class="small muted mt">우리 유니폼을 입었던 모든 선수가 카드로 남아요. 오래 뛰고, 잘하고, 상을 받을수록 등급이 올라가요. (시즌이 끝나거나 팀을 떠날 때 기록돼요)</p>
+      <div class="seg mt">${[['all', `전체 ${all.length}`], ...Object.entries(RARITY).map(([k, r]) => [k, `${r.ko} ${cnt(k)}`])].map(([k, l]) => `<button class="${f === k ? 'on' : ''}" data-act="dexF" data-v="${k}">${l}</button>`).join('')}</div>
+      <div class="dexgrid mt">${L.map((e) => `<button class="dexcard r-${e.rarity}" ${state.players[e.id] ? `data-act="openPlayer" data-pid="${e.id}"` : ''} style="--rc:${RARITY[e.rarity].c}"><img src="${playerImg(e.look || e)}" alt="" loading="lazy"><span class="dx-r">${RARITY[e.rarity].ko}</span><b>${esc(e.name)}</b><small>${e.pos || ''} · 최고 ${e.best} · ${e.seasons}시즌</small>${e.awards?.length ? `<em>🏆 ${e.awards.length}</em>` : ''}${e.left ? `<small class="faint">${esc(e.left)}</small>` : ''}</button>`).join('') || '<div class="empty">시즌이 끝나면 카드가 생겨요.</div>'}</div>`;
+  }
+  if (v === 'balls') {
+    const B = (state.balls || []).slice().reverse();
+    return head + tabs + `<p class="small muted mt">구단과 선수들의 처음을 담은 기념구예요. 창단 첫 승, 첫 홈런, 신인들의 데뷔 첫 안타·첫 승까지 모두 진열장에 남아요.</p>
+      <div class="ballcase mt">${B.map((b) => `<div class="ball ${b.team ? 'team' : ''}" ${b.pid && state.players[b.pid] ? `data-act="openPlayer" data-pid="${b.pid}"` : ''}><span class="bl-i">⚾</span><span class="bl-k">${b.icon}</span><b>${esc(b.ko)}</b><small>${esc(b.name || '')}</small><small class="faint">${b.s} ${esc(b.date || '')}</small></div>`).join('') || '<div class="empty">첫 경기를 치르면 진열장이 채워지기 시작해요.</div>'}</div>`;
+  }
   if (v === 'ours') {
     const L = franchiseList(state);
     return head + tabs + `<div class="mt"><p class="small muted">창단 멤버와 우리가 직접 뽑은 선수들이에요. 4시즌 넘게 함께하며 크게 성장하거나 상을 받으면 '프랜차이즈 스타'가 돼요. 프랜차이즈 스타는 충성도가 높고 팬이 많이 따라요.</p>

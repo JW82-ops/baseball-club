@@ -40,6 +40,7 @@ import { characterWeek, potentialDrift } from './character.js';
 import { crisisWeek, crisisSeasonStart } from './crisis.js';
 import { lifeWeek, addStory } from './life.js';
 import { scenarioCheck, metaPostUnlock } from './scenario.js';
+import { dexSeasonEnd, teamBalls, dexUpdate } from './collect.js';
 import { rivalsWeek, rivalGame, rivalFA, rivalsSeasonEnd } from './rivals.js';
 import { homecomingStory, checkTitles, cheerEff, cheerWeekly } from './fandom.js';
 import { CAMP_LOCS, campGrow, payCamp, finishCampPlan, markHomegrown, checkFranchise } from './camp.js';
@@ -159,6 +160,7 @@ function userGameStory(state, g, sg) {
   trackRivalry(state, g, sg);
   homecomingStory(state, g, sg);
   rivalGame(state, sg, g);
+  teamBalls(state, g, sg);
   rookieDebut(state, g);
   checkMilestones(state, [...side.lineup.map((l) => l.pid), ...side.used]);
   for (const f of g.formChanges || []) {
@@ -567,6 +569,7 @@ function endSeason(state) {
   });
   const userRank = state.finalStandings.indexOf(user.id) + 1;
   metaPostUnlock(state);
+  dexSeasonEnd(state, awards);
   { const e = scenarioCheck(state); if (e) addNews(state, e.kind === 'clear' ? `🏆 시나리오 클리어! ${e.text}` : `⌛ 시나리오 실패: ${e.text}`, e.kind === 'clear' ? 'big' : 'bad'); }
   {
     // 모기업 환수: 쌓아 둔 돈이 너무 많으면 일부를 모기업이 가져가요 (빚더미 시나리오 진행 중엔 안 가져가요)
@@ -718,6 +721,7 @@ function userSeasonStars(state, user) {
 }
 function retirePlayer(state, p) {
   const team = state.teams[p.team];
+  if (p.team === state.userTeamId) dexUpdate(state, p, { left: `${state.season} 은퇴` });
   if (team) team.roster = team.roster.filter((x) => x !== p.id);
   const car = careerTotals(p);
   const entry = { id: p.id, name: p.name, type: p.type, pos: p.pos, num: p.num, nat: p.nat, eth: p.eth, foreign: p.foreign, retiredSeason: state.season, quote: p.age >= 37 ? '야구 덕분에 행복했습니다. 이제 팬으로 돌아갈게요.' : '몸은 떠나도 마음은 늘 이 팀에 있을 거예요.', lastTeam: team?.name, age: p.age, peak: Math.max(...p.dev, calcOvr(p)), awards: p.awards, car, wasUser: p.team === state.userTeamId, userSeasons: p.history.filter((h) => h.t === state.userTeamId).length, origin: p.origin, draft: p.draft, franchise: p.franchise || null, founder: !!p.founder };

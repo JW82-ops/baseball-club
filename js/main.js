@@ -448,6 +448,7 @@ registerActions({
   upgradeCheer: () => { const err = upgradeCheer(state); if (err) return toast(err, 'bad'); sfx.coin?.(); commit('📣 응원단을 키웠어요!', 'good'); },
   makeSong: (d) => { const r = makeSong(state, d.pid); if (r.msg) commit(r.msg, r.ok ? 'good' : 'bad'); },
   pwaInstall: async () => { const ok = await promptInstall(); toast(ok ? '홈 화면에 설치됐어요! 📲' : '설치를 취소했어요', ok ? 'good' : 'info'); render(); },
+  dexF: (d) => { ui.dexF = d.v; render(); },
   titleSheet: () => openModal(titleSheetHtml(), { sheet: true }),
   setTitle: (d) => { state.ownerTitle = d.k; save(); closeModal(); render(); },
   mgrTalk: (d) => { const r = talkMgr(state, d.k); commit(r.msg, r.ok ? 'good' : 'bad'); },
