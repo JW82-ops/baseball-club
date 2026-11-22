@@ -1285,3 +1285,19 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .conds small { font-size: 11px; color: var(--muted); }
 .crew { padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, .04); display: flex; flex-direction: column; gap: 6px; }
 .staff-card.dim { opacity: .55; }
+
+/* 메일 속 선수 카드 (트레이드 제안 등) */
+.tradebox { background: var(--board-2, rgba(255,255,255,.05)); border: 1px solid var(--line); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.tb-h { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; font-size: 14px; }
+.tb-h small { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.tb-arrow { text-align: center; font-size: 20px; color: var(--gold); line-height: 1; }
+.mp-card { display: flex; align-items: center; gap: 10px; text-align: left; padding: 9px 10px; border-radius: 14px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); width: 100%; }
+.mp-card:active { background: rgba(255,255,255,.1); }
+.mp-card .grow { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mp-card b { font-size: 14.5px; }
+.mp-card em { font-style: normal; font-size: 10.5px; color: #ff9a7a; font-weight: 700; }
+.mp-card small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-r { display: flex; align-items: center; gap: 6px; }
+.mp-r i { font-style: normal; color: var(--muted); font-size: 18px; }
+.tb-sum { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--muted); padding-top: 4px; border-top: 1px dashed rgba(255,255,255,.12); }
+.tb-sum b { color: var(--text, #fff); }

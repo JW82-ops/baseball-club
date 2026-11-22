@@ -1,6 +1,9 @@
 import { state } from '../../core/store.js';
 import { ui } from '../ui-state.js';
-import { esc, avatar } from '../components.js';
+import { esc, avatar, gradeTag, posShort } from '../components.js';
+import { calcOvr, potentialEstimate, batLine, pitLine } from '../../engine/player.js';
+import { scoutLevelOf } from '../../engine/club.js';
+import { formatMoney } from '../../core/util.js';
 import { moodLabel } from '../../engine/mood.js';
 import { playerImg, npcImg, faceHtml, bodyHtml } from '../portraits.js';
 
@@ -25,6 +28,47 @@ export function renderMail() {
   </section>`;
 }
 
+// 메일에 나온 선수를 바로 눌러볼 수 있는 카드
+function pCard(p, tag) {
+  if (!p) return '';
+  const est = potentialEstimate(p, scoutLevelOf(state));
+  const t = state.teams[p.team];
+  const line = p.type === 'P'
+    ? (p.cur?.pit?.outs ? `${p.cur.pit.w}승 ${p.cur.pit.l}패 · ERA ${pitLine(p.cur.pit).era.toFixed(2)}` : '올 시즌 기록 없음')
+    : (p.cur?.bat?.ab ? `타율 ${batLine(p.cur.bat).avg.toFixed(3).replace(/^0/, '')} · ${p.cur.bat.hr}홈런` : '올 시즌 기록 없음');
+  return `<button class="mp-card" data-act="openPlayer" data-pid="${p.id}">
+    ${avatar(p, t?.color || '#5f6f66', 44)}
+    <span class="grow"><b>${esc(p.name)}</b>${tag ? ` <em>${tag}</em>` : ''}<small>${posShort(p)} · ${p.age}세 · 연봉 ${formatMoney(p.salary)}${p.contract?.years > 0 ? ` · 계약 ${p.contract.years}년` : ''}</small><small>${line} · 잠재 ${est.loG === est.hiG ? est.hiG : `${est.loG}~${est.hiG}`}</small></span>
+    <span class="mp-r">${gradeTag(calcOvr(p))}<i>›</i></span></button>`;
+}
+function tradeBlock(m) {
+  const o = m.data || {};
+  const give = (o.give || []).map((id) => state.players[id]).filter(Boolean);
+  const get = (o.get || []).map((id) => state.players[id]).filter(Boolean);
+  if (!give.length && !get.length) return '';
+  const sal = (a) => a.reduce((s, p) => s + p.salary, 0);
+  const dSal = sal(get) - sal(give);
+  const other = state.teams[o.otherId];
+  return `<div class="tradebox mt">
+    <div class="tb-h"><span>📤 보내는 선수</span><small>우리 구단</small></div>${give.map((p) => pCard(p, p.team !== state.userTeamId ? '이미 이적' : '')).join('')}
+    <div class="tb-arrow">⇅</div>
+    <div class="tb-h"><span>📥 받는 선수</span><small>${esc(other?.name || '')}</small></div>${get.map((p) => pCard(p, p.team !== o.otherId ? '이적함' : '')).join('')}
+    <div class="tb-sum"><span>OVR <b>${give.map(calcOvr).join(' + ')}</b> ↔ <b class="${Math.max(0, ...get.map(calcOvr)) >= Math.max(0, ...give.map(calcOvr)) ? 'good' : 'bad'}">${get.map(calcOvr).join(' + ')}</b></span><span>연봉 ${dSal >= 0 ? '+' : ''}${formatMoney(dSal)}</span><span>인원 ${give.length} → ${get.length}</span></div>
+    <p class="tiny faint">선수를 누르면 능력치·기록·성장을 자세히 볼 수 있어요. 닫으면 이 메일로 돌아와요.</p>
+  </div>`;
+}
+// 메일에 관련된 다른 선수 (감독 요청·사건 등)
+function relatedPlayers(m) {
+  const ids = new Set();
+  if (m.kind === 'mgrReq') { const r = state.teams[state.userTeamId].staff?.manager?.req; if (r?.id === m.data?.rid && r.pid) ids.add(r.pid); }
+  if (m.data?.pid) ids.add(m.data.pid);
+  if (m.data?.other) ids.add(m.data.other);
+  if (m.data?.a) ids.add(m.data.a);
+  if (m.data?.b) ids.add(m.data.b);
+  if (m.from) ids.delete(m.from);
+  const ps = [...ids].map((id) => state.players[id]).filter(Boolean);
+  return ps.length ? `<div class="tradebox mt"><div class="tb-h"><span>👀 관련 선수</span></div>${ps.map((p) => pCard(p)).join('')}</div>` : '';
+}
 function mailDetail(m) {
   const p = m.from && state.players[m.from];
   const ml = p ? moodLabel(p.morale) : null;
@@ -39,6 +83,7 @@ function mailDetail(m) {
       <p class="mt">${esc(m.body)}</p>
       <p class="tiny faint mt" style="text-align:right">${m.season} 시즌 ${Math.floor(m.day / 6) + 1}주차</p>
     </div>
+    ${m.kind === 'tradeOffer' ? tradeBlock(m) : relatedPlayers(m)}
     ${m.resolved ? `<div class="panel mt small">${m.auto ? '답장하지 않아 무시한 것으로 처리됐어요.' : `답장: <b>${esc(m.choices?.[m.answer]?.label || '')}</b>`}${m.result ? `<br><span class="muted">${esc(m.result)}</span>` : ''}</div>`
       : (m.choices || []).map((c, i) => `<button class="choice" data-act="answerMail" data-id="${m.id}" data-i="${i}"><b>${esc(c.label)}</b>${c.sub ? `<span>${esc(c.sub)}</span>` : ''}</button>`).join('')}
   </section>`;
