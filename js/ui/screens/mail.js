@@ -1,6 +1,7 @@
 import { state, save } from '../../core/store.js';
 import { ui } from '../ui-state.js';
-import { esc, avatar, gradeTag, posShort } from '../components.js';
+import { esc, avatar, gradeTag, posShort, opinionsHtml } from '../components.js';
+import { tradeOpinions } from '../../engine/clubhouse.js';
 import { calcOvr, potentialEstimate, batLine, pitLine } from '../../engine/player.js';
 import { scoutLevelOf } from '../../engine/club.js';
 import { formatMoney } from '../../core/util.js';
@@ -70,7 +71,7 @@ function tradeBlock(m) {
     <div class="tb-h"><span>📥 받는 선수</span><small>${esc(other?.name || '')}</small></div>${get.map((p) => pCard(p, p.team !== o.otherId ? '이적함' : '')).join('')}
     <div class="tb-sum"><span>OVR <b>${give.map(calcOvr).join(' + ')}</b> ↔ <b class="${Math.max(0, ...get.map(calcOvr)) >= Math.max(0, ...give.map(calcOvr)) ? 'good' : 'bad'}">${get.map(calcOvr).join(' + ')}</b></span><span>연봉 ${dSal >= 0 ? '+' : ''}${formatMoney(dSal)}</span><span>인원 ${give.length} → ${get.length}</span></div>
     <p class="tiny faint">선수를 누르면 능력치·기록·성장을 자세히 볼 수 있어요. 닫으면 이 메일로 돌아와요.</p>
-  </div>`;
+  </div>${!m.resolved && give.length && get.length ? `<div class="mt">${opinionsHtml(tradeOpinions(state, o.give, o.get))}</div>` : ''}`;
 }
 // 메일에 관련된 다른 선수 (감독 요청·사건 등)
 function relatedPlayers(m) {

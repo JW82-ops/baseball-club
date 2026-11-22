@@ -20,6 +20,8 @@ import { sponsorLogo } from '../../data/brandArt.js';
 import { recordsView } from './league.js';
 import { franchiseList, userSeasons } from '../../engine/camp.js';
 import { installCard } from '../pwa.js';
+import { tradeOpinions } from '../../engine/clubhouse.js';
+import { opinionsHtml } from '../components.js';
 import { CHEER_LV, cheerLv, cheerWeekly, songMax, SONG_COST, jerseyRank, TITLES } from '../../engine/fandom.js';
 import { playerImg } from '../portraits.js';
 import { ensureRegion, ACTS, actState, apMax, partnerMax, partnerWeekly, PETITIONS, petitionState, petitionOdds, electionYear, PRESS_COST } from '../../engine/region.js';
@@ -461,6 +463,7 @@ function tradeView(t) {
       <div class="row gap mt"><span class="small">현금 추가</span><button class="btn sm" data-act="tradeCash" data-d="-5000">−5천</button><b>${formatMoney(tr.cash)}</b><button class="btn sm" data-act="tradeCash" data-d="5000">＋5천</button></div>
       <button class="btn block mt ${ev?.ok ? 'primary' : ''}" data-act="tradePropose" ${ev?.ok ? '' : 'disabled'}>트레이드 성사시키기</button>
     </div>
+    ${tr.give.length || tr.get.length ? `<div class="mt">${opinionsHtml(tradeOpinions(state, tr.give, tr.get))}</div>` : ''}
     <div class="sec-h mt-l"><h2>받을 선수 (${esc(other.short)})</h2></div>
     <div class="panel plist">${theirs.map((p) => row(p, tr.get.includes(p.id), 'tradeGet')).join('')}</div>
     <div class="sec-h mt-l"><h2>줄 선수 (우리)</h2></div>

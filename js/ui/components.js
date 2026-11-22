@@ -106,3 +106,13 @@ export function pitchList(p) {
 }
 
 export { calcOvr, velocityKmh };
+
+// 트레이드 코칭스태프 의견 패널
+export function opinionsHtml(op, compact = false) {
+  if (!op) return '';
+  const tag = { pro: ['찬성', 'good'], con: ['반대', 'bad'], mid: ['중립', 'muted'], info: ['참고', 'muted'] };
+  const sum = op.con === 0 && op.pro > 0 ? '코칭스태프는 대체로 찬성해요' : op.pro === 0 && op.con > 0 ? '코칭스태프는 대체로 반대해요' : op.pro || op.con ? `찬성 ${op.pro} · 반대 ${op.con}로 의견이 갈려요` : '코칭스태프 의견은 중립이에요';
+  return `<div class="opins ${compact ? 'compact' : ''}"><div class="op-h"><b>🗣️ 코칭스태프 의견</b><span class="tiny muted">${sum}</span></div>
+    ${op.list.map((o) => `<div class="op ${o.stance}"><span class="op-i">${o.icon}</span><div class="grow"><div class="op-w"><b>${esc(o.who)}</b><em class="${tag[o.stance][1]}">${tag[o.stance][0]}</em>${o.sub ? `<small>${esc(o.sub)}</small>` : ''}</div><p>${esc(o.text)}</p></div></div>`).join('')}
+    <p class="tiny faint">참고 의견이에요. 결정은 구단주 몫이지만, 감독이 강하게 반대하는 트레이드를 밀어붙이면 관계가 나빠져요.</p></div>`;
+}

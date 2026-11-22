@@ -12,7 +12,7 @@ import { brandValue, tierFor, genSponsorOffers } from './sponsor.js';
 import { resolvePress } from './story.js';
 import { resolvePartnerMail, resolveCityEvent } from './region.js';
 import { resolveIncident } from './character.js';
-import { resolveBigInjury } from './clubhouse.js';
+import { resolveBigInjury, tradeOpinions, tradeOpinionEffect } from './clubhouse.js';
 import { resolveMgrReq, resolveMgrQuit, resolveMgrPoach, resolveMgrRenew } from './manager.js';
 
 export const weekAbs = (state) => state.season * 100 + Math.floor(state.day / 6);
@@ -300,12 +300,14 @@ export function resolveMail(state, id, idx) {
       }
       return '';
     case 'tradeOffer': {
-      if (idx !== 0) return '제안을 거절했어요.';
       const o = m.data;
       const okAll = [...o.give, ...o.get].every((id) => P(state, id));
+      const op = okAll && !m.auto ? tradeOpinions(state, o.give, o.get) : null;
+      if (idx !== 0) return '제안을 거절했어요.' + tradeOpinionEffect(state, op, false);
       if (!okAll) return '이미 상황이 바뀌어 성사되지 않았어요.';
+      const note = tradeOpinionEffect(state, op, true);
       executeTrade(state, o.otherId, o.give, o.get, o.cash || 0);
-      return `트레이드 성사! ${o.get.map((id) => P(state, id).name).join(', ')} 영입`;
+      return `트레이드 성사! ${o.get.map((id) => P(state, id).name).join(', ')} 영입${note}`;
     }
     case 'press': return resolvePress(state, m, idx);
     case 'partner': return resolvePartnerMail(state, m, idx);

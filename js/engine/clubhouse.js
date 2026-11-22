@@ -1,11 +1,12 @@
 // 클럽하우스 운영: 멘토링 · 부상 이력/큰 부상 결정 · 트레이드 마감일 · 주간 코치 회의
 import { chance, pick, randInt } from '../core/rng.js';
 import { clamp, uid, formatMoney } from '../core/util.js';
-import { calcOvr, potOvr } from './player.js';
+import { calcOvr, potOvr, potentialEstimate } from './player.js';
+import { VICES } from './character.js';
 import { teamPlayers, firstTeam, canPromote, canDemote, ensureLineupValid } from './roster.js';
 import { addMoodEvent, addRel, getRel } from './mood.js';
 import { pushMail, weekAbs } from './mail.js';
-import { bLv, staffStat } from './club.js';
+import { bLv, staffStat, scoutLevelOf } from './club.js';
 import { addRelMgr } from './manager.js';
 import { standings } from './league.js';
 import { aiTradeOffer } from './trade.js';
@@ -253,3 +254,95 @@ export function answerMeeting(state, id, yes) {
   return { ok: true, msg: '' };
 }
 export const meetingPending = (state) => (state.meeting?.season === state.season ? state.meeting.items.filter((i) => !i.done).length : 0);
+
+// ═════════ 트레이드에 대한 코칭스태프 의견 ═════════
+// 감독·타격코치·투수코치·2군 감독·스카우트가 각자 관점에서 찬성/반대를 말해요 (참고용 — 결정은 구단주)
+const nmOf = (t, role, fallback) => (t.staff?.[role] ? `${STAFF_ROLES[role].ko} ${t.staff[role].name}` : `${fallback}(대행)`);
+const starterRank = (state, t, p, excl = []) => {
+  // 우리 팀에서 이 선수가 같은 유형 중 몇 번째로 좋은가 (1군 주전급인지 판단)
+  const pool = teamPlayers(state, t).filter((x) => x.type === p.type && !excl.includes(x.id) && x.id !== p.id && !x.injury);
+  const o = calcOvr(p);
+  return pool.filter((x) => calcOvr(x) > o).length + 1;
+};
+export function tradeOpinions(state, give, get) {
+  const t = U(state);
+  const G = give.map((id) => P(state, id)).filter(Boolean);
+  const R = get.map((id) => P(state, id)).filter(Boolean);
+  if (!G.length && !R.length) return null;
+  const sl = scoutLevelOf(state);
+  const out = [];
+  const rank = state.phase === 'regular' ? standings(state).findIndex((x) => x.team.id === t.id) + 1 : (state.history.at(-1)?.userRank || 10);
+  const m = t.staff?.manager;
+  const contend = rank <= 5 || m?.voice === 'ambitious';
+  const youthLean = m?.conds?.includes('youth') || (!contend && rank >= 8);
+  // 즉시 전력 · 미래 가치
+  const now = (ps) => ps.reduce((s, p) => s + Math.max(0, calcOvr(p) - 58) * (starterRank(state, t, p, give) <= (p.type === 'P' ? 12 : 10) ? 1 : 0.4), 0);
+  const fut = (ps) => ps.reduce((s, p) => { if (p.age > 25) return s; const e = potentialEstimate(p, sl); return s + Math.max(0, (e.lo + e.hi) / 2 - 62) * ((27 - p.age) / 5); }, 0);
+  const dNow = now(R) - now(G), dFut = fut(R) - fut(G);
+  // ── 감독
+  {
+    let sc = contend ? dNow * 1.2 + dFut * 0.4 : youthLean ? dNow * 0.4 + dFut * 1.2 : dNow * 0.8 + dFut * 0.8;
+    const lines = [];
+    const req = m?.req && !m.req.done ? m.req : null;
+    if (req?.kind === 'keep' && give.includes(req.pid)) { sc -= 40; lines.push(`${P(state, req.pid)?.name}만큼은 지켜달라고 부탁드렸잖습니까.`); }
+    if (req?.kind === 'dump' && give.includes(req.pid)) { sc += 20; lines.push('정리해 달라던 선수를 보내는 건 찬성입니다.'); }
+    if (req?.kind === 'dlBuy') sc += dNow > 0 ? 10 : -6;
+    if (req?.kind === 'dlSell') sc += G.some((p) => p.age >= 30) && R.some((p) => p.age <= 24) ? 12 : -4;
+    if (req?.kind === 'reinforce' && R.some((p) => p.type === req.type && calcOvr(p) >= 65)) { sc += 8; lines.push(`${req.type === 'P' ? '투수' : '타자'} 보강이라면 반갑습니다.`); }
+    for (const p of G) if (p.franchise) { sc -= 12; lines.push(`${p.name}은(는) 우리 팀의 얼굴입니다. 팬들이 가만있지 않을 겁니다.`); }
+    if (!lines.length) lines.push(contend
+      ? (dNow > 3 ? '지금 당장 이기는 데 도움이 됩니다. 해야 합니다.' : dNow < -3 ? '올해 성적을 생각하면 손해입니다. 전력이 빠져요.' : '지금 전력엔 큰 차이가 없습니다.')
+      : (dFut > 3 ? '몇 년 뒤를 보면 남는 장사입니다.' : dFut < -3 ? '미래를 내주는 거래 같습니다. 신중해 주세요.' : dNow > 3 ? '당장은 도움이 되겠지만 우리 상황엔 급하지 않아요.' : '큰 차이 없는 거래입니다.'));
+    const top = (ps) => ps.slice().sort((a, b) => calcOvr(b) - calcOvr(a))[0];
+    const tg = top(G), tr = top(R);
+    if (tg && tr) lines.push(`핵심은 ${tg.name}(${calcOvr(tg)}, ${tg.age}세)을 주고 ${tr.name}(${calcOvr(tr)}, ${tr.age}세)을 받는 거죠.`);
+    out.push({ role: 'manager', who: m ? `감독 ${m.name}` : '감독대행', icon: '🧢', sc, text: lines.join(' '), sub: contend ? `${rank}위 · 지금 이겨야 할 때` : `${rank}위 · 미래를 볼 때` });
+  }
+  // ── 타격·투수 코치: 유형별 전력·뎁스
+  for (const type of ['B', 'P']) {
+    const g = G.filter((p) => p.type === type), r = R.filter((p) => p.type === type);
+    if (!g.length && !r.length) continue;
+    const role = type === 'B' ? 'hitCoach' : 'pitchCoach';
+    const lines = [];
+    let sc = (r.reduce((s, p) => s + calcOvr(p), 0) - g.reduce((s, p) => s + calcOvr(p), 0)) * 0.4;
+    for (const p of g) {
+      const sr = starterRank(state, t, p, give);
+      const depth = teamPlayers(state, t).filter((x) => x.type === type && !give.includes(x.id) && x.id !== p.id && (type === 'B' ? x.pos === p.pos : (p.pos === 'SP' ? x.pos === 'SP' : x.pos !== 'SP')) && calcOvr(x) >= calcOvr(p) - 6).length;
+      if (sr <= (type === 'B' ? 9 : 6) && depth === 0) { sc -= 10; lines.push(`${p.name}이(가) 빠지면 ${type === 'B' ? p.pos + ' 자리' : p.pos === 'SP' ? '선발 로테이션' : '불펜'}를 메울 선수가 없어요.`); }
+    }
+    for (const p of r) {
+      const k = type === 'B' ? (p.r.power >= 70 ? '장타력이' : p.r.contact >= 70 ? '정확도가' : p.r.speed >= 72 ? '발이' : null) : (p.r.velo >= 72 ? '구위가' : p.r.control >= 70 ? '제구가' : p.r.breaking >= 70 ? '변화구가' : null);
+      if (calcOvr(p) >= 66 && k) lines.push(`${p.name}은(는) ${k} 좋아요. ${starterRank(state, t, p, give) <= (type === 'B' ? 9 : 6) ? '바로 주전으로 쓸 수 있어요.' : '쓸 만한 카드예요.'}`);
+      if (p.injury) { sc -= 6; lines.push(`${p.name}은(는) 지금 부상 중이에요 (${p.injury.weeks}주).`); }
+      if ((p.injHist || []).length >= 3 || (p.chronic || []).length) { sc -= 4; lines.push(`${p.name}은(는) 부상 이력이 잦아요.`); }
+      if (type === 'P' && p.age >= 33) { sc -= 2; lines.push(`${p.name}은(는) 나이가 있어 구속이 떨어질 시점이에요.`); }
+    }
+    if (!lines.length) lines.push(sc > 2 ? `${type === 'B' ? '타선' : '마운드'}이 조금 더 단단해져요.` : sc < -2 ? `${type === 'B' ? '타선' : '마운드'}이 약해져요.` : '전력 차이는 크지 않아요.');
+    out.push({ role, who: nmOf(t, role, type === 'B' ? '타격코치' : '투수코치'), icon: type === 'B' ? '🏏' : '🎯', sc, text: lines.slice(0, 2).join(' ') });
+  }
+  // ── 2군 감독 / 스카우트: 유망주와 숨은 위험
+  {
+    const lines = [];
+    let sc = dFut * 0.8;
+    for (const p of G) if (p.age <= 23) { const e = potentialEstimate(p, sl); if (e.hi >= 80) { sc -= 8; lines.push(`${p.name}은(는) 잠재력 ${e.loG}~${e.hiG}짜리예요. 아직 꽃도 안 폈는데 보내기 아까워요.`); } }
+    for (const p of R) if (p.age <= 23) { const e = potentialEstimate(p, sl); if (e.hi >= 78) lines.push(`${p.name}은(는) 잠재력 ${e.loG}~${e.hiG}로 보입니다. 키워볼 만해요.`); }
+    for (const p of R) if (p.vice && sl >= 2 && (sl >= 4 || calcOvr(p) >= 60)) { sc -= 6; lines.push(`⚠️ ${p.name}에 대해 '${VICES[p.vice].ko}' 소문이 있어요.`); }
+    for (const p of R) if (p.ethic != null && sl >= 3 && p.ethic >= 75) lines.push(`${p.name}은(는) 연습벌레라고 소문났어요.`);
+    if (lines.length) out.push({ role: 'futuresMgr', who: nmOf(t, 'futuresMgr', '2군 감독'), icon: '🔭', sc, text: lines.slice(0, 2).join(' ') });
+  }
+  // ── 운영팀: 연봉
+  const dSal = R.reduce((s, p) => s + p.salary, 0) - G.reduce((s, p) => s + p.salary, 0);
+  if (Math.abs(dSal) >= 3000) out.push({ role: 'front', who: '운영팀', icon: '💼', sc: dSal > 0 && t.cash < dSal * 4 ? -6 : 0, text: dSal > 0 ? `연봉이 연 ${formatMoney(dSal)} 늘어요.${t.cash < dSal * 4 ? ' 지금 자금으로는 부담돼요.' : ''}` : `연봉을 연 ${formatMoney(-dSal)} 아낄 수 있어요.`, info: true });
+  for (const o of out) o.stance = o.info ? 'info' : o.sc >= 4 ? 'pro' : o.sc <= -4 ? 'con' : 'mid';
+  const vote = out.filter((o) => !o.info);
+  return { list: out, pro: vote.filter((o) => o.stance === 'pro').length, con: vote.filter((o) => o.stance === 'con').length, mgr: out.find((o) => o.role === 'manager') };
+}
+// 감독 의견과 반대로 결정하면 관계에 영향
+export function tradeOpinionEffect(state, op, accepted) {
+  const mg = op?.mgr;
+  if (!mg || !U(state).staff?.manager) return '';
+  if (accepted && mg.sc <= -12) { addRelMgr(state, -5, '반대한 트레이드 강행'); return ' (감독이 반대한 트레이드라 서운해해요)'; }
+  if (accepted && mg.sc >= 6) { addRelMgr(state, 2, '원하던 트레이드'); return ' (감독이 반겨요)'; }
+  if (!accepted && mg.sc >= 12) { addRelMgr(state, -2, '찬성한 트레이드 거절'); return ' (감독은 아쉬워해요)'; }
+  return '';
+}

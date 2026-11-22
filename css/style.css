@@ -1352,3 +1352,17 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .hud-meta .bellbtn { font-size: 17px; }
 .hud-meta > .grow + .iconbtn { margin-left: auto; }
 .hud-meta .iconbtn + .iconbtn { margin-left: -4px; }
+
+/* 트레이드 코칭스태프 의견 */
+.opins { background: var(--board-2, rgba(255,255,255,.05)); border: 1px solid var(--line); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.op-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.op-h b { font-size: 14px; }
+.op { display: flex; gap: 10px; padding: 9px 10px; border-radius: 12px; background: rgba(255,255,255,.04); border-left: 3px solid rgba(255,255,255,.15); }
+.op.pro { border-left-color: var(--good, #5ee08f); }
+.op.con { border-left-color: #ff7a7a; }
+.op-i { font-size: 20px; line-height: 1.2; }
+.op-w { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.op-w b { font-size: 13px; }
+.op-w em { font-style: normal; font-size: 11px; font-weight: 800; }
+.op-w small { font-size: 10.5px; color: var(--muted); }
+.op p { font-size: 12.5px; line-height: 1.45; margin: 3px 0 0; }

@@ -31,6 +31,7 @@ import { resolveMail, unreadCount } from './engine/mail.js';
 import { signSponsor, cancelSponsor } from './engine/sponsor.js';
 import { doAct, submitPetition } from './engine/region.js';
 import { offerManager, fireManager, talkMgr, buyout } from './engine/manager.js';
+import { tradeOpinions, tradeOpinionEffect } from './engine/clubhouse.js';
 import { annualOffer, multiOffer, releaseNego, faMarketOffer, fairSalary, negoPreview } from './engine/contracts.js';
 import { npcImg, playerImg } from './ui/portraits.js';
 import { evaluateTrade, executeTrade } from './engine/trade.js';
@@ -539,11 +540,12 @@ registerActions({
     const ev = evaluateTrade(state, tr.otherId, tr.give, tr.get, tr.cash);
     if (!ev.ok) { toast(ev.msg, 'bad'); return; }
     const names = tr.get.map((id) => state.players[id].name).join(', ');
+    const note = tradeOpinionEffect(state, tradeOpinions(state, tr.give, tr.get), true);
     executeTrade(state, tr.otherId, tr.give, tr.get, tr.cash);
     state.flags = state.flags || {}; state.flags.traded = true;
     ui.trade = { otherId: tr.otherId, give: [], get: [], cash: 0 };
     sfx.levelup();
-    commit(`트레이드 성사! ${names} 영입`, 'big');
+    commit(`트레이드 성사! ${names} 영입${note}`, 'big');
   },
   hofInduct: (d) => {
     const e = induct(state, d.id, d.n === '1');
