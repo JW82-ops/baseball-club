@@ -21,6 +21,7 @@ import { recordsView } from './league.js';
 import { franchiseList, userSeasons } from '../../engine/camp.js';
 import { installCard } from '../pwa.js';
 import { tradeOpinions } from '../../engine/clubhouse.js';
+import { RIVAL_STYLES, grudgeLabel } from '../../engine/rivals.js';
 import { opinionsHtml } from '../components.js';
 import { CHEER_LV, cheerLv, cheerWeekly, songMax, SONG_COST, jerseyRank, TITLES } from '../../engine/fandom.js';
 import { playerImg } from '../portraits.js';
@@ -421,7 +422,7 @@ function marketRow(p, t, isFA) {
   const price = isFA ? `요구 ${formatMoney(p.askSalary || p.salary)}` : formatMoney(signingFee(p));
   return `<button class="prow" data-act="${isFA ? 'faSheet' : 'openPlayer'}" data-pid="${p.id}">
     ${avatar(p, '#5f6f66', 38)}
-    <div class="grow"><div class="nm">${esc(p.name)} <span class="tiny">${flagOf(p)}</span>${p.scoutPick ? ' <span class="gem">⭐ 리포트</span>' : ''}</div><div class="meta">${posShort(p)} · ${p.age}세 · ${esc(p.origin)}${isFA && p.prevTeam ? ` · 전 ${esc(state.teams[p.prevTeam]?.short || '')}` : ` · 연봉 ${formatMoney(p.salary)}`}</div></div>
+    <div class="grow"><div class="nm">${esc(p.name)} <span class="tiny">${flagOf(p)}</span>${p.scoutPick ? ' <span class="gem">⭐ 리포트</span>' : ''}${p.rivalBid ? ` <span class="chip bad" style="font-size:10px">⚔️ ${esc(state.teams[p.rivalBid]?.short || '')} 경쟁</span>` : ''}</div><div class="meta">${posShort(p)} · ${p.age}세 · ${esc(p.origin)}${isFA && p.prevTeam ? ` · 전 ${esc(state.teams[p.prevTeam]?.short || '')}` : ` · 연봉 ${formatMoney(p.salary)}`}</div></div>
     <div class="right">${gradeTag(calcOvr(p))}<span class="small amber">${price}</span></div>
   </button>`;
 }
@@ -456,6 +457,7 @@ function tradeView(t) {
   const row = (p, sel, act) => `<button class="prow ${sel ? 'sel' : ''}" data-act="${act}" data-pid="${p.id}"><div class="grow"><div class="nm">${esc(p.name)}${p.tradeBlock ? ' <span class="chip bad" style="font-size:10px">블록</span>' : ''}</div><div class="meta">${posShort(p)} · ${p.age}세 · 연봉 ${formatMoney(p.salary)} · 가치 ${playerValue(p, other)}</div></div>${gradeTag(calcOvr(p))}</button>`;
   return `
     <div class="row gap">${emblem(other, 30)}<b class="grow">${esc(other.name)}와(과) 트레이드</b><button class="btn sm ghost" data-act="tradeTeam" data-id="">구단 변경</button></div>
+    ${(() => { const r = (state.rivals || []).find((x) => x.tid === other.id); if (!r) return ''; const gl = grudgeLabel(r.grudge); return `<p class="small mt">${RIVAL_STYLES[r.style].icon} 라이벌 단장 <b>${esc(r.name)}</b> · <span class="${gl[1]}">${gl[0]}</span>${r.grudge > 0 ? ` — 앙숙이라 조건을 ${Math.round(r.grudge / 2.5)}% 더 까다롭게 따져요` : ''}</p>`; })()}
     <div class="panel mt trade-box" style="position:sticky;top:130px;z-index:5">
       <div class="row between small"><span>우리가 주는 쪽 <b>${tr.give.length}명</b>${tr.cash ? ` + ${formatMoney(tr.cash)}` : ''}</span><span>받는 쪽 <b>${tr.get.length}명</b></span></div>
       <div class="bar mt"><i style="width:${meter}%;background:${ev?.ok ? 'var(--good)' : 'var(--amber)'}"></i></div>

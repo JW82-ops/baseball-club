@@ -37,6 +37,7 @@ import { rehabWeek, mechProgress, planCondBonus, workloadWeek, settleWinter } fr
 import { ensureRegion, regionWeek, regionSeasonStart, regionSeasonEnd, perkSum } from './region.js';
 import { makeGoals, settleGoals } from './goals.js';
 import { characterWeek, potentialDrift } from './character.js';
+import { rivalsWeek, rivalGame, rivalFA, rivalsSeasonEnd } from './rivals.js';
 import { homecomingStory, checkTitles, cheerEff, cheerWeekly } from './fandom.js';
 import { CAMP_LOCS, campGrow, payCamp, finishCampPlan, markHomegrown, checkFranchise } from './camp.js';
 import { mentorWeek, injuryWeek, deadlineWeek, makeMeeting } from './clubhouse.js';
@@ -154,6 +155,7 @@ function userGameStory(state, g, sg) {
   queueInterview(state, g, sg, star);
   trackRivalry(state, g, sg);
   homecomingStory(state, g, sg);
+  rivalGame(state, sg, g);
   rookieDebut(state, g);
   checkMilestones(state, [...side.lineup.map((l) => l.pid), ...side.used]);
   for (const f of g.formChanges || []) {
@@ -268,6 +270,7 @@ export function weeklyCycle(state, opts = {}) {
   for (const n of characterWeek(state, { camp: !!opts.camp })) addNews(state, n.text, n.t);
   for (const n of mentorWeek(state)) addNews(state, n.text, n.t);
   for (const n of injuryWeek(state)) addNews(state, n.text, n.t);
+  if (!opts.camp) for (const n of rivalsWeek(state)) addNews(state, n.text, n.t);
   if (!opts.camp) { for (const n of deadlineWeek(state)) addNews(state, n.text, n.t); if (state.phase === 'regular' && state.day < state.schedule.length) makeMeeting(state); }
   for (const d of tickConstruction(user)) {
     addNews(state, `🏗️ ${d.name} 공사 완료! ${d.title}${d.kind === 'b' ? ` (Lv.${d.lv})` : ''}`, 'big');
@@ -581,6 +584,7 @@ function endSeason(state) {
   }
   for (const n of settleSponsorsSeason(state, userRank, state.post.seeds.includes(user.id), champ === user.id)) addNews(state, `🤝 ${n}`, 'info');
   for (const n of regionSeasonEnd(state, state.post.seeds.includes(user.id))) addNews(state, n, 'big');
+  for (const n of rivalsSeasonEnd(state)) addNews(state, n, 'info');
   if (state.openPledge?.season === state.season) {
     const pg = state.openPledge;
     if (pg.goal === 'title' && champ !== user.id) { user.fans = Math.max(5000, user.fans - 2500); addNews(state, '🎤 개막 때 "우승"을 외쳤지만 지키지 못했어요. 팬들이 실망했어요', 'bad'); }
@@ -681,6 +685,7 @@ export function proceedToDraft(state) {
   }
   { const n = closeOffReq(state, 'resign'); if (n) addNews(state, n, n.includes('해결') ? 'good' : 'bad'); }
   finishContractPhase(state);
+  for (const n of rivalFA(state)) addNews(state, n, 'big');
   offseasonReq(state, 'faSign');
   if (state.faPool.length) addNews(state, `💼 FA 시장 개장: ${state.faPool.length}명이 시장에 나왔어요`, 'info');
   setupDraft(state);

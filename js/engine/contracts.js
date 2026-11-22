@@ -88,6 +88,7 @@ export function annualOffer(state, pid, mode) {
   return msg;
 }
 
+import { rivalSigned } from './rivals.js';
 // 성적 옵션·주전 보장 약속은 선수 마음을 움직여요
 const incM = (opts) => (opts.incentive ? 1.05 : 1) * (opts.starter ? 1.07 : 1);
 function promiseStarter(state, p, opts) {
@@ -207,7 +208,7 @@ export function faMarketOffer(state, pid, salary, years, opts = {}) {
       if (c) compMsg = ` · ${c.grade}등급 FA 보상: ${state.teams[p.prevTeam].short || state.teams[p.prevTeam].name}에 ${c.player ? `보상선수 ${c.player.name} + ` : ''}보상금 ${c.cash.toLocaleString()}만`;
       p.team = null;
     }
-    const sp = promiseStarter(state, p, opts);
+    const sp = promiseStarter(state, p, opts) + rivalSigned(state, p);
     return { ok: true, fee, msg: `${p.name} FA 계약 성공!${sp} ${years}년 · 연봉 ${p.salary.toLocaleString()}만 · 계약금 ${fee.toLocaleString()}만${compMsg}` };
   }
   if (p.faTries >= 4) return { ok: false, gone: true, msg: `${p.name}: "다른 구단과 계약하기로 했어요."` };

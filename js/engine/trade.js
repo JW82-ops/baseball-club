@@ -39,7 +39,8 @@ export function evaluateTrade(state, otherId, give, get, cash = 0) {
   if (cash > user.cash) return { ok: false, ratio, msg: '자금이 부족해요' };
   // 상대 구단 핵심 선수(전력 상위 3명)는 더 비싸게
   const core = teamPlayers(state, other).sort((a, b) => calcOvr(b) - calcOvr(a)).slice(0, 3).map((p) => p.id);
-  const need = get.some((id) => core.includes(id)) ? 1.25 : 1.08;
+  const rv = (state.rivals || []).find((r) => r.tid === otherId);
+  const need = (get.some((id) => core.includes(id)) ? 1.25 : 1.08) * (rv ? 1 + Math.max(0, rv.grudge) / 250 : 1);
   const ok = ratio >= need;
   let msg;
   if (ok) msg = '좋습니다. 이 조건이면 받아들이죠.';
@@ -74,16 +75,16 @@ function moveTo(state, p, from, to) {
 }
 
 // AI가 먼저 제안: 유저 선수 하나를 원하고 비슷한 가치로 맞춤
-export function aiTradeOffer(state) {
+export function aiTradeOffer(state, opts = {}) {
   if (!tradeOpen(state)) return null;
   const user = state.teams[state.userTeamId];
   const mine = teamPlayers(state, user).filter((p) => !p.injury);
   const block = mine.filter((p) => p.tradeBlock);
-  const target = block.length && chance(0.7) ? pick(block)
+  const target = opts.target ? state.players[opts.target] : block.length && chance(0.7) ? pick(block)
     : mine.filter((p) => calcOvr(p) >= 62).sort(() => Math.random() - 0.5)[0];
   if (!target) return null;
   const ai = state.teamOrder.filter((id) => id !== user.id);
-  const otherId = pick(ai);
+  const otherId = opts.otherId || pick(ai);
   const other = state.teams[otherId];
   const want = playerValue(target, other);
   const pool = teamPlayers(state, other).filter((p) => !p.injury && p.type === (chance(0.5) ? target.type : p.type));
@@ -94,7 +95,7 @@ export function aiTradeOffer(state) {
     const b = chance(0.4) ? pick(pool) : null;
     const set = [a, b].filter(Boolean).filter((x, j, arr) => arr.indexOf(x) === j);
     const v = set.reduce((s, x) => s + playerValue(x, other), 0);
-    const diff = Math.abs(v - want * 0.92);
+    const diff = Math.abs(v - want * (opts.lowball || 0.92));
     if (!best || diff < best.diff) best = { set, v, diff };
   }
   if (!best) return null;

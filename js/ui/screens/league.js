@@ -16,6 +16,7 @@ import { teamPlayers } from '../../engine/roster.js';
 import { registerActions, openModal } from '../dom.js';
 import { MANAGER_STYLES } from '../../data/club.js';
 import { probableStarter } from '../../engine/analysis.js';
+import { ensureRivals, RIVAL_STYLES, grudgeLabel } from '../../engine/rivals.js';
 
 const dots = (t) => (t.last10 || []).slice(-10).map((r) => `<i class="${r === 'W' ? 'w' : r === 'L' ? 'l' : 'd'}"></i>`).join('');
 // 순위 추이: 우리 팀(굵게)과 1위 팀
@@ -178,10 +179,21 @@ function paperView() {
   return pp.slice(0, 12).map((x) => `<div class="paper"><div class="paper-h"><span>주간 베이스볼 ${LEAGUES[x.league || 'KBO'].flag}</span><span>${x.season} · ${x.week}주차</span></div><h3>${esc(x.head)}</h3>${x.lines.map((l) => `<p>· ${esc(l)}</p>`).join('')}</div>`).join('');
 }
 
+function rivalsView() {
+  ensureRivals(state);
+  const st = standings(state);
+  return `<p class="small muted">우리 구단을 견제하는 단장들이에요. 앙숙 지수가 높을수록 도발이 잦아지고, 트레이드 조건이 까다로워져요. 맞대결에서 이기면 지수가 더 오르고, 정중하게 대하거나 거래를 하면 누그러져요.</p>
+    ${state.rivals.map((r) => { const o = state.teams[r.tid]; const S = RIVAL_STYLES[r.style]; const gl = grudgeLabel(r.grudge); const rk = st.findIndex((x) => x.team.id === r.tid) + 1;
+      return `<div class="panel rivalc mt"><div class="row gap">${emblem(o, 44)}<div class="grow"><b>${S.icon} ${esc(r.name)} 단장</b> <span class="tiny muted">${esc(o.name)} · ${rk}위</span><div class="tiny muted">${S.ko} — ${S.desc}</div></div></div>
+        <div class="row between mt small"><span>앙숙 지수 <b class="${gl[1]}">${gl[0]}</b></span><b>${Math.round(r.grudge)}</b></div><div class="rg-bar trust"><i style="width:${Math.max(2, Math.min(100, r.grudge))}%;background:linear-gradient(90deg,#ff9a5a,#ff4d6d)"></i></div>
+        <div class="kv"><div><span>올해 맞대결</span><b>${r.season === state.season ? `${r.sw}승 ${r.sl}패` : '0승 0패'}</b></div><div><span>통산 맞대결</span><b>${r.w}승 ${r.l}패</b></div></div>
+        ${(r.log || []).length ? `<p class="tiny muted mt">최근: ${r.log.slice(-3).reverse().map((x) => `${x.why}(${x.d > 0 ? '+' : ''}${x.d})`).join(' · ')}</p>` : ''}
+        <button class="btn sm ghost block mt" data-act="openTeam" data-id="${r.tid}">구단 정보 보기</button></div>`; }).join('')}`;
+}
 export function renderLeague() {
   return `
   <section class="sec">
-    <div class="seg scrollseg">${[['standings', '순위'], ['leaders', '개인기록'], ['learn', '야구 교실'], ['schedule', '일정'], ['paper', '신문'], ['records', '기록실'], ['history', '역대']].map(([k, l]) => `<button class="${ui.leagueView === k ? 'on' : ''}" data-act="leagueView" data-v="${k}">${l}</button>`).join('')}</div>
-    <div class="mt">${{ standings: standingsView, leaders: leadersView, learn: learnView, schedule: scheduleView, history: historyView, paper: paperView, records: recordsView }[ui.leagueView]()}</div>
+    <div class="seg scrollseg">${[['standings', '순위'], ['rivals', '라이벌'], ['leaders', '개인기록'], ['learn', '야구 교실'], ['schedule', '일정'], ['paper', '신문'], ['records', '기록실'], ['history', '역대']].map(([k, l]) => `<button class="${ui.leagueView === k ? 'on' : ''}" data-act="leagueView" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="mt">${{ standings: standingsView, rivals: rivalsView, leaders: leadersView, learn: learnView, schedule: scheduleView, history: historyView, paper: paperView, records: recordsView }[ui.leagueView]()}</div>
   </section>`;
 }
