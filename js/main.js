@@ -47,6 +47,7 @@ import { icon } from './ui/portraits.js';
 import { gameDate } from './engine/calendar.js';
 import { stadiumArt } from './ui/components.js';
 import { showLearn, shortWhy } from './ui/screens/learn.js';
+import { openPitchCall } from './ui/screens/pitchcall.js';
 import { upgradeDept, assignScout, DEPTS, REGIONS } from './engine/front.js';
 import { waivePlayer, claimWaiver, signDev, convertDev, secondDraftPick, capInfo, faGrade } from './engine/kborules.js';
 import { planOf, startMech, REHAB, sendWinter } from './engine/dev2.js';
@@ -318,6 +319,12 @@ registerActions({
   simGame: () => quickGame(),
   clutchPick: (d) => {
     const o = ui.clutchOpts?.[Number(d.i)];
+    if (o?.manual) {
+      const cb = ui.clutchCb; ui.clutchCb = null;
+      closeModal();
+      openPitchCall(ui.qs || ui.live, cb);
+      return;
+    }
     if (o) o.act();
     sfx.click();
     closeModal();

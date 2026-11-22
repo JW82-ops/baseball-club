@@ -455,6 +455,18 @@ function pitchSeq(pitcher, sd, n, outcome) {
 }
 
 // ───────── 유저 작전 ─────────
+// 직접 볼배합: 지금 타석의 투구 계산용 값(투수 자동 교체 없이 이 투수로 간다)
+export function previewPA(state, g) {
+  const o = off(g), d = def(g);
+  d.manual = d.pitcher;
+  const slotIdx = o.idx % o.lineup.length;
+  const batter = state.players[o.lineup[slotIdx].pid];
+  const pitcher = state.players[d.pitcher];
+  const B = batterEff(state, g, batter, pitcher, slotIdx);
+  const P = pitcherEff(state, g, pitcher, d);
+  const top = velocityKmh(pitcher.r.velo) - Math.round(Math.max(0, d.pc - 70) / 15);
+  return { B, P, batter, pitcher, top, swingAdj: 0 };
+}
 export function setOrder(g, key, val = true) { g.orders = { ...(g.orders || {}), [key]: val }; }
 
 export function pinchHit(state, g, slotIdx, pid) {
@@ -563,7 +575,8 @@ export function stepPA(state, g) {
   } else {
   const stuffZ = z(P.stuff);
   const top = velocityKmh(pitcher.r.velo) - Math.round(Math.max(0, d.pc - 70) / 15);
-  const PR = simPitches({ B, P, batter, pitcher, top, swingAdj: userOff && orders.power ? 0.05 : 0 });
+  const PR = orders.forcedPR || simPitches({ B, P, batter, pitcher, top, swingAdj: userOff && orders.power ? 0.05 : 0, guess: userOff ? orders.guess : null });
+  if (PR.guessHit != null) g.lastGuess = PR.guessHit;
   seqOut = PR.seq;
   pitches = PR.seq.length;
   outcome = PR.outcome;
