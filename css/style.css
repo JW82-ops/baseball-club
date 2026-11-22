@@ -999,3 +999,34 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .pc-res b { font-size: 24px; }
 .pc-res.good b { color: #7ee2a0; }
 .pc-res.bad b { color: #ff9d92; }
+
+/* 선수 상세: 히어로 카드 + 탭 */
+.phero { position: relative; height: 230px; margin: -16px -16px 0; overflow: hidden; border-radius: 18px 18px 0 0;
+  --c1: color-mix(in srgb, var(--team) 55%, #fff); --c2: var(--team); --c3: color-mix(in srgb, var(--team) 50%, #000);
+  background: radial-gradient(ellipse at 70% 35%, var(--c1), var(--c2) 55%, var(--c3)); }
+.phero.fx { --c1: #8fc4ff; --c2: #3b82f6; --c3: #1e3a8a; }
+.phero.yg { --c1: #9ff0c6; --c2: #10b981; --c3: #065f46; }
+.phero.inj { --c1: #b9c2bd; --c2: #6b7a72; --c3: #34403a; }
+.phero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(5, 15, 10, .82) 0%, rgba(5, 15, 10, .35) 50%, rgba(0, 0, 0, 0) 75%), linear-gradient(0deg, rgba(5, 15, 10, .5), transparent 40%); pointer-events: none; }
+.phero.elite { box-shadow: inset 0 0 0 3px var(--gold); }
+.ph-body { position: absolute; right: 2%; bottom: -8px; height: 226px; max-width: 58%; object-fit: contain; object-position: bottom; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .4)); }
+.ph-ovr { position: absolute; left: 16px; top: 16px; z-index: 1; line-height: 1; text-align: center; }
+.ph-ovr b { display: block; font-family: var(--display); font-weight: 400; font-size: 52px; color: #fff; text-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
+.phero.elite .ph-ovr b { color: var(--gold-hi); }
+.ph-ovr i { display: inline-block; margin-top: 2px; font-style: normal; font-size: 12px; font-weight: 900; background: rgba(0, 0, 0, .4); color: #fff; padding: 2px 10px; border-radius: 99px; }
+.ph-pos { position: absolute; left: 88px; top: 22px; z-index: 1; font-size: 12px; font-weight: 900; background: #fff3c8; color: #3d2300; padding: 3px 10px; border-radius: 99px; text-shadow: none; }
+.ph-info { position: absolute; left: 16px; right: 40%; bottom: 14px; z-index: 1; }
+.ph-info h2 { font-family: var(--display); font-weight: 400; font-size: 26px; line-height: 1.1; color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, .6); }
+.ph-info h2 .num { font-size: 16px; opacity: .8; }
+.ph-info p { font-size: 12px; color: #e9f3ea; margin-top: 3px; text-shadow: 0 1px 3px rgba(0, 0, 0, .8); }
+.ph-pot b { color: var(--gold-hi); }
+.ptabs button { font-size: 14px; }
+.radarbox { margin-top: 4px; padding: 6px 0 2px; border-radius: 16px; background: rgba(255, 255, 255, .04); }
+.radar { display: block; width: min(100%, 300px); margin: 0 auto; }
+.radar .rl { font-size: 10.5px; font-weight: 700; fill: var(--muted); }
+.radar .rv { font-size: 11px; font-weight: 900; fill: #fff; }
+.gcard { padding: 8px; border-radius: 16px; background: rgba(255, 255, 255, .04); }
+.gchart { display: block; width: 100%; height: auto; }
+.gchart .gl { font-size: 10px; fill: var(--muted); font-weight: 700; }
+.gchart .gl.up { fill: #7ee2a0; } .gchart .gl.dn { fill: #ff9d92; }
+.modal-box .sheet-close { z-index: 5; background: rgba(5, 15, 10, .6); color: #fff; }
