@@ -19,6 +19,7 @@ import { avatar as av } from '../components.js';
 import { sponsorLogo } from '../../data/brandArt.js';
 import { recordsView } from './league.js';
 import { franchiseList, userSeasons } from '../../engine/camp.js';
+import { installCard } from '../pwa.js';
 import { CHEER_LV, cheerLv, cheerWeekly, songMax, SONG_COST, jerseyRank, TITLES } from '../../engine/fandom.js';
 import { playerImg } from '../portraits.js';
 import { ensureRegion, ACTS, actState, apMax, partnerMax, partnerWeekly, PETITIONS, petitionState, petitionOdds, electionYear, PRESS_COST } from '../../engine/region.js';
@@ -496,7 +497,7 @@ function hofView(t, inMuseum = false) {
 function financeView(t) {
   const payroll = teamPlayers(state, t).reduce((s, p) => s + p.salary, 0);
   const L = t.ledger;
-  return `
+  return `${installCard()}
     <div class="panel">
       <div class="kv" style="margin-top:0">
         <div><span>보유 자금</span><b class="${t.cash < 0 ? 'bad' : ''}">${formatMoney(t.cash)}</b></div>

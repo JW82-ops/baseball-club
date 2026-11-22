@@ -24,6 +24,8 @@ import { isClutch, clutchOptions, clutchSituation } from './engine/clutch.js';
 import { upgradeBuilding, buildSub, hireStaff, fireStaff, bNext } from './engine/club.js';
 import { slotSheetHtml, subSheetHtml, staffMarketHtml, petitionSheetHtml, titleSheetHtml } from './ui/screens/club.js';
 import { upgradeCheer, makeSong } from './engine/fandom.js';
+import { notifCount } from './ui/screens/notify.js';
+import { initPWA, promptInstall } from './ui/pwa.js';
 import { renderMail } from './ui/screens/mail.js';
 import { resolveMail, unreadCount } from './engine/mail.js';
 import { signSponsor, cancelSponsor } from './engine/sponsor.js';
@@ -80,7 +82,7 @@ function renderHud() {
       <div class="hud-name"><h1>${esc(t.name)}</h1><small>${state.season} ${PHASE_KO[state.phase] || ''} · ${gameDate(state).label} ${gameDate(state).icon}</small></div>
       <div class="led"><div><b>${t.w}</b><span>승</span></div><div><b>${t.l}</b><span>패</span></div><div><b>${rank}</b><span>위</span></div></div>
     </div>
-    <div class="hud-meta"><span class="hm">${icon('money', 18)}<b>${formatMoney(t.cash)}</b></span><span class="hm">${icon('fans', 18)}<b>${formatFans(t.fans)}</b></span><span class="hm">⚾<b>${teamOvr(state, t)}</b></span><span class="grow"></span><button class="iconbtn hud-badge mailbtn" data-act="tab" data-tab="mail" aria-label="메일함">${icon('mail', 26)}${unreadCount(state) ? `<em>${unreadCount(state)}</em>` : ''}</button><button class="iconbtn" style="width:28px;height:28px;font-size:13px" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>
+    <div class="hud-meta"><span class="hm">${icon('money', 18)}<b>${formatMoney(t.cash)}</b></span><span class="hm">${icon('fans', 18)}<b>${formatFans(t.fans)}</b></span><span class="hm">⚾<b>${teamOvr(state, t)}</b></span><span class="grow"></span><button class="iconbtn hud-badge bellbtn" data-act="openNotif" aria-label="알림 센터">🔔${notifCount() ? `<em>${notifCount()}</em>` : ''}</button><button class="iconbtn hud-badge mailbtn" data-act="tab" data-tab="mail" aria-label="메일함">${icon('mail', 26)}${unreadCount(state) ? `<em>${unreadCount(state)}</em>` : ''}</button><button class="iconbtn" style="width:28px;height:28px;font-size:13px" data-act="toggleSound" aria-label="소리">${soundOn() ? '🔊' : '🔇'}</button></div>
     ${syn.length && ui.tab !== 'home' ? `<div class="hud-syn">${syn.map((k) => `<span>${SYNERGIES[k].icon} ${SYNERGIES[k].ko}</span>`).join('')}</div>` : ''}`;
 }
 
@@ -438,6 +440,7 @@ registerActions({
   },
   upgradeCheer: () => { const err = upgradeCheer(state); if (err) return toast(err, 'bad'); sfx.coin?.(); commit('📣 응원단을 키웠어요!', 'good'); },
   makeSong: (d) => { const r = makeSong(state, d.pid); if (r.msg) commit(r.msg, r.ok ? 'good' : 'bad'); },
+  pwaInstall: async () => { const ok = await promptInstall(); toast(ok ? '홈 화면에 설치됐어요! 📲' : '설치를 취소했어요', ok ? 'good' : 'info'); render(); },
   titleSheet: () => openModal(titleSheetHtml(), { sheet: true }),
   setTitle: (d) => { state.ownerTitle = d.k; save(); closeModal(); render(); },
   mgrTalk: (d) => { const r = talkMgr(state, d.k); commit(r.msg, r.ok ? 'good' : 'bad'); },
@@ -864,6 +867,8 @@ function boxModal() {
 
 // ───────── 부팅 ─────────
 initActions();
+initPWA(() => toast('🆕 새 버전으로 업데이트됐어요', 'good'));
+document.addEventListener('pwa-ready', () => { if (!state) render(); });
 initCreateActions(render, (opts) => {
   setSlot(title.slot);
   wipe();

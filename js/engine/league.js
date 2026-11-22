@@ -199,7 +199,8 @@ export function standings(state) {
 export const pct = (t) => (t.w + t.l ? t.w / (t.w + t.l) : 0);
 
 export function addNews(state, text, type = 'info') {
-  state.news.unshift({ season: state.season, day: state.day, text, type });
+  state.newsN = (state.newsN || 0) + 1;
+  state.news.unshift({ season: state.season, day: state.day, text, type, n: state.newsN });
   if (state.news.length > 120) state.news.length = 120;
 }
 

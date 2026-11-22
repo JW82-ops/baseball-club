@@ -1334,3 +1334,21 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .ttl.lock { opacity: .45; }
 .ttl.cur { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255,197,61,.22); }
 .jr-n { width: 18px; text-align: center; font-family: var(--display); color: var(--gold); }
+.bellbtn { font-size: 20px; }
+.ntodo .ni { font-size: 20px; width: 30px; text-align: center; }
+.ntodo.soft { opacity: .7; }
+.nlist { display: flex; flex-direction: column; gap: 2px; padding: 6px; }
+.nrow { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; border-left: 3px solid transparent; }
+.nrow p { flex: 1; font-size: 12.5px; line-height: 1.45; margin: 0; }
+.nrow small { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.nrow.big { border-left-color: var(--gold); }
+.nrow.bad { border-left-color: #ff7a7a; }
+.nrow.new { background: rgba(255,197,61,.08); }
+.installc { margin-bottom: 10px; border-color: rgba(79,163,255,.4); }
+/* HUD: 알림·메일·소리 버튼이 늘어서 자금이 줄바꿈되지 않게 */
+.hud-meta { gap: 10px; }
+.hud-meta .hm b { white-space: nowrap; }
+.hud-meta .iconbtn { width: 32px; height: 32px; }
+.hud-meta .bellbtn { font-size: 17px; }
+.hud-meta > .grow + .iconbtn { margin-left: auto; }
+.hud-meta .iconbtn + .iconbtn { margin-left: -4px; }
