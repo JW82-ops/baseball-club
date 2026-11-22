@@ -163,7 +163,7 @@ function sceneFor(tab) {
     if (ph === 'post') return 'crowd';
     return `stadium${Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1))}`;
   }
-  if (tab === 'club') return { map: 'stadium1', biz: 'crowd', front: 'office', facility: 'stadium' + Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1)), staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'map'] || 'office';
+  if (tab === 'club') return { map: 'stadium1', biz: 'crowd', front: 'office', facility: 'stadium' + Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1)), staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', museum: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'map'] || 'office';
   if (tab === 'roster' && ui.rosterView === 'futures') return 'futures';
   return { roster: 'clubhouse', develop: 'gym', league: 'crowd', mail: 'contract' }[tab] || 'stadium1';
 }
@@ -609,6 +609,7 @@ registerActions({
   // 선수단
   rosterView: (d) => { ui.rosterView = d.v; ui.lineupSel = null; render(); },
   rosterType: (d) => { ui.rosterType = d.v; render(); },
+  musView: (d) => { ui.musView = d.v; render(); },
   rosterLayout: (d) => { ui.rosterLayout = d.v; render(); },
   autoLineup: () => { autoLineup(state, userTeam(state)); ui.lineupSel = null; ui.fieldSel = null; commit('라인업 자동 편성'); },
   autoPitching: () => { autoPitching(state, userTeam(state)); ui.lineupSel = null; commit('투수진 자동 편성'); },

@@ -154,7 +154,7 @@ function historyView() {
     </div>`).join('');
 }
 
-function recordsView() {
+export function recordsView() {
   const R = state.records || { season: {}, team: {} };
   const len = state.settings.seasonLength;
   const S = R.season[len] || {};

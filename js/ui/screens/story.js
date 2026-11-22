@@ -53,6 +53,6 @@ export function retireCards() {
           <p class="retire-q">“${esc(e.quote || '고마웠습니다.')}”</p></div>
       </div>`;
     }).join('')}
-    ${(state.hofCandidates || []).length ? '<button class="btn sm block mt" data-act="clubView" data-v="hof">명예의 전당 후보 보기</button>' : ''}
+    ${(state.hofCandidates || []).length ? '<button class="btn sm block mt" data-act="clubView" data-v="museum">명예의 전당 후보 보기</button>' : ''}
   </section>`;
 }

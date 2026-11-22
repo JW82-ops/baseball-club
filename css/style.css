@@ -1197,3 +1197,27 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .neg-meter i { display: block; height: 100%; border-radius: 99px; background: #ff6f61; transition: width .25s; }
 .neg-meter i.warn { background: var(--gold); } .neg-meter i.good { background: #63d48f; }
 .small.warn { color: var(--gold); }
+
+/* 구단 역사관 */
+.timeline { position: relative; padding-left: 30px; }
+.timeline::before { content: ''; position: absolute; left: 13px; top: 6px; bottom: 6px; width: 3px; border-radius: 3px; background: linear-gradient(180deg, var(--gold), rgba(255, 255, 255, .15)); }
+.tl-node { position: relative; margin-bottom: 10px; }
+.tl-dot { position: absolute; left: -30px; top: 8px; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; background: #12301f; border: 2px solid rgba(255, 255, 255, .3); }
+.tl-node.gold .tl-dot { background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: #3d2300; border-color: #fff3c8; }
+.tl-node.now .tl-dot { background: #63d48f; border-color: #fff; animation: hotbob 1.6s ease-in-out infinite; }
+.tl-card { padding: 10px 12px; border-radius: 16px; background: var(--glass); border: 1px solid rgba(255, 255, 255, .1); }
+.tl-node.gold .tl-card { border-color: var(--gold); background: linear-gradient(135deg, rgba(255, 197, 61, .16), var(--glass)); }
+.tl-card b.gold { color: var(--gold); }
+.tl-stars { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.tl-stars span { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+.tl-stars img { width: 30px; height: 30px; object-fit: cover; object-position: top; border-radius: 50%; background: rgba(255, 255, 255, .1); }
+.tl-stars small { color: var(--muted); font-weight: 500; font-size: 10.5px; }
+.album { display: flex; flex-direction: column; gap: 12px; }
+.alb { position: relative; height: 220px; border-radius: 20px; overflow: hidden; background-size: cover; background-position: center; border: 3px solid var(--gold); box-shadow: 0 0 0 4px rgba(255, 197, 61, .2), 0 10px 22px rgba(0, 0, 0, .4); }
+.alb-y { position: absolute; left: 14px; top: 10px; font-family: var(--display); font-size: 38px; color: #fff3c8; text-shadow: 0 3px 0 var(--gold-edge); }
+.alb-t { position: absolute; right: 12px; top: 16px; font-size: 12px; font-weight: 900; background: rgba(0, 0, 0, .55); padding: 3px 10px; border-radius: 99px; }
+.alb-st { position: absolute; right: 10px; bottom: 50px; display: flex; }
+.alb-st img { height: 110px; margin-left: -18px; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .5)); }
+.alb-b { position: absolute; left: 14px; right: 14px; bottom: 10px; }
+.alb-b b { display: block; font-size: 15px; }
+.alb-b small { font-size: 11px; color: #e9f3ea; }

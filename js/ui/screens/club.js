@@ -17,6 +17,40 @@ import { ACHV } from '../../engine/achievements.js';
 import { CLUB_COLORS } from '../../data/teams.js';
 import { avatar as av } from '../components.js';
 import { sponsorLogo } from '../../data/brandArt.js';
+import { recordsView } from './league.js';
+import { playerImg } from '../portraits.js';
+
+// ───────── 구단 역사관: 연표 · 우승 앨범 · 명예의 전당 · 기록 ─────────
+const LG_FLAG = (k) => LEAGUES[k || 'KBO']?.flag || '';
+function museumView(t) {
+  const v = ui.musView || 'time';
+  const hist = (state.history || []);
+  const titles = hist.filter((h) => h.champion === t.id);
+  const tabs = `<div class="seg mt">${[['time', '연표'], ['album', `우승 앨범 ${titles.length ? titles.length : ''}`], ['hof', '명예의 전당'], ['rec', '기록']].map(([k, l]) => `<button class="${v === k ? 'on' : ''}" data-act="musView" data-v="${k}">${l}</button>`).join('')}</div>`;
+  const head = artHero('hof', `<span class="k">${LG_FLAG(state.league)} 창단 ${(hist[0]?.season ?? state.season)}년 · ${hist.length + 1}번째 시즌</span><h2>구단 역사관</h2><p>우승 ${titles.length}회 · 가을야구 ${hist.filter((h) => h.post).length}회 · 명예의 전당 ${(state.hof || []).length}명</p>`);
+  if (v === 'hof') return head + tabs + `<div class="mt">${hofView(t, true)}</div>`;
+  if (v === 'rec') return head + tabs + `<div class="mt">${recordsView()}</div>`;
+  if (v === 'album') {
+    return head + tabs + (titles.length ? `<div class="album mt">${titles.slice().reverse().map((h) => `<div class="alb" style="${artBg('champion', 'linear-gradient(180deg,rgba(0,0,0,.05),rgba(6,16,11,.92))')}">
+      <span class="alb-y">${h.season}</span><span class="alb-t">🏆 ${LG_FLAG(h.league)} ${LEAGUES[h.league || 'KBO']?.series || '시리즈'} 우승</span>
+      <div class="alb-st">${(h.stars || []).map((x) => `<img src="${playerImg({ ...x })}" alt="">`).join('')}</div>
+      <div class="alb-b"><b>${h.rec ? `${h.rec.w}승 ${h.rec.l}패` : ''} · 정규 ${h.userRank}위</b><small>${(h.stars || []).map((x) => `${esc(x.name)} ${esc(x.line)}`).join(' / ')}</small></div></div>`).join('')}</div>`
+      : '<div class="panel empty mt">아직 우승 사진이 없어요. 첫 트로피를 이 앨범에 걸어 봐요! 🏆</div>');
+  }
+  const cur = `<div class="tl-node now"><span class="tl-dot"></span><div class="tl-card"><b>${state.season} · 진행 중</b><p class="small">${t.w}승 ${t.l}패${t.t ? ` ${t.t}무` : ''} · ${LG_FLAG(state.league)} ${LEAGUES[state.league || 'KBO'].ko}</p></div></div>`;
+  const nodes = hist.slice().reverse().map((h) => {
+    const champ = h.champion === t.id;
+    const ours = (h.awards || []).filter((a) => a.team === t.short).slice(0, 3);
+    return `<div class="tl-node ${champ ? 'gold' : ''}"><span class="tl-dot">${champ ? '🏆' : h.userRank}</span><div class="tl-card">
+      <div class="row between"><b>${h.season}</b><span class="tiny muted">${LG_FLAG(h.league)} ${h.rec ? `${h.rec.w}승 ${h.rec.l}패` : ''}</span></div>
+      <p class="small">정규시즌 <b class="${h.userRank <= 5 ? 'amber' : ''}">${h.userRank}위</b>${h.post ? ` · 가을야구 <b class="${champ ? 'gold' : ''}">${esc(h.post)}</b>` : ''}</p>
+      ${(h.stars || []).length ? `<div class="tl-stars">${h.stars.map((x) => `<span><img src="${playerImg({ ...x })}" alt="">${esc(x.name)}<small>${esc(x.line)}</small></span>`).join('')}</div>` : ''}
+      ${ours.length ? `<p class="tiny amber mt">🏅 ${ours.map((a) => `${esc(a.award)} ${esc(a.name || '')}`).join(' · ')}</p>` : ''}
+      <p class="tiny faint">우승 ${esc(state.teams[h.champion]?.short || '')}${h.fans ? ` · 팬 ${Math.round(h.fans / 1000) / 10}만` : ''}</p></div></div>`;
+  }).join('');
+  const found = `<div class="tl-node"><span class="tl-dot">⚾</span><div class="tl-card"><b>${hist[0]?.season ?? state.season} 창단</b><p class="small">${esc(t.name)}의 첫 시즌</p></div></div>`;
+  return head + tabs + `<div class="timeline mt">${cur}${nodes}${found}</div>`;
+}
 import { PROMOS, MERCH_LV, activePromo, gateFactors, merchMult } from '../../engine/biz.js';
 
 // ───────── 관중·수익 ─────────
@@ -63,8 +97,8 @@ import { ensureFront, frontLv, DEPTS, DEPT_COST, DEPT_UPKEEP, REGIONS, satLabel,
 import { flagOf } from '../../data/nations.js';
 import { capInfo } from '../../engine/kborules.js';
 
-const TAB_ICO = { biz: 'fans', front: 'club', facility: 'build', staff: 'staff', sponsor: 'sponsor', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
-const TABS = [['front', '프런트'], ['biz', '관중·수익'], ['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['hof', '명예의 전당'], ['achv', '업적'], ['finance', '재정·설정']];
+const TAB_ICO = { museum: 'league', biz: 'fans', front: 'club', facility: 'build', staff: 'staff', sponsor: 'sponsor', market: 'scout', trade: 'roster', hof: 'league', achv: 'fans', finance: 'money' };
+const TABS = [['front', '프런트'], ['biz', '관중·수익'], ['facility', '시설'], ['staff', '스태프'], ['sponsor', '스폰서'], ['market', '영입'], ['trade', '트레이드'], ['museum', '역사관'], ['achv', '업적'], ['finance', '재정·설정']];
 
 // ───────── 프런트 ─────────
 function frontView(t) {
@@ -295,7 +329,7 @@ function tradeView(t) {
 }
 
 // ───────── 명예의 전당 ─────────
-function hofView(t) {
+function hofView(t, inMuseum = false) {
   const cands = state.hofCandidates || [];
   const hof = state.hof || [];
   const nums = t.retiredNums || [];
@@ -304,7 +338,7 @@ function hofView(t) {
     return e.type === 'P' ? `통산 ${q.w || 0}승 ${q.sv || 0}세이브 ${q.so || 0}탈삼진` : `통산 ${b.h || 0}안타 ${b.hr || 0}홈런 ${b.rbi || 0}타점`;
   };
   return `
-    ${artHero('hof', `<span class="k">헌액 ${hof.length}명 · 영구결번 ${nums.length}개</span><h2>명예의 전당</h2><p>구단의 역사를 만든 이름들</p>`)}
+    ${inMuseum ? `<p class="small muted">헌액 ${hof.length}명 · 영구결번 ${nums.length}개</p>` : artHero('hof', `<span class="k">헌액 ${hof.length}명 · 영구결번 ${nums.length}개</span><h2>명예의 전당</h2><p>구단의 역사를 만든 이름들</p>`)}
     ${cands.length ? `<div class="sec-h"><h2>헌액 후보</h2></div>${cands.map((e) => `
       <div class="event-card" style="margin-bottom:10px">
         <h3>${esc(e.name)} <span class="small muted">#${e.num ?? '-'}</span></h3>
@@ -391,7 +425,7 @@ const SPOTS = [
   ['front', 'club', '프런트', 80, 46],
   ['sponsor', 'sponsor', '스폰서 광장', 50, 56],
   ['develop', 'develop', '훈련장', 27, 75.5],
-  ['hof', 'league', '명예의 전당', 79, 71.5],
+  ['museum', 'league', '역사관', 79, 71.5],
   ['market', 'scout', '공항', 36, 84.5],
 ];
 // 레벨에 따라 바뀌는 건물: [이미지 접두어, 중심 x%, 중심 y%, 너비%]
@@ -418,7 +452,7 @@ function spotInfo(t, k) {
     case 'front': return { sub: '이사회', alert: (state.board?.sat ?? 60) < 40 };
     case 'sponsor': { const open = Object.keys(SPONSOR_SLOTS).filter((sl) => !t.sponsors[sl]).length; return { sub: open ? `빈 자리 ${open}` : '계약 완료', alert: open > 0 && (state.sponsorOffers || []).length > 0 }; }
     case 'develop': { const fb = t.buildings?.futures; return { sub: fb?.build ? `🏗️ ${fb.build.weeks}주` : '육성', cls: fb?.build ? 'build' : '' }; }
-    case 'hof': return { sub: '', alert: (state.hofCandidates || []).length > 0 };
+    case 'museum': return { sub: '명예의 전당', alert: (state.hofCandidates || []).length > 0 };
     case 'market': return { sub: '외국인·FA' };
     default: return {};
   }
@@ -446,11 +480,11 @@ export function renderClub() {
   const view = ui.clubView || 'map';
   const head = `<div class="panel row gap card-accent clubhead"><span class="ownerav"><img src="${ownerImg(t.owner)}" alt="구단주"></span>${emblem(t, 54)}<div class="grow"><h2 class="disp" style="font-size:20px">${esc(t.name)}</h2><p class="small muted">${phil.icon} ${phil.ko} · ${LEAGUES[state.league || 'KBO'].flag} ${state.history.length + 1}년차 · 우승 ${titles}회 · 자금 <b class="amber">${formatMoney(t.cash)}</b></p></div></div>`;
   if (view === 'map') return `<section class="sec">${head}</section>${mapView(t)}`;
-  const body = { biz: bizView, front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
+  const body = { museum: museumView, biz: bizView, front: frontView, facility: facilityView, staff: staffView, sponsor: sponsorView, market: marketView, trade: tradeView, hof: hofView, achv: achvView, finance: financeView }[view](t);
   return `
   <section class="sec">
     <div class="row gap"><button class="btn sm ghost backmap" data-act="clubView" data-v="map">${icon('club', 22)}캠퍼스</button><h2 class="disp grow" style="font-size:19px">${TABS.find(([k]) => k === view)?.[1] || ''}</h2></div>
-    <div class="seg scrollseg icoseg mt">${TABS.map(([k, l]) => `<button class="${view === k ? 'on' : ''}" data-act="clubView" data-v="${k}">${icon(TAB_ICO[k], 22)}${l}${k === 'hof' && (state.hofCandidates || []).length ? ' •' : ''}</button>`).join('')}</div>
+    <div class="seg scrollseg icoseg mt">${TABS.map(([k, l]) => `<button class="${view === k ? 'on' : ''}" data-act="clubView" data-v="${k}">${icon(TAB_ICO[k], 22)}${l}${k === 'museum' && (state.hofCandidates || []).length ? ' •' : ''}</button>`).join('')}</div>
     <div class="mt">${body}</div>
   </section>`;
 }

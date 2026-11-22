@@ -524,6 +524,12 @@ function endSeason(state) {
     userRank: state.finalStandings.indexOf(user.id) + 1,
     awards: awards.map((a) => ({ ...a, name: state.players[a.pid]?.name, team: state.teams[state.players[a.pid]?.team]?.short })),
     ledger: { ...user.ledger },
+    league: state.league || 'KBO',
+    rec: { w: user.w, l: user.l, t: user.t },
+    fans: user.fans,
+    stad: user.buildings?.stadium?.lv || 1,
+    post: champ === user.id ? '우승' : ((state.post?.rounds || []).filter((r) => r.high === user.id || r.low === user.id).pop()?.name || null),
+    stars: userSeasonStars(state, user),
   });
   const userRank = state.finalStandings.indexOf(user.id) + 1;
   {
@@ -624,6 +630,16 @@ export function proceedToDraft(state) {
 export function dropPlayer(state, id) {
   delete state.players[id];
   for (const k in state.rels || {}) if (k.split('|').includes(id)) delete state.rels[k];
+}
+// 시즌 우리 팀 MVP 후보(타자·투수 한 명씩)
+function userSeasonStars(state, user) {
+  const ps = teamPlayers(state, user);
+  const b = ps.filter((p) => p.type === 'B' && p.cur?.bat?.pa >= 80).sort((x, y) => batLine(y.cur.bat).ops - batLine(x.cur.bat).ops)[0];
+  const q = ps.filter((p) => p.type === 'P' && p.cur?.pit?.outs >= 90).sort((x, y) => pitLine(x.cur.pit).era - pitLine(y.cur.pit).era)[0];
+  const out = [];
+  if (b) { const l = batLine(b.cur.bat); out.push({ id: b.id, name: b.name, type: 'B', pos: b.pos, nat: b.nat, eth: b.eth, foreign: b.foreign, age: b.age, line: `타율 ${l.avg.toFixed(3).replace(/^0/, '')} · ${b.cur.bat.hr}홈런 · ${b.cur.bat.rbi}타점` }); }
+  if (q) { const l = pitLine(q.cur.pit); out.push({ id: q.id, name: q.name, type: 'P', pos: q.pos, nat: q.nat, eth: q.eth, foreign: q.foreign, age: q.age, line: `${q.cur.pit.w}승 ${q.cur.pit.l}패 · ERA ${l.era.toFixed(2)}${q.cur.pit.sv ? ` · ${q.cur.pit.sv}세이브` : ''}` }); }
+  return out;
 }
 function retirePlayer(state, p) {
   const team = state.teams[p.team];
