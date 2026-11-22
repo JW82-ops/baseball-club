@@ -1050,3 +1050,21 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .pr-b em { font-style: normal; font-size: 11.5px; color: var(--gold); font-weight: 700; }
 .pr-on { position: absolute; right: 8px; top: 8px; font-size: 10.5px; font-weight: 900; color: #3d2300; background: var(--gold); padding: 1px 8px; border-radius: 99px; }
 .campus-more { grid-template-columns: repeat(2, 1fr) !important; }
+
+/* 수훈 선수 인터뷰 · 은퇴식 */
+.iview { text-align: center; }
+.iv-stage { position: relative; height: 210px; margin: -16px -16px 10px; overflow: hidden; border-radius: 14px 14px 0 0; background: radial-gradient(circle at 50% 30%, #2a4a8a, #101c3a 70%); }
+.iv-stage::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 30px, transparent 30px 60px); }
+.iv-tag { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 2; font-size: 12px; font-weight: 900; background: var(--gold); color: #3d2300; padding: 3px 12px; border-radius: 99px; white-space: nowrap; }
+.iv-body { position: absolute; left: 50%; bottom: -30px; height: 230px; transform: translateX(-50%); filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .5)); }
+.iv-mics { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); display: flex; gap: 22px; z-index: 2; }
+.iv-mics i { display: block; width: 10px; height: 54px; border-radius: 5px; background: linear-gradient(180deg, #555 0 30%, #222 30%); transform-origin: bottom; }
+.iv-mics i:nth-child(1) { transform: rotate(-18deg); } .iv-mics i:nth-child(3) { transform: rotate(18deg); }
+.iv-score { position: absolute; right: 10px; bottom: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; font-size: 13px; background: rgba(0, 0, 0, .55); padding: 3px 10px; border-radius: 99px; }
+.iview h2 { font-size: 26px; }
+.iv-quote { margin: 10px auto 4px; padding: 10px 14px; border-radius: 16px; background: #fffaf0; color: #2b2014; font-weight: 600; font-size: 14px; line-height: 1.5; text-shadow: none; max-width: 330px; }
+.iview .choice { text-align: left; }
+.retire { display: flex; gap: 12px; align-items: center; padding: 12px; margin-bottom: 10px; border-radius: 18px; background: linear-gradient(135deg, rgba(255, 197, 61, .14), rgba(255, 255, 255, .03)); border: 1px solid rgba(255, 197, 61, .35); }
+.retire img { width: 84px; height: 110px; object-fit: contain; object-position: bottom; flex: none; filter: sepia(.25) drop-shadow(0 4px 6px rgba(0, 0, 0, .4)); }
+.retire b.disp { font-size: 20px; }
+.retire-q { font-size: 12.5px; color: var(--gold-hi); margin-top: 4px; font-style: italic; }

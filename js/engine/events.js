@@ -6,6 +6,7 @@ import { ROSTER, BAT_ATTRS } from '../data/constants.js';
 import { assignNumber } from './hof.js';
 import { leagueNat } from '../data/nations.js';
 import { regCount } from './roster.js';
+import { getRel, addRel } from './mood.js';
 
 const P = (state, id) => state.players[id];
 const mine = (state) => state.teams[state.userTeamId];
@@ -14,6 +15,50 @@ const morale = (p, v) => { p.morale = clamp((p.morale ?? 70) + v, 10, 100); };
 
 // ───────── 주간 돌발 이벤트 ─────────
 const EVENTS = {
+  clash: {
+    w: 3,
+    build(state, t) {
+      const fl = firstTeam(state, t);
+      let pair = null, worst = -25;
+      for (let i = 0; i < fl.length; i++) for (let j = i + 1; j < fl.length; j++) { const v = getRel(state, fl[i].id, fl[j].id); if (v < worst) { worst = v; pair = [fl[i], fl[j]]; } }
+      if (!pair) {
+        // 관계 기록이 없으면 성적 부진 + 자존심 강한 베테랑 둘 사이에서 가끔 생겨요
+        const vets = fl.filter((p) => p.age >= 28 && (p.morale ?? 70) < 62);
+        if (vets.length < 2 || !chance(0.5)) return null;
+        pair = vets.slice(0, 2);
+      }
+      const [a, b] = pair.sort((x, y) => calcOvr(y) - calcOvr(x));
+      return {
+        pid: a.id, vid: b.id,
+        title: '라커룸 갈등',
+        desc: `${a.name}와(과) ${b.name}이(가) 라커룸에서 언성을 높였어요. 기자들 귀에 들어가기 전에 정리가 필요해요.`,
+        choices: [
+          { label: '둘을 불러 면담한다', sub: '관계 회복, 두 선수 기분 +4 (감독 리더십이 높을수록 잘 풀려요)' },
+          { label: `${b.name}을(를) 2군으로 보낸다`, sub: `${a.name} 기분 +6, ${b.name} 기분 -12` },
+          { label: '선수들끼리 풀게 둔다', sub: '팀 분위기 하락 위험' },
+        ],
+      };
+    },
+    apply(state, t, pr, i) {
+      const a = P(state, pr.pid), b = P(state, pr.vid);
+      if (!a || !b) return '';
+      if (i === 0) {
+        const lead = t.staff?.manager?.stats?.leadership ?? 50;
+        const ok = chance(0.45 + lead / 200);
+        addRel(state, a.id, b.id, ok ? 45 : 15);
+        morale(a, 4); morale(b, 4);
+        return ok ? `면담 끝에 둘이 악수했어요. 오히려 사이가 좋아졌어요.` : `일단 봉합은 했지만 앙금이 조금 남았어요.`;
+      }
+      if (i === 1) {
+        if (b.level === 1) { b.level = 2; ensureLineupValid(state, t); }
+        morale(a, 6); morale(b, -12); addRel(state, a.id, b.id, -10);
+        return `${b.name}이(가) 2군으로 내려갔어요. 라커룸은 조용해졌지만 ${b.name}은(는) 서운해해요.`;
+      }
+      addRel(state, a.id, b.id, -15);
+      firstTeam(state, t).forEach((p) => morale(p, -2));
+      return '갈등이 계속되며 라커룸 분위기가 가라앉았어요. (1군 기분 -2)';
+    },
+  },
   slump: {
     w: 3,
     build(state, t) {

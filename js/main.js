@@ -49,6 +49,8 @@ import { stadiumArt } from './ui/components.js';
 import { showLearn, shortWhy } from './ui/screens/learn.js';
 import { openPitchCall } from './ui/screens/pitchcall.js';
 import { PROMOS, setPromo, upgradeMerch } from './engine/biz.js';
+import { openInterview } from './ui/screens/story.js';
+function afterGameStory() { if (state?.pendingInterview && !isModalOpen()) setTimeout(() => { if (state.pendingInterview && !isModalOpen()) openInterview(); }, 900); }
 import { backupToFile, restoreFromFile, restoreToEmptySlot } from './ui/backup.js';
 let saveFailShown = 0;
 window.addEventListener('savefail', () => { if (Date.now() - saveFailShown > 60000) { saveFailShown = Date.now(); toast('기기 저장 공간이 부족해 저장하지 못했어요. 구단 → 재정·설정에서 백업 파일로 저장하고, 안 쓰는 슬롯을 지워 주세요', 'bad'); } });
@@ -209,6 +211,7 @@ function simDays(n) {
   save();
   render();
   window.scrollTo(0, 0);
+  if (n > 1) state.pendingInterview = null; else afterGameStory();
   if (n > 1) toast(`${wins + losses}경기 진행: ${wins}승 ${losses}패${state.pendingEvent ? ' — 확인할 이슈가 있어요' : ''}`, wins >= losses ? 'good' : 'bad');
   else userResultToast(last);
   if (state.phase === 'post') toast('정규시즌 종료! 포스트시즌이 시작됐어요', 'big');
@@ -237,6 +240,7 @@ function continueQuick() {
   const res = simDay(state, { liveGame: g });
   save(); render(); window.scrollTo(0, 0);
   userResultToast(res);
+  afterGameStory();
   if (state.phase === 'post' && !state.post?.champion) toast('포스트시즌 진행 중', 'big');
 }
 // 승부처 VS 컷인: 투수(왼쪽) vs 타자(오른쪽)
@@ -289,6 +293,7 @@ function finishLive() {
   render();
   window.scrollTo(0, 0);
   userResultToast(res);
+  afterGameStory();
 }
 
 // ───────── 액션 ─────────

@@ -19,7 +19,7 @@ import { checkPromotionOffer, promote } from './promotion.js';
 import { offseasonMilitary, returnFromService, militaryWeek, ensureMil } from './military.js';
 import { eventFor, runTournament, EVENTS as NAT_EVENTS } from './national.js';
 import { futuresWeek, futuresAwards } from './futures.js';
-import { snsAfterGame, trackRivalry, checkMilestones, rookieDebut, lastSeasonCheck, retirementCeremony, pressTriggers, snsPost } from './story.js';
+import { queueInterview, snsAfterGame, trackRivalry, checkMilestones, rookieDebut, lastSeasonCheck, retirementCeremony, pressTriggers, snsPost } from './story.js';
 import { trainingProgress, finishCamp } from './training.js';
 import { checkAchievements } from './achievements.js';
 import { pushMail } from './mail.js';
@@ -142,7 +142,9 @@ function gameStar(state, g, sd) {
 function userGameStory(state, g, sg) {
   const uidv = state.userTeamId;
   const side = sg.home === uidv ? g.home : g.away;
-  snsAfterGame(state, g, sg, gameStar(state, g, side));
+  const star = gameStar(state, g, side);
+  snsAfterGame(state, g, sg, star);
+  queueInterview(state, g, sg, star);
   trackRivalry(state, g, sg);
   rookieDebut(state, g);
   checkMilestones(state, [...side.lineup.map((l) => l.pid), ...side.used]);
@@ -617,7 +619,7 @@ function retirePlayer(state, p) {
   const team = state.teams[p.team];
   if (team) team.roster = team.roster.filter((x) => x !== p.id);
   const car = careerTotals(p);
-  const entry = { id: p.id, name: p.name, type: p.type, pos: p.pos, num: p.num, lastTeam: team?.name, age: p.age, peak: Math.max(...p.dev, calcOvr(p)), awards: p.awards, car, wasUser: p.team === state.userTeamId, userSeasons: p.history.filter((h) => h.t === state.userTeamId).length, origin: p.origin, draft: p.draft };
+  const entry = { id: p.id, name: p.name, type: p.type, pos: p.pos, num: p.num, nat: p.nat, eth: p.eth, foreign: p.foreign, retiredSeason: state.season, quote: p.age >= 37 ? '야구 덕분에 행복했습니다. 이제 팬으로 돌아갈게요.' : '몸은 떠나도 마음은 늘 이 팀에 있을 거예요.', lastTeam: team?.name, age: p.age, peak: Math.max(...p.dev, calcOvr(p)), awards: p.awards, car, wasUser: p.team === state.userTeamId, userSeasons: p.history.filter((h) => h.t === state.userTeamId).length, origin: p.origin, draft: p.draft };
   state.retired.push(entry);
   considerHof(state, entry);
   if (state.retired.length > 400) state.retired.shift();

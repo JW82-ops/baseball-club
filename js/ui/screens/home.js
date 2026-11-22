@@ -23,6 +23,7 @@ import { scoutLevelOf } from '../../engine/club.js';
 import { WINTER } from '../../engine/dev2.js';
 import { prepDone } from './analysis.js';
 import { sponsorLogo, missionImg } from '../../data/brandArt.js';
+import { retireCards } from './story.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -306,6 +307,7 @@ function offseasonView() {
       <p>우리 구단 정규시즌 ${h.userRank}위${h.champion === user.id ? ' · 정상에 섰어요!' : ''}</p>`, 'tall')}
   </section>
   ${natCard()}
+  ${retireCards()}
   <section class="sec"><div class="panel row gap"><span style="font-size:26px">💾</span><div class="grow"><b class="small">시즌이 끝났어요 — 백업해 두세요</b><p class="tiny muted">파일로 저장해 두면 기기를 바꿔도 이어서 할 수 있어요.</p></div><button class="btn sm primary" data-act="backupFile">저장</button></div></section>
   ${state.promotionOffer ? `<section class="sec"><div class="event-card levelup">
     <span class="small amber">${LEAGUES[state.promotionOffer].flag} 리그 승격 제안</span>

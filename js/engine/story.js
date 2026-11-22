@@ -44,6 +44,42 @@ export function snsAfterGame(state, g, sg, mvp) {
   }
 }
 
+// ───────── 경기 후 수훈 선수 인터뷰 ─────────
+export function queueInterview(state, g, sg, star) {
+  const uid = state.userTeamId;
+  const side = sg.home === uid ? g.home : g.away, opp = sg.home === uid ? g.away : g.home;
+  if (side.runs <= opp.runs) return;
+  if (state.day - (state.lastInterviewDay ?? -99) < 4 || !chance(0.5)) return;
+  let hero = null, line = '', kind = 'bat';
+  const sp = state.players[side.starter], spt = g.stats[side.starter]?.pit;
+  if (sp && spt && ((spt.outs >= 21 && spt.r <= 1) || spt.so >= 9)) { hero = sp; kind = 'pit'; line = `${Math.floor(spt.outs / 3)}이닝 ${spt.so}탈삼진 ${spt.r}실점`; }
+  else if (star) { const b = g.stats[star.id]?.bat; hero = star; line = `${b.ab}타수 ${b.h}안타${b.hr ? ` ${b.hr}홈런` : ''} ${b.rbi}타점`; }
+  if (!hero) return;
+  state.lastInterviewDay = state.day;
+  const walkoff = sg.home === uid && g.log.some((e) => e.type === 'walkoff');
+  state.pendingInterview = { pid: hero.id, kind, line, score: `${side.runs}:${opp.runs}`, oppId: opp.teamId, walkoff, day: state.day, season: state.season };
+}
+export function interviewQuote(p, iv) {
+  const young = p.age <= 24;
+  const q = iv.kind === 'pit'
+    ? ['포수 리드만 믿고 던졌어요. 오늘은 직구가 정말 좋았습니다!', '마운드에서 팬들 함성이 들려서 힘이 났어요.', '한 타자 한 타자 집중했더니 여기까지 왔네요.']
+    : ['노림수가 딱 맞았어요. 감독님이 믿어주셔서 자신 있게 돌렸습니다!', '전 타석 실수를 만회하고 싶었는데 다행이에요.', '팬분들 응원 소리에 배트가 저절로 나갔어요!'];
+  if (young) q.push('아직 배울 게 많아요. 선배님들 덕분입니다!');
+  if (iv.walkoff) return '끝내기라니… 아직도 손이 떨려요! 평생 못 잊을 거예요.';
+  return q[(p.id.length + iv.day) % q.length];
+}
+export function resolveInterview(state, idx) {
+  const iv = state.pendingInterview;
+  state.pendingInterview = null;
+  const p = iv && state.players[iv.pid];
+  if (!p) return '';
+  const t = mine(state);
+  if (idx === 0) { addMoodEvent(p, '감독의 공개 칭찬', 8, 4); t.fans += 300; return `${p.name}의 어깨가 으쓱해졌어요. (기분 +8, 팬 +300)`; }
+  if (idx === 1) { firstTeam(state, t).forEach((x) => addMoodEvent(x, '팀워크 강조', 2, 3)); return '선수단 전체 분위기가 좋아졌어요. (1군 기분 +2)'; }
+  addMoodEvent(p, '더 큰 기대', 4, 4); t.fans += 500; snsPost(state, `감독님이 ${p.name} 더 큰 선수 된다고 했다!! 기대된다`, 'pos', 1.3);
+  return `기사가 쏟아졌어요. "${p.name}, 더 큰 선수가 될 것" (팬 +500)`;
+}
+
 // ───────── 라이벌 ─────────
 export function trackRivalry(state, g, sg) {
   const t = mine(state);
