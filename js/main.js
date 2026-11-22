@@ -27,6 +27,7 @@ import { renderMail } from './ui/screens/mail.js';
 import { resolveMail, unreadCount } from './engine/mail.js';
 import { signSponsor, cancelSponsor } from './engine/sponsor.js';
 import { doAct, submitPetition } from './engine/region.js';
+import { offerManager, fireManager, talkMgr, buyout } from './engine/manager.js';
 import { annualOffer, multiOffer, releaseNego, faMarketOffer, fairSalary, negoPreview } from './engine/contracts.js';
 import { npcImg, playerImg } from './ui/portraits.js';
 import { evaluateTrade, executeTrade } from './engine/trade.js';
@@ -429,6 +430,13 @@ registerActions({
     if (r.ok) { sfx.levelup(); closeModal(); }
     commit(r.msg, r.ok ? 'good' : 'bad');
   },
+  mgrOffer: (d) => {
+    const r = offerManager(state, d.id, { raise: !!d.raise });
+    if (r.ok) { sfx.levelup(); closeModal(); commit(r.msg, 'good'); return; }
+    toast(r.msg, r.refused ? 'bad' : 'info'); save(); openModal(staffMarketHtml('manager'), { keepScroll: true });
+  },
+  mgrTalk: (d) => { const r = talkMgr(state, d.k); commit(r.msg, r.ok ? 'good' : 'bad'); },
+  mgrFire: () => { const m = userTeam(state).staff.manager; if (!m) return; confirmBox(`${m.name} 감독을 해임할까요? 남은 계약에 대한 위약금 ${formatMoney(buyout(m))}을 내야 하고, 감독을 자주 바꾸면 다음 후보들이 꺼려요.`, '해임', () => { const pen = fireManager(state); commit(`감독 해임 (위약금 ${formatMoney(pen)})`, 'bad'); }, 'danger'); },
   signSponsor: (d) => { const r = signSponsor(state, d.id); if (r.ok) sfx.coin(); commit(r.msg, r.ok ? 'good' : 'bad'); },
   cancelSponsor: (d) => confirmBox('계약을 해지하면 시즌 금액의 30%를 위약금으로 내야 해요. 해지할까요?', '해지', () => { const fee = cancelSponsor(state, d.s); commit(`계약 해지 (위약금 ${formatMoney(fee || 0)})`); }, 'danger'),
   signPlayer: (d) => {

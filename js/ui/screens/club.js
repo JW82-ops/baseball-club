@@ -7,7 +7,7 @@ import { formatMoney, formatFans } from '../../core/util.js';
 import { PHILOSOPHIES, SEASON_LENGTHS } from '../../data/constants.js';
 import { BUILDINGS, SUBS, STAFF_ROLES, MANAGER_STYLES, SPONSOR_SLOTS, SPONSOR_TIERS, LEAGUES, MAX_CONCURRENT_BUILDS } from '../../data/club.js';
 import { UPKEEP, bLv, bInfo, bNext, subLv, slotsUsed, slotsTotal, activeBuilds, canUpgradeBuilding, canBuildSub, subNextLevel, buildingCost, staffOvr, staffWeeklyOf, staffSignOf, staffWeekly, scoutLevelOf } from '../../engine/club.js';
-import { foreignCount, foreignMax, signingFee } from '../../engine/market.js';
+import { foreignCount, foreignMax, signingFee, newClubPerk } from '../../engine/market.js';
 import { calcOvr } from '../../engine/player.js';
 import { HOF_BAR } from '../../engine/hof.js';
 import { brandValue, tierFor } from '../../engine/sponsor.js';
@@ -21,6 +21,7 @@ import { recordsView } from './league.js';
 import { playerImg } from '../portraits.js';
 import { ensureRegion, ACTS, actState, apMax, partnerMax, partnerWeekly, PETITIONS, petitionState, petitionOdds, electionYear, PRESS_COST } from '../../engine/region.js';
 import { weekAbs } from '../../engine/mail.js';
+import { ensureMgr, managerCandidates, willingness, willLabel, hirePackage, buyout, relLabel, relMod, VOICES, CONDS, annualPay } from '../../engine/manager.js';
 
 // ───────── 구단 역사관: 연표 · 우승 앨범 · 명예의 전당 · 기록 ─────────
 const LG_FLAG = (k) => LEAGUES[k || 'KBO']?.flag || '';
@@ -214,7 +215,36 @@ export function subSheetHtml(sk) {
 }
 
 // ───────── 스태프 ─────────
+function managerCard(t) {
+  const m = ensureMgr(t.staff.manager);
+  if (!m) return `<div class="staff-card mgrcard empty-mgr"><div class="row gap"><span class="sgrade sg-D">-</span><div class="grow"><b>🧢 감독 공석</b><div class="tiny muted">대행 체제(기본 능력 40). 구단의 첫 감독을 모셔 오세요.</div></div><button class="btn sm primary" data-act="staffMarket" data-r="manager">감독 찾기</button></div></div>`;
+  const rl = relLabel(m.rel);
+  const V = VOICES[m.voice];
+  const r = m.req && !m.req.done ? m.req : null;
+  const now = weekAbs(state);
+  const grow = m.growLog || [];
+  const potTxt = m.pot >= 14 ? '아직 한참 클 감독' : m.pot >= 6 ? '조금 더 클 여지' : m.pot > 0 ? '거의 완성형' : '완성형';
+  return `<div class="staff-card mgrcard">
+    <div class="row gap">${bodyHtml(staffImg(m), t.color, 'staff')}<span class="sgrade sg-${m.grade}">${m.grade}</span>
+      <div class="grow"><b>🧢 감독 ${esc(m.name)}</b> <span class="small muted">${m.age}세</span>
+        <div class="tiny muted">${esc(m.bg)} · 계약 ${Math.max(0, Math.ceil(m.years))}년 · 주급 ${formatMoney(staffWeeklyOf(m))}${m.payMult > 1 ? ' (인상분 포함)' : ''}</div>
+        <div class="chips mt">${V ? `<span class="chip">${V.icon} ${V.ko}</span>` : ''}${(m.conds || []).map((c) => `<span class="chip">${CONDS[c].icon} ${CONDS[c].ko}</span>`).join('')}<span class="chip">🌱 ${potTxt}</span></div></div></div>
+    <div class="mgr-rel mt"><div class="row between"><span class="small">${rl[2]} 구단과의 관계 <b class="${rl[1]}">${rl[0]}</b></span><b>${Math.round(m.rel)}</b></div>
+      <div class="rg-bar trust"><i style="width:${Math.round(m.rel)}%"></i></div>
+      <p class="tiny muted">관계가 좋으면 감독 능력 +${Math.max(0, relMod(m))}까지, 나쁘면 −5까지. 너무 나빠지면 사임하거나 재계약을 거부해요. ${V ? V.desc : ''}</p></div>
+    ${r ? `<div class="mgr-req mt"><b class="small">📋 감독 요청 · ${r.area}</b><p class="small">${esc(r.goal)}</p><p class="tiny muted">${r.off ? '다음 캠프 전까지' : `${Math.max(0, r.due - now)}주 남음`}${r.promised === 0 ? ' · 약속함' : r.promised === 1 ? ' · 검토 중' : r.promised == null ? ' · 메일에 답장이 필요해요' : ''}</p></div>` : ''}
+    <div class="mt">${Object.entries(STAFF_ROLES.manager.stats).map(([k, ko]) => ratingBar(ko, m.stats[k])).join('')}</div>
+    ${grow.length ? `<p class="tiny muted mt">성장 기록: ${grow.slice(-4).map((g) => `${g.s} ${g.from}→${g.to}`).join(' · ')}</p>` : '<p class="tiny faint mt">시즌이 끝날 때마다 성장해요. 젊을수록, 성적과 관계가 좋을수록 많이 커요.</p>'}
+    <div class="mgr-acts mt">
+      <button class="btn sm" data-act="mgrTalk" data-k="trust">🤝 신뢰 표현</button>
+      <button class="btn sm" data-act="mgrTalk" data-k="listen">👂 고민 듣기</button>
+      <button class="btn sm" data-act="mgrTalk" data-k="push">📢 성적 압박</button>
+    </div>
+    <div class="row gap mt"><button class="btn sm ghost grow" data-act="staffMarket" data-r="manager">다른 감독 알아보기</button><button class="btn sm ghost danger" data-act="mgrFire">해임 · 위약금 ${formatMoney(buyout(m))}</button></div>
+  </div>`;
+}
 function staffCard(t, role) {
+  if (role === 'manager') return managerCard(t);
   const R = STAFF_ROLES[role];
   const s = t.staff[role];
   const ovr = staffOvr(s);
@@ -233,7 +263,31 @@ function staffView(t) {
     <p class="tiny faint">코치의 지도 능력은 해당 능력치 성장 속도에 직접 반영돼요. 능력 50이 기준이고, 95면 약 1.2배예요.</p>
     ${Object.keys(STAFF_ROLES).map((r) => staffCard(t, r)).join('')}`;
 }
+function mgrMarketHtml() {
+  const t = userTeam(state);
+  if (!state.mgrMarket) state.mgrMarket = managerCandidates(state);
+  const cur = t.staff.manager;
+  return `<h2 class="disp" style="font-size:20px">🧢 감독 후보</h2>
+    <p class="small muted mt">현재: ${cur ? `${esc(cur.name)} (${cur.grade}) · 해임 위약금 ${formatMoney(buyout(cur))}` : '공석'} · 자금 ${formatMoney(t.cash)}</p>
+    <p class="tiny faint">거물 감독일수록 신생·약체 구단엔 잘 안 오려고 해요. 젊은 감독은 기회를 반기고, 함께 크면서 성장해요. 감독을 자주 자르면 다음 감독들이 꺼려요.</p>
+    ${state.mgrMarket.map((m) => {
+      const w = willingness(state, m); const wl = willLabel(w);
+      const pk = hirePackage(state, m);
+      const V = VOICES[m.voice];
+      return `<div class="staff-card ${m.refused ? 'dim' : ''}">
+        <div class="row gap">${bodyHtml(staffImg(m), t.color, 'staff')}<span class="sgrade sg-${m.grade}">${m.grade}</span><div class="grow"><b>${esc(m.name)}</b> <span class="small muted">${m.age}세 · 종합 ${staffOvr(m)}</span><div class="tiny muted">${esc(m.bg)} · 주급 ${formatMoney(staffWeeklyOf(m))} · ${m.years}년</div></div>
+          <div class="will ${wl[1]}"><small>의향</small><b>${m.refused ? '거절' : wl[0]}</b></div></div>
+        <div class="chips mt">${V ? `<span class="chip">${V.icon} ${V.ko}</span>` : ''}${m.age < 45 ? '<span class="chip good">🌱 성장형 젊은 감독</span>' : m.age >= 56 ? '<span class="chip">🎖️ 베테랑</span>' : ''}${m.style ? `<span class="chip">${MANAGER_STYLES[m.style].icon} ${MANAGER_STYLES[m.style].ko}</span>` : ''}</div>
+        ${(m.conds || []).length ? `<div class="conds mt">${m.conds.map((c) => `<div><b>${CONDS[c].icon} 조건: ${CONDS[c].ko}</b><small>${CONDS[c].desc}</small></div>`).join('')}</div>` : '<p class="tiny muted mt">특별한 조건 없음</p>'}
+        ${(m.crew || []).length ? `<div class="crew mt">${m.crew.map((c) => `<div class="row gap small"><span class="sgrade sg-${c.grade}" style="width:26px;height:26px;font-size:13px">${c.grade}</span><span class="grow">${STAFF_ROLES[c.role].ko} <b>${esc(c.name)}</b> <span class="tiny muted">종합 ${staffOvr(c)}${t.staff[c.role] ? ` · 현 ${esc(t.staff[c.role].name)} 교체` : ''}</span></span></div>`).join('')}</div>` : ''}
+        <div class="mt">${Object.entries(STAFF_ROLES.manager.stats).map(([k, ko]) => ratingBar(ko, m.stats[k], null, null, cur ? `<span class="tiny ${m.stats[k] >= cur.stats[k] ? 'good' : 'bad'}">${m.stats[k] >= cur.stats[k] ? '▲' : '▼'}</span>` : '')).join('')}</div>
+        <p class="tiny muted mt">총 비용 ${formatMoney(pk.total)} = 계약금 ${formatMoney(pk.sign)}${pk.crew.length ? ` + 사단 ${formatMoney(pk.crew.reduce((a, x) => a + x.sign, 0))}` : ''}${pk.penMgr + pk.crew.reduce((a, x) => a + x.pen, 0) ? ` + 위약금 ${formatMoney(pk.penMgr + pk.crew.reduce((a, x) => a + x.pen, 0))}` : ''}</p>
+        ${m.refused ? '<p class="small bad center mt">이번 시즌엔 우리 제안을 거절했어요</p>' : `<div class="row gap mt"><button class="btn grow ${t.cash >= pk.total ? 'primary' : ''}" data-act="mgrOffer" data-id="${m.id}" ${t.cash >= pk.total ? '' : 'disabled'}>제안하기</button><button class="btn" data-act="mgrOffer" data-id="${m.id}" data-raise="1">연봉 +25%로 제안</button></div>`}
+      </div>`;
+    }).join('')}`;
+}
 export function staffMarketHtml(role) {
+  if (role === 'manager') return mgrMarketHtml();
   const t = userTeam(state);
   const R = STAFF_ROLES[role];
   const cur = t.staff[role];
@@ -354,7 +408,7 @@ function marketView(t) {
   return `
     <div class="sec-h"><h2>FA 시장</h2><span class="sub">${fa.length ? `${fa.length}명` : '오프시즌에 열려요'}</span></div>
     ${fa.length ? `<p class="tiny faint">연봉과 계약 기간을 제시해 협상해요. 4번 거절당하면 다른 구단으로 가요. 캠프가 시작되면 남은 FA는 다른 구단과 계약해요.</p><div class="panel plist mt">${fa.sort((a, b) => calcOvr(b) - calcOvr(a)).map((p) => marketRow(p, t, true)).join('')}</div>` : '<div class="panel empty">시즌이 끝나고 계약 협상이 마감되면 FA 선수들이 시장에 나와요.</div>'}
-    <div class="sec-h mt-l"><h2>외국인 선수</h2><span class="sub">보유 ${foreignCount(state, t)}/${foreignMax(state)}</span></div>
+    <div class="sec-h mt-l"><h2>외국인 선수</h2><span class="sub">보유 ${foreignCount(state, t)}/${foreignMax(state)}${newClubPerk(state) ? ' · 신생팀 +1' : ''}</span></div>
     <p class="tiny faint">즉시 전력감이지만 연봉이 비싸요. 금액은 계약금이고, 연봉은 매주 나눠 나가요.</p>
     <div class="panel plist mt">${fp.map((p) => marketRow(p, t, false)).join('') || '<div class="empty">이번 시즌 시장이 닫혔어요.</div>'}</div>
     <div class="sec-h mt-l"><h2>📋 웨이버 공시</h2><button class="linkish" data-act="learn" data-k="waiver">웨이버란?</button></div>

@@ -11,6 +11,8 @@ import { aiTradeOffer, evaluateTrade, executeTrade, playerValue } from './trade.
 import { brandValue, tierFor, genSponsorOffers } from './sponsor.js';
 import { resolvePress } from './story.js';
 import { resolvePartnerMail, resolveCityEvent } from './region.js';
+import { resolveIncident } from './character.js';
+import { resolveMgrReq, resolveMgrQuit, resolveMgrPoach, resolveMgrRenew } from './manager.js';
 
 export const weekAbs = (state) => state.season * 100 + Math.floor(state.day / 6);
 const mine = (state) => state.teams[state.userTeamId];
@@ -306,6 +308,11 @@ export function resolveMail(state, id, idx) {
     case 'press': return resolvePress(state, m, idx);
     case 'partner': return resolvePartnerMail(state, m, idx);
     case 'cityEv': return resolveCityEvent(state, m, idx);
+    case 'mgrReq': return resolveMgrReq(state, m, idx);
+    case 'incident': return resolveIncident(state, m, idx);
+    case 'mgrQuit': return resolveMgrQuit(state, m, idx);
+    case 'mgrPoach': return resolveMgrPoach(state, m, idx);
+    case 'mgrRenew': return resolveMgrRenew(state, m, idx);
     default: return '';
   }
 }
@@ -319,7 +326,7 @@ export function weeklyMailUpkeep(state) {
   for (const m of state.inbox || []) {
     if (m.resolved || now - m.week < 2) continue;
     const last = m.choices.length - 1;
-    const msg = resolveMail(state, m.id, m.kind === 'tradeOffer' ? 1 : last);
+    const msg = resolveMail(state, m.id, m.kind === 'tradeOffer' ? 1 : m.kind === 'mgrRenew' ? 1 : last);
     m.auto = true;
     const p = m.from && state.players[m.from];
     if (p) addMoodEvent(p, '메일에 답이 없음', -4, 3);

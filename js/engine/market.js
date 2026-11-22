@@ -14,7 +14,9 @@ const FOREIGN_FIRST = ['마이클', '데이비드', '라이언', '조시', '케�
 const FOREIGN_LAST = ['존슨', '스미스', '로드리게스', '마르티네스', '가르시아', '페레스', '윌리엄스', '브라운', '데이비스', '로페즈', '에르난데스', '앤더슨', '톰슨', '화이트', '클락', '레예스', '산체스', '라미레스', '페냐', '카브레라', '알칸타라', '스톤', '헤이즈', '메디나'];
 const FOREIGN_FROM = ['미국', '미국', '미국', '도미니카', '도미니카', '베네수엘라', '쿠바', '푸에르토리코', '멕시코', '호주', '캐나다', '대만', '일본'];
 export const FOREIGN_MAX = 3;
-export const foreignMax = (state) => LEAGUES[state.league || 'KBO'].foreignMax;
+// 신생팀 혜택: 창단 후 두 시즌은 외국인 선수 1명 더
+export const newClubPerk = (state) => (state.history || []).length < 2 && (state.league || 'KBO') === 'KBO';
+export const foreignMax = (state) => LEAGUES[state.league || 'KBO'].foreignMax + (newClubPerk(state) ? 1 : 0);
 
 export function foreignCount(state, team) {
   return teamPlayers(state, team).filter((p) => p.foreign).length;

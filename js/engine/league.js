@@ -128,7 +128,8 @@ export function createNewGame(opts) {
     ledger: { income: 0, expense: 0, ticket: 0, merch: 0, salary: 0, prize: 0 },
     autoRest: true, stealMode: 'normal',
   };
-  const userS = ({ develop: 67, balanced: 69, win: 71 }[user.philosophy] ?? 68) + ({ easy: 3, normal: 0, hard: -2 }[opts.difficulty || 'normal']);
+  // 신생 구단은 리그 최약체로 출발해요 (기존 구단 최저 67)
+  const userS = ({ develop: 64, balanced: 65.5, win: 67 }[user.philosophy] ?? 65.5) + ({ easy: 3, normal: 0, hard: -2 }[opts.difficulty || 'normal']);
   state.teams.user = user;
   state.teamOrder.push('user');
   generateRoster(state, user, userS, user.philosophy, 'KBO', false);

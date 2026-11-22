@@ -1269,3 +1269,19 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .gl-bar span { position: relative; display: block; text-align: right; padding-right: 8px; font-size: 11px; font-weight: 800; line-height: 18px; }
 .gl-cheer { padding: 3px 10px !important; font-size: 11.5px !important; }
 .gl-b { width: 44px; text-align: center; }
+
+/* 감독 */
+.mgrcard { border-color: rgba(255, 197, 61, .35); }
+.mgr-rel { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .04); }
+.mgr-req { padding: 10px 12px; border-radius: 12px; background: rgba(79, 163, 255, .12); border: 1px solid rgba(79, 163, 255, .35); }
+.mgr-acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.mgr-acts .btn { padding: 8px 4px; font-size: 12px; }
+.will { display: flex; flex-direction: column; align-items: center; padding: 4px 8px; border-radius: 10px; background: rgba(255, 255, 255, .06); min-width: 58px; }
+.will small { font-size: 10px; color: var(--muted); }
+.will b { font-size: 13px; }
+.will.good b { color: var(--good, #5ee08f); } .will.amber b { color: var(--gold); } .will.bad b { color: #ff7a7a; }
+.conds { display: flex; flex-direction: column; gap: 6px; }
+.conds > div { padding: 8px 10px; border-radius: 10px; background: rgba(255, 197, 61, .1); border: 1px solid rgba(255, 197, 61, .3); display: flex; flex-direction: column; }
+.conds small { font-size: 11px; color: var(--muted); }
+.crew { padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, .04); display: flex; flex-direction: column; gap: 6px; }
+.staff-card.dim { opacity: .55; }

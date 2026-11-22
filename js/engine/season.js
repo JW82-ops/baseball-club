@@ -36,6 +36,8 @@ import { settleCap, updateCapLimit, secondDraftYear, finishSecondDraft, waiverWe
 import { rehabWeek, mechProgress, planCondBonus, workloadWeek, settleWinter } from './dev2.js';
 import { ensureRegion, regionWeek, regionSeasonStart, regionSeasonEnd, perkSum } from './region.js';
 import { makeGoals, settleGoals } from './goals.js';
+import { characterWeek, potentialDrift } from './character.js';
+import { managerWeek, managerOffseason, managerContractEnd, offseasonReq, closeOffReq } from './manager.js';
 
 export const CAMP_WEEKS = 6;
 export function weeksInSeason(state) { return Math.ceil(state.schedule.length / GAMES_PER_WEEK); }
@@ -256,6 +258,8 @@ export function weeklyCycle(state, opts = {}) {
   const user = userTeam(state);
   ensureRegion(state);
   for (const n of regionWeek(state, { camp: !!opts.camp })) addNews(state, n.text, n.t);
+  if (!opts.camp) for (const n of managerWeek(state)) addNews(state, n.text, n.t);
+  for (const n of characterWeek(state, { camp: !!opts.camp })) addNews(state, n.text, n.t);
   for (const d of tickConstruction(user)) {
     addNews(state, `🏗️ ${d.name} 공사 완료! ${d.title}${d.kind === 'b' ? ` (Lv.${d.lv})` : ''}`, 'big');
     report.events.push({ type: 'build', text: `${d.name} 완공` });
@@ -638,9 +642,17 @@ export function runOffseasonStart(state) {
   offseasonInternational(state, 'off');
   aiOffseason(state);
   state.flags = state.flags || {};
+  for (const n of potentialDrift(state)) addNews(state, n.text, n.t);
   const left = staffOffseason(state, user);
   if (left.length) addNews(state, `👔 고령으로 코치 은퇴: ${left.join(', ')}`, 'info');
+  {
+    const h = state.history.at(-1) || {};
+    for (const n of managerOffseason(state, { rank: h.userRank || 6, post: !!h.post, champ: h.champion === user.id })) addNews(state, n, 'big');
+    const m = user.staff?.manager;
+    if (m && m.years <= 0) { const n = managerContractEnd(state, m); if (n) addNews(state, `🧢 ${n}`, 'bad'); }
+  }
   startContractPhase(state); // phase = 'contracts'
+  offseasonReq(state, 'resign');
 }
 
 // 계약 협상 마감 → FA 시장 개장 + 드래프트
@@ -650,7 +662,9 @@ export function proceedToDraft(state) {
     const sd = finishSecondDraft(state);
     if (sd.picks.length || sd.lost.length) addNews(state, `🔀 2차 드래프트: 영입 ${sd.picks.length}명${sd.lost.length ? ` · 유출 ${sd.lost.map((x) => x.name).join(', ')}` : ''}`, 'info');
   }
+  { const n = closeOffReq(state, 'resign'); if (n) addNews(state, n, n.includes('해결') ? 'good' : 'bad'); }
   finishContractPhase(state);
+  offseasonReq(state, 'faSign');
   if (state.faPool.length) addNews(state, `💼 FA 시장 개장: ${state.faPool.length}명이 시장에 나왔어요`, 'info');
   setupDraft(state);
   state.phase = 'draft';
@@ -714,8 +728,8 @@ function setupDraft(state) {
     const ovr = Math.round(hs ? randInt(30, 46) : randInt(40, 54));
     // 드래프트 잠재력: 상위 몇 명은 특급
     let pot = ovr + Math.round(Math.abs(gauss(hs ? 16 : 10, 8)));
-    if (i < 3) pot += randInt(5, 11);
-    pot = clamp(pot, ovr + 4, 95);
+    if (i < 3) pot += randInt(4, 9);
+    pot = clamp(pot, ovr + 4, 90);
     const type = chance(0.52) ? 'P' : 'B';
     const p = createPlayer({ type, age, ovr, pot, nat: leagueNat(state.league, rng), pos: type === 'P' ? (chance(0.55) ? 'SP' : 'RP') : undefined, origin: hs ? undefined : undefined });
     p.draftClass = state.season + 1;
@@ -812,6 +826,7 @@ export function finishDraft(state) {
 // ───────── 스프링캠프 → 새 시즌 ─────────
 export function runCampAndStartSeason(state) {
   settleFA(state, assignNumber);
+  { const n = closeOffReq(state, 'faSign'); if (n) addNews(state, n, n.includes('해결') ? 'good' : 'bad'); }
   if (state.pendingPromotion) promote(state, state.pendingPromotion);
   state.promotionOffer = null;
   offseasonInternational(state, 'camp');

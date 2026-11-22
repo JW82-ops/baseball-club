@@ -4,6 +4,7 @@ import { BAT_ATTRS, PIT_ATTRS, TRAINING_FOCUS, GROWTH_TYPES, POS_KO } from '../.
 import { calcOvr, potentialEstimate, velocityKmh, batLine, pitLine, ageCurveLabel, unpackBat, unpackPit } from '../../engine/player.js';
 import { careerTotals, userTeam, draftOnClock } from '../../engine/season.js';
 import { goalStatus } from '../../engine/goals.js';
+import { ensureCharacter, ethicLabel, VICES } from '../../engine/character.js';
 import { canPromote, canDemote } from '../../engine/roster.js';
 import { fmtAvg, fmtEra, fmtIP, formatMoney } from '../../core/util.js';
 import { scoutLevel } from './draft.js';
@@ -139,7 +140,9 @@ export function renderPlayer(pid, opts = {}) {
     <div><span>소속</span><b>${p.amateur ? '아마추어' : p.market === 'foreign' ? '외국인 시장' : p.market === 'fa' ? 'FA' : p.level === 1 ? '1군' : '2군'}</b></div>
     <div><span>연봉</span><b>${formatMoney(p.salary)}</b></div>
     <div><span>성격</span><b>${PERSONALITIES[p.personality] ? `${PERSONALITIES[p.personality].icon} ${PERSONALITIES[p.personality].ko}` : '-'}</b></div>
-  </div>`;
+    ${isMine ? (() => { ensureCharacter(p); const el = ethicLabel(p.ethic); return `<div><span>훈련 태도</span><b class="${el[1]}">${el[0]}</b></div><div><span>사생활·성향</span><b class="${p.vice && p.viceKnown ? 'bad' : ''}">${p.vice && p.viceKnown ? `${VICES[p.vice].icon} ${VICES[p.vice].ko}` : p.teamWeeks >= 8 || !p.vice ? '문제 없음' : '파악 중'}</b></div>`; })() : ''}
+  </div>
+  ${isMine && p.vice && p.viceKnown ? `<p class="tiny muted mt">${VICES[p.vice].icon} ${VICES[p.vice].desc}. 교정 ${Math.min(100, Math.round(p.viceFix || 0))}% — 징계·상담·리더십 있는 감독과 주장이 고치는 데 도움이 돼요.${p.slump > 0 ? ` <span class="bad">사건 후유증으로 ${p.slump}주간 성장 둔화</span>` : ''}</p>` : ''}`;
   const abTab = `
     <div class="radarbox">${radar(attrs, curs, caps)}<p class="tiny faint center">초록 = 지금 능력 · 노란 점선 = 잠재 한계 추정 (스카우트 정확도 ${Math.round(est.acc * 100)}%)</p></div>
     <div class="sec mt">${bars}

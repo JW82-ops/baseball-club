@@ -6,6 +6,7 @@ import { nameFor, ethFor, pickStaffImportNat } from '../data/nations.js';
 import { frontLv, scoutRegionBonus } from './front.js';
 import { planAttrMult, planInjuryMult, affMult, coachFor } from './dev2.js';
 import { stadiumDiscount, useStadiumDiscount } from './region.js';
+import { charGrowthMult } from './character.js';
 
 // ───────── 구조 보장 ─────────
 export function ensureClub(team) {
@@ -124,7 +125,9 @@ export function staffOvr(s) {
   return Math.round(v.reduce((a, b) => a + b, 0) / v.length);
 }
 export function gradeOfStaff(ovr) { return ovr >= 82 ? 'S' : ovr >= 70 ? 'A' : ovr >= 58 ? 'B' : ovr >= 46 ? 'C' : 'D'; }
-export function staffWeeklyOf(s) { const o = staffOvr(s); return Math.round((120 + Math.pow(Math.max(0, o - 35), 2) * 0.85) / 10) * 10; }
+export function staffWeeklyOf(s) { const o = staffOvr(s); return Math.round((120 + Math.pow(Math.max(0, o - 35), 2) * 0.85) * (s.payMult || 1) / 10) * 10; }
+// 코치 교체 위약금: 남은 계약 연봉의 60% (연 24주 기준)
+export function staffBuyout(s) { return s ? Math.round(staffWeeklyOf(s) * 24 * Math.max(0, s.years || 0) * 0.6 / 100) * 100 : 0; }
 export function staffSignOf(s) { return Math.round(staffWeeklyOf(s) * 9 / 100) * 100; }
 
 function staffNat(role, league) {
@@ -151,6 +154,7 @@ export function genStaff(role, grade, league = 'KBO') {
 export function genStaffMarket(state) {
   const out = [];
   for (const role of Object.keys(STAFF_ROLES)) {
+    if (role === 'manager') continue; // 감독은 manager.js의 후보 시장
     for (let i = 0; i < 3; i++) out.push(genStaff(role, weightedPick(['C', 'B', 'A', 'S'], (g) => ({ C: 5, B: 4.5, A: 2.4, S: 0.9 }[g])), state.league || 'KBO'));
   }
   state.staffMarket = out;
@@ -159,13 +163,14 @@ export function genStaffMarket(state) {
 export function hireStaff(state, team, id) {
   const c = (state.staffMarket || []).find((x) => x.id === id);
   if (!c) return { ok: false, msg: '후보를 찾을 수 없어요' };
-  const sign = staffSignOf(c);
-  if (team.cash < sign) return { ok: false, msg: '계약금이 부족해요' };
-  pay(team, sign, 'staff');
   const prev = team.staff[c.role];
+  const pen = staffBuyout(prev);
+  const sign = staffSignOf(c);
+  if (team.cash < sign + pen) return { ok: false, msg: `계약금${pen ? '·위약금' : ''}이 부족해요` };
+  pay(team, sign + pen, 'staff');
   team.staff[c.role] = { ...c, since: state.season };
   state.staffMarket = state.staffMarket.filter((x) => x.id !== id);
-  return { ok: true, msg: `${STAFF_ROLES[c.role].ko} ${c.name} 선임${prev ? ` (전임 ${prev.name} 해임)` : ''}`, prev };
+  return { ok: true, msg: `${STAFF_ROLES[c.role].ko} ${c.name} 선임${prev ? ` (전임 ${prev.name} 해임${pen ? ` · 위약금 ${pen.toLocaleString()}만` : ''})` : ''}`, prev };
 }
 export function fireStaff(team, role) { team.staff[role] = null; }
 // 시설 유지비(주간, 만원): 큰 시설일수록 관리비가 들어요
@@ -180,7 +185,12 @@ export function staffWeekly(team) {
   for (const r in team.staff || {}) if (team.staff[r]) s += staffWeeklyOf(team.staff[r]);
   return s;
 }
-export function staffStat(team, role, key) { return team.staff?.[role]?.stats?.[key] ?? 40; }
+// 감독은 구단과의 관계에 따라 능력 발휘가 ±5 달라져요
+export function staffStat(team, role, key) {
+  const s = team.staff?.[role];
+  const v = s?.stats?.[key] ?? 40;
+  return role === 'manager' && s ? v + Math.max(-5, Math.min(5, Math.round(((s.rel ?? 55) - 55) / 8))) : v;
+}
 export const mgrStyle = (team) => team.staff?.manager?.style || null;
 
 // 오프시즌: 계약 만료 처리
@@ -191,6 +201,7 @@ export function staffOffseason(state, team) {
     if (!s) continue;
     s.years -= 1;
     s.age += 1;
+    if (s.years <= 0 && r === 'manager') continue; // 감독 재계약은 따로 (manager.js)
     if (s.years <= 0) {
       // 자동 재계약 (스탯 소폭 변화), 고령이면 은퇴
       if (s.age >= 70) { left.push(s.name); team.staff[r] = null; continue; }
@@ -240,6 +251,7 @@ export function devCtxFor(state, team, p, synergyList = [], eff = null) {
   if (synergyList.includes('youngGuns')) base *= 1.1;
   const mood = p.morale ?? 70;
   base *= 0.85 + (mood / 100) * 0.3;
+  base *= charGrowthMult(p);
   for (const k in p.r) {
     let m = base * (eff.grow[k] || 1);
     if (p.type === 'B') {
