@@ -1,6 +1,6 @@
 import { state } from '../../core/store.js';
 import { ui } from '../ui-state.js';
-import { esc, emblem, gradeTag, avatar, posShort, ratingBar, artBg, artHero } from '../components.js';
+import { esc, emblem, gradeTag, avatar, posShort, ratingBar, artBg, artHero, constructionFx } from '../components.js';
 import { userTeam } from '../../engine/season.js';
 import { teamPlayers } from '../../engine/roster.js';
 import { formatMoney, formatFans } from '../../core/util.js';
@@ -78,11 +78,11 @@ function buildingCard(t, k) {
   const eff = k === 'stadium' ? `${info.cap.toLocaleString()}석` : `성장 ×${info.growth.toFixed(2)}`;
   const artN = k === 'stadium' ? `stadium${lv}` : k;
   return `<div class="bld">
-    <div class="bld-art" style="${artBg(artN, 'linear-gradient(180deg,rgba(6,16,11,0) 40%,rgba(22,50,34,.95) 100%)')}">${b ? `<span class="bld-tag">🏗️ Lv.${b.to} 증축 중</span>` : ''}</div>
+    <div class="bld-art ${b ? 'building' : ''}" style="${artBg(artN, 'linear-gradient(180deg,rgba(6,16,11,0) 40%,rgba(22,50,34,.95) 100%)')}">${b ? `<span class="bld-tag">🏗️ Lv.${b.to} 증축 중</span>${constructionFx(b)}` : ''}</div>
     <div class="bld-h">
       <div class="ic">${B.icon}</div>
       <div class="grow"><div class="row between"><h3>${B.ko}</h3><span class="small amber">Lv.${lv}</span></div>
-        <div class="pips">${B.levels.map((_, i) => `<i class="${i < lv ? 'on' : b && i === b.to - 1 ? 'bld' : ''}"></i>`).join('')}</div>
+        <div class="pips">${B.levels.map((_, i) => `<i class="${i < lv ? 'on' : b && i === b.to - 1 ? 'bldg' : ''}"></i>`).join('')}</div>
         <p class="small">${esc(info.title)} · <b>${eff}</b> · 칸 ${used}/${total}</p></div>
     </div>
     ${b ? progress(`${esc(B.levels[b.to - 1].title)} 증축 중`, b) : next ? `<div class="row gap mt"><span class="tiny muted grow">다음: ${esc(next.title)} · 칸 ${next.slots}개 · ${next.weeks}주</span>
@@ -91,7 +91,7 @@ function buildingCard(t, k) {
       ${built.map(([sk, s]) => {
         const sl = subLv(t, sk);
         const sb = t.subs[sk]?.build;
-        return `<button class="slot on" data-act="subSheet" data-k="${sk}"><span class="si">${s.icon}</span><b>${s.ko}</b><small>${sb ? `🏗️ ${sb.weeks}주` : `Lv.${sl} · ${s.fmt(s.levels[sl - 1].val)}`}</small></button>`;
+        return `<button class="slot on ${sb ? 'building' : ''}" data-act="subSheet" data-k="${sk}">${sb ? '<img class="slot-crane" src="img/ui/c_crane.webp" alt="">' : ''}<span class="si">${s.icon}</span><b>${s.ko}</b><small>${sb ? `🏗️ ${sb.weeks}주` : `Lv.${sl} · ${s.fmt(s.levels[sl - 1].val)}`}</small></button>`;
       }).join('')}
       ${Array.from({ length: Math.max(0, total - used) }, () => `<button class="slot empty" data-act="slotSheet" data-k="${k}"><span class="si">＋</span><b>빈 칸</b><small>시설 짓기</small></button>`).join('')}
       ${next ? `<div class="slot locked"><span class="si">🔒</span><b>+${next.slots - total}칸</b><small>Lv.${lv + 1}에서</small></div>` : ''}
@@ -132,7 +132,7 @@ export function subSheetHtml(sk) {
     <h2 class="disp" style="font-size:22px">${s.icon} ${s.ko}</h2>
     <p class="small muted mt">${s.desc} · ${BUILDINGS[s.b].ko} 소속</p>
     <div class="panel mt">${s.levels.map((l, i) => `<div class="row between small" style="padding:4px 0"><span class="${i < lv ? 'amber' : 'muted'}">Lv.${i + 1}${i < lv ? ' ✓' : ''}</span><span>${s.fmt(l.val)}</span><span class="muted">${formatMoney(l.cost)} · ${l.weeks}주</span></div>`).join('')}</div>
-    ${b ? progress(`Lv.${b.to} 공사 중`, b) : next ? `<button class="btn primary block mt" data-act="buildSub" data-k="${sk}" ${err ? 'disabled' : ''}>Lv.${lv + 1}로 업그레이드 · ${formatMoney(next.cost)}</button>${err ? `<p class="tiny bad mt center">${err}</p>` : ''}` : '<p class="center good mt">최고 레벨이에요</p>'}`;
+    ${b ? `<div class="sub-cons">${constructionFx(b, 'sm')}</div>${progress(`Lv.${b.to} 공사 중`, b)}` : next ? `<button class="btn primary block mt" data-act="buildSub" data-k="${sk}" ${err ? 'disabled' : ''}>Lv.${lv + 1}로 업그레이드 · ${formatMoney(next.cost)}</button>${err ? `<p class="tiny bad mt center">${err}</p>` : ''}` : '<p class="center good mt">최고 레벨이에요</p>'}`;
 }
 
 // ───────── 스태프 ─────────
@@ -350,7 +350,7 @@ function spotInfo(t, k) {
   const sb = t.buildings?.stadium;
   switch (k) {
     case 'facility': return { sub: sb?.build ? `🏗️ ${sb.build.weeks}주` : `Lv.${bLv(t, 'stadium')}`, cls: sb?.build ? 'build' : '' };
-    case 'staff': return { sub: t.staff?.manager ? '코치진' : '감독 공석', alert: !t.staff?.manager };
+    case 'staff': { const cb = t.buildings?.clubhouse?.build; return { sub: cb ? `🏗️ ${cb.weeks}주` : t.staff?.manager ? '코치진' : '감독 공석', alert: !t.staff?.manager, cls: cb ? 'build' : '' }; }
     case 'front': return { sub: '이사회', alert: (state.board?.sat ?? 60) < 40 };
     case 'sponsor': { const open = Object.keys(SPONSOR_SLOTS).filter((sl) => !t.sponsors[sl]).length; return { sub: open ? `빈 자리 ${open}` : '계약 완료', alert: open > 0 && (state.sponsorOffers || []).length > 0 }; }
     case 'develop': { const fb = t.buildings?.futures; return { sub: fb?.build ? `🏗️ ${fb.build.weeks}주` : '육성', cls: fb?.build ? 'build' : '' }; }
@@ -359,8 +359,10 @@ function spotInfo(t, k) {
     default: return {};
   }
 }
+const CAMPUS_BUILD = { stadium: [66, 6], clubhouse: [0, 24], futures: [26, 56] };
 function mapView(t) {
-  return `<section class="campus" style="background-image:url(img/art/campus.webp)">
+  const cranes = Object.entries(CAMPUS_BUILD).filter(([k]) => t.buildings?.[k]?.build).map(([, [x, y]]) => `<div class="map-cons" style="left:${x}%;top:${y}%"><img class="c-crane" src="img/ui/c_crane.webp" alt=""><img class="c-worker" src="img/ui/c_worker.webp" alt=""></div>`).join('');
+  return `<section class="campus" style="background-image:url(img/art/campus.webp)">${cranes}
     ${SPOTS.map(([k, ico, ko, x, y]) => { const inf = spotInfo(t, k); return `<button class="hot ${inf.cls || ''} ${inf.alert ? 'alert' : ''}" style="left:${x}%;top:${y}%" ${k === 'develop' ? 'data-act="tab" data-tab="develop"' : `data-act="clubView" data-v="${k}"`}>${icon(ico, 28)}${ko}${inf.sub ? `<small>${inf.sub}</small>` : ''}</button>`; }).join('')}
   </section>
   <div class="campus-more">

@@ -12,6 +12,19 @@ export const esc = escapeHtml;
 export const artUrl = (n) => `img/art/${n}.webp`;
 const FADE = 'linear-gradient(180deg,rgba(6,18,12,.1) 0%,rgba(10,28,19,.45) 42%,rgba(16,38,28,.97) 100%)';
 export function artBg(n, grad = FADE) { return `background-image:${grad},url(${artUrl(n)})`; }
+// 공사 중 연출: 크레인·인부·레미콘이 움직이고 남은 기간 테이프
+export function constructionFx(b, size = '') {
+  if (!b) return '';
+  const pct = Math.round(((b.total - b.weeks) / Math.max(1, b.total)) * 100);
+  return `<div class="cons ${size}" aria-label="공사 중 ${b.weeks}주 남음">
+    <img class="c-crane" src="img/ui/c_crane.webp" alt="" loading="lazy">
+    <span class="c-beam"></span>
+    <img class="c-props" src="img/ui/c_props.webp" alt="" loading="lazy">
+    <img class="c-worker" src="img/ui/c_worker.webp" alt="" loading="lazy">
+    <i class="c-dust"></i><i class="c-dust d2"></i><i class="c-spark"></i>
+    <div class="c-tape"><span>공사 중 · ${b.weeks}주 남음 · ${pct}%</span></div>
+  </div>`;
+}
 export function artHero(n, inner, cls = '') { return `<div class="art-hero ${cls}" style="${artBg(n)}">${inner}</div>`; }
 const AWAY_ST = new Set(['lg', 'kia', 'samsung', 'doosan', 'ssg', 'hanwha', 'kt', 'lotte', 'nc', 'hawks', 'tigers', 'giants', 'buffaloes', 'swallows', 'baystars', 'carp', 'fighters', 'marines', 'dodgers', 'yankees', 'braves', 'phillies', 'astros', 'padres', 'orioles', 'rangers', 'cubs']);
 export function stadiumArt(team, isUser) {
