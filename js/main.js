@@ -28,6 +28,8 @@ import { notifCount } from './ui/screens/notify.js';
 import { initPWA, promptInstall } from './ui/pwa.js';
 import { endingHtml } from './ui/screens/ending.js';
 import { applyScenario } from './engine/scenario.js';
+import { snapshotOvr } from './engine/recap.js';
+import { recapHtml } from './ui/screens/recap.js';
 import { renderMail } from './ui/screens/mail.js';
 import { resolveMail, unreadCount } from './engine/mail.js';
 import { signSponsor, cancelSponsor } from './engine/sponsor.js';
@@ -104,6 +106,7 @@ function render() {
   $('#tabs').hidden = !!ui.live;
   renderHud();
   if (state.ending) { $('#tabs').hidden = true; main.innerHTML = endingHtml(); return; }
+  if (state.recap && !state.recap.seen && state.phase === 'offseason' && !ui.live) { state.recap.seen = true; setTimeout(() => openModal(recapHtml(), { sheet: true }), 300); }
   if (ui.live) {
     ensureGuard();
     setScene(null);
@@ -884,6 +887,7 @@ initCreateActions(render, (opts) => {
   title.creating = false;
   const s = createNewGame(opts);
   applyScenario(s, opts.scenario, opts.trait);
+  snapshotOvr(s);
   startGuide(s);
   setState(s);
   ui.tab = 'home';

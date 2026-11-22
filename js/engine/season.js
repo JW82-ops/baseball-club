@@ -41,6 +41,7 @@ import { crisisWeek, crisisSeasonStart } from './crisis.js';
 import { lifeWeek, addStory } from './life.js';
 import { scenarioCheck, metaPostUnlock } from './scenario.js';
 import { dexSeasonEnd, teamBalls, dexUpdate } from './collect.js';
+import { snapshotOvr, recordMoment, buildRecap } from './recap.js';
 import { rivalsWeek, rivalGame, rivalFA, rivalsSeasonEnd } from './rivals.js';
 import { homecomingStory, checkTitles, cheerEff, cheerWeekly } from './fandom.js';
 import { CAMP_LOCS, campGrow, payCamp, finishCampPlan, markHomegrown, checkFranchise } from './camp.js';
@@ -161,6 +162,7 @@ function userGameStory(state, g, sg) {
   homecomingStory(state, g, sg);
   rivalGame(state, sg, g);
   teamBalls(state, g, sg);
+  recordMoment(state, g, sg);
   rookieDebut(state, g);
   checkMilestones(state, [...side.lineup.map((l) => l.pid), ...side.used]);
   for (const f of g.formChanges || []) {
@@ -570,6 +572,7 @@ function endSeason(state) {
   const userRank = state.finalStandings.indexOf(user.id) + 1;
   metaPostUnlock(state);
   dexSeasonEnd(state, awards);
+  buildRecap(state);
   { const e = scenarioCheck(state); if (e) addNews(state, e.kind === 'clear' ? `🏆 시나리오 클리어! ${e.text}` : `⌛ 시나리오 실패: ${e.text}`, e.kind === 'clear' ? 'big' : 'bad'); }
   {
     // 모기업 환수: 쌓아 둔 돈이 너무 많으면 일부를 모기업이 가져가요 (빚더미 시나리오 진행 중엔 안 가져가요)
@@ -936,6 +939,7 @@ export function runCampAndStartSeason(state) {
   genSponsorOffers(state);
   makeGoals(state);
   markHomegrown(state);
+  snapshotOvr(state);
   pruneRels(state);
   for (const id in state.players) { const pl = state.players[id]; if (pl.team) { ensureContract(pl); ensureMil(pl); } }
   for (const n of returnFromService(state)) addNews(state, `🎖️ ${n}`, 'big');

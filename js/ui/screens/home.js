@@ -2,6 +2,7 @@ import { state, save } from '../../core/store.js';
 import { makeGoals, goalStatus, backGoal } from '../../engine/goals.js';
 import { CAMP_LOCS, CAMP_THEMES, campPlan, campCost } from '../../engine/camp.js';
 import { CRISES, crisisProgress, strikeCount } from '../../engine/crisis.js';
+import '../screens/recap.js';
 import { answerMeeting, meetingPending, deadlineLeft } from '../../engine/clubhouse.js';
 import { ui, rerender } from '../ui-state.js';
 import { artBg, artHero, stadiumArt, esc, emblem, gradeTag, avatar, posShort, potTag } from '../components.js';
@@ -344,10 +345,12 @@ function offseasonView() {
   const h = state.history[state.history.length - 1];
   const user = userTeam(state);
   const champ = state.teams[h.champion];
+  const recapBtn = state.recap?.season === state.season ? `<button class="btn block mt recap-btn" data-act="openRecap">📜 ${state.season} 시즌 결산 보기</button>` : '';
   return `
   <section class="sec">
     ${artHero('champion', `<div class="row gap">${emblem(champ, 52)}<div><span class="k">${h.season} ${LEAGUES[state.league || 'KBO'].series || '시리즈'} 우승</span><h2>${esc(champ.name)}</h2></div></div>
       <p>우리 구단 정규시즌 ${h.userRank}위${h.champion === user.id ? ' · 정상에 섰어요!' : ''}</p>`, 'tall')}
+    ${recapBtn}
   </section>
   ${natCard()}
   ${retireCards()}
