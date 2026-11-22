@@ -3,6 +3,7 @@ import { chance, pick, randInt } from '../core/rng.js';
 import { clamp, uid, formatMoney } from '../core/util.js';
 import { calcOvr, potOvr, potentialEstimate } from './player.js';
 import { VICES } from './character.js';
+import { addStory } from './life.js';
 import { teamPlayers, firstTeam, canPromote, canDemote, ensureLineupValid } from './roster.js';
 import { addMoodEvent, addRel, getRel } from './mood.js';
 import { pushMail, weekAbs } from './mail.js';
@@ -97,6 +98,7 @@ export function injuryWeek(state) {
         out.push({ t: 'bad', text: `🩹 ${p.name}의 ${part}가 만성 부상이 됐어요. 재발이 잦아질 수 있어요` });
       }
       // 큰 부상(10주 이상): 의무팀 소견 → 수술 vs 재활
+      if (inj.weeks >= 10) addStory(state, p, '🏥', `${inj.name}으로 ${inj.weeks}주 이탈했어요`);
       if (inj.weeks >= 10 && !inj.decided) {
         const tommy = inj.name.includes('팔꿈치 인대');
         pushMail(state, {

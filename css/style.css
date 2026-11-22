@@ -1377,3 +1377,8 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .tcards i.on { background: linear-gradient(160deg, #ffe066, #ff9f1c); border-color: #ffd23f; box-shadow: 0 2px 6px rgba(255,170,0,.4); }
 .tcards .tiny { margin-left: 4px; }
 .choice.off { opacity: .4; }
+.storyline { display: flex; flex-direction: column; border-left: 2px solid rgba(255,197,61,.4); margin-left: 12px; }
+.storyline .sl { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0 10px; margin-left: -13px; }
+.storyline .sl-i { width: 24px; height: 24px; border-radius: 50%; background: #1c3a2a; display: grid; place-items: center; font-size: 13px; flex: none; border: 1.5px solid rgba(255,197,61,.5); }
+.storyline b { display: block; font-size: 13px; }
+.storyline small { font-size: 11px; color: var(--muted); }

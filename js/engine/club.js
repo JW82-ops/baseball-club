@@ -157,6 +157,16 @@ export function genStaffMarket(state) {
     if (role === 'manager') continue; // 감독은 manager.js의 후보 시장
     for (let i = 0; i < 3; i++) out.push(genStaff(role, weightedPick(['C', 'B', 'A', 'S'], (g) => ({ C: 5, B: 4.5, A: 2.4, S: 0.9 }[g])), state.league || 'KBO'));
   }
+  // 우리 팀에서 은퇴하며 코치를 약속한 레전드: 이름 그대로 코치 후보로
+  for (const ex of state.exCoaches || []) {
+    const role = ex.type === 'P' ? 'pitchCoach' : 'hitCoach';
+    if (!STAFF_ROLES[role]) continue;
+    const c = genStaff(role, 'B', state.league || 'KBO');
+    c.name = ex.name; c.bg = `우리 구단 출신 · ${ex.season} 은퇴`; c.age = 37; c.exPlayer = true;
+    for (const k in c.stats) c.stats[k] = Math.min(99, c.stats[k] + 4);
+    out.unshift(c);
+  }
+  state.exCoaches = [];
   state.staffMarket = out;
 }
 

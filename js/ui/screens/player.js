@@ -128,7 +128,7 @@ export function renderPlayer(pid, opts = {}) {
 
   const ovr = calcOvr(p);
   const tone = p.injury ? 'inj' : p.foreign ? 'fx' : p.age <= 23 ? 'yg' : 'tm';
-  const tabs = [['ab', '능력'], ['rec', '기록'], ['grow', '성장'], ...(isMine && !draftMode ? [['care', '관리']] : [])];
+  const tabs = [['ab', '능력'], ['rec', '기록'], ['grow', '성장'], ...(isMine && !draftMode ? [['care', '관리']] : []), ...((p.story || []).length || isMine ? [['story', '이야기']] : [])];
   const tab = tabs.some(([k]) => k === ui.pTab) ? ui.pTab : 'ab';
   const ml = moodLabel(p.morale);
   const caps = attrs.map((a) => Math.min(100, spreadOf(a.key)[1]));
@@ -176,7 +176,12 @@ export function renderPlayer(pid, opts = {}) {
     <div><span>연차</span><b>${p.service ?? 0}년${(p.service ?? 0) >= FA_SERVICE ? ' (FA)' : ''}</b></div><div><span>적정 연봉</span><b>${formatMoney(fairSalary(state, p))}</b></div>
     <div><span>병역</span><b>${milLabel(p)}</b></div><div><span>국가대표</span><b>${p.national?.length ? `${p.national.length}회${p.national.some((x) => x.medal === 'gold') ? ' 🥇' : ''}` : '-'}</b></div>
   </div>${(() => { const g = state.goals?.season === state.season && state.goals.list.find((x) => x.pid === p.id); const st = g && goalStatus(state, g); return st ? `<div class="panel mt goalsc"><b class="small">🎯 시즌 목표: ${st.text}${g.backed ? ' 📣' : ''}</b><div class="gl-bar mt ${st.done ? 'done' : ''}"><i style="width:${Math.round(st.pct * 100)}%"></i><span>${st.now}</span></div><p class="tiny faint mt">${st.done ? '목표 달성! 시즌이 끝나면 기분과 충성도가 올라요.' : '달성하면 시즌 끝에 기분·충성도 상승, 실패하면 조금 실망해요.'}</p></div>` : ''; })()}${(p.injHist || []).length ? `<div class="panel mt"><b class="small">🩹 부상 이력</b>${(p.chronic || []).length ? ` <span class="tiny bad">만성: ${p.chronic.join(', ')}</span>` : ''}<div class="chips mt">${p.injHist.slice(-6).reverse().map((h) => `<span class="chip ${(p.chronic || []).includes(h.part) ? 'bad' : ''}">${h.s} ${h.part} ${h.w}주</span>`).join('')}</div><p class="tiny faint mt">같은 부위를 두 번 다치면 만성이 돼서 재발 위험이 커져요.</p></div>` : ''}${moodSection(p)}` : '';
-  const body = { ab: abTab, rec: recTab, grow: growTab, care: careTab }[tab];
+  const storyTab = (() => {
+    const st = (p.story || []).slice().reverse();
+    const fam = [p.married ? `💍 ${p.married}년 결혼` : '', p.kids ? `👶 자녀 ${p.kids}명` : ''].filter(Boolean).join(' · ');
+    return `${fam ? `<p class="small">${fam}</p>` : ''}<div class="storyline mt">${st.map((x) => `<div class="sl"><span class="sl-i">${x.icon}</span><div><b>${esc(x.text)}</b><small>${x.date || x.s}</small></div></div>`).join('') || '<p class="small muted">아직 기록된 이야기가 없어요. 첫 안타, 결혼, 트레이드, 캠프 MVP 같은 순간이 여기에 쌓여요.</p>'}</div>`;
+  })();
+  const body = { ab: abTab, rec: recTab, grow: growTab, care: careTab, story: storyTab }[tab];
 
   return `
   <button class="sheet-close" data-act="closeModal" aria-label="닫기">×</button>

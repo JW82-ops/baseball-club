@@ -5,6 +5,7 @@ import { calcOvr } from './player.js';
 import { teamPlayers, firstTeam } from './roster.js';
 import { addMoodEvent, addRel } from './mood.js';
 import { LEAGUES } from '../data/club.js';
+import { addStory } from './life.js';
 
 const U = (state) => state.teams[state.userTeamId];
 
@@ -58,7 +59,8 @@ export function finishCampPlan(state, before) {
   const mvp = risers.find((x) => x.p.level === 1);
   const star = risers.find((x) => x.p.level === 2 && x.p.age <= 23 && x.d >= 2);
   if (mvp) { out.mvp = mvp; addMoodEvent(mvp.p, '캠프 MVP', 8, 5); }
-  if (star) { out.star = star; star.p.campStar = state.season; addMoodEvent(star.p, '캠프 깜짝 스타', 10, 5); }
+  if (mvp) addStory(state, mvp.p, '🏅', `${state.season} 스프링캠프 MVP`);
+  if (star) { addStory(state, star.p, '🌟', `${state.season} 스프링캠프 깜짝 스타`); out.star = star; star.p.campStar = state.season; addMoodEvent(star.p, '캠프 깜짝 스타', 10, 5); }
   return out;
 }
 
@@ -83,6 +85,7 @@ export function checkFranchise(state) {
     const yrs = userSeasons(p, t.id);
     if (yrs >= 4 && (calcOvr(p) >= 74 || (p.awards || []).length >= 1)) {
       p.franchise = state.season;
+      addStory(state, p, '⭐', '구단의 프랜차이즈 스타가 됐어요');
       p.loyalty = clamp((p.loyalty ?? 40) + 20, 0, 100);
       t.fans += 2500;
       out.push(`⭐ ${p.name}이(가) 우리 구단의 프랜차이즈 스타가 됐어요! ${p.founder ? '창단 멤버로 시작해' : '우리가 뽑아서'} ${yrs}시즌을 함께했어요`);

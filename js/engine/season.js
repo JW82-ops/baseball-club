@@ -38,6 +38,7 @@ import { ensureRegion, regionWeek, regionSeasonStart, regionSeasonEnd, perkSum }
 import { makeGoals, settleGoals } from './goals.js';
 import { characterWeek, potentialDrift } from './character.js';
 import { crisisWeek, crisisSeasonStart } from './crisis.js';
+import { lifeWeek, addStory } from './life.js';
 import { rivalsWeek, rivalGame, rivalFA, rivalsSeasonEnd } from './rivals.js';
 import { homecomingStory, checkTitles, cheerEff, cheerWeekly } from './fandom.js';
 import { CAMP_LOCS, campGrow, payCamp, finishCampPlan, markHomegrown, checkFranchise } from './camp.js';
@@ -273,6 +274,7 @@ export function weeklyCycle(state, opts = {}) {
   for (const n of injuryWeek(state)) addNews(state, n.text, n.t);
   if (!opts.camp) for (const n of rivalsWeek(state)) addNews(state, n.text, n.t);
   for (const n of crisisWeek(state)) addNews(state, n.text, n.t);
+  if (!opts.camp) for (const n of lifeWeek(state)) addNews(state, n.text, n.t);
   if (!opts.camp) { for (const n of deadlineWeek(state)) addNews(state, n.text, n.t); if (state.phase === 'regular' && state.day < state.schedule.length) makeMeeting(state); }
   for (const d of tickConstruction(user)) {
     addNews(state, `🏗️ ${d.name} 공사 완료! ${d.title}${d.kind === 'b' ? ` (Lv.${d.lv})` : ''}`, 'big');
@@ -644,8 +646,10 @@ export function runOffseasonStart(state) {
     const p = state.players[id];
     if (!p.team || p.amateur) continue; // 시장·아마추어 선수 제외
     p.history.push(packHistory(p, state.season, state.teams[p.team]?.short, p.team));
-    if (p.lastSeason === state.season || chance(retireChance(p))) {
+    const keep = p.team === user.id && p.retireAsk === state.season && !p.retireNext; // 붙잡은 베테랑은 1년 더
+    if (p.lastSeason === state.season || p.retireNext === state.season || (!keep && chance(retireChance(p)))) {
       const wasUser = p.team === user.id;
+      if (wasUser && p.coachNext) (state.exCoaches = state.exCoaches || []).push({ name: p.name, type: p.type, season: state.season });
       if (wasUser) retiredUser.push(p.name);
       const entry = retirePlayer(state, p);
       if (wasUser && entry) retirementCeremony(state, entry);
