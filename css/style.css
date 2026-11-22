@@ -1130,3 +1130,29 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .tsgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .tsp { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 12px; background: rgba(255, 255, 255, .05); text-align: left; }
 .tsp b { display: block; font-size: 12.5px; } .tsp small { font-size: 10.5px; color: var(--muted); }
+
+/* 육성 센터 */
+.devhero { position: relative; height: 150px; border-radius: 20px; overflow: hidden; background: linear-gradient(180deg, #8ec9ec 0%, #cfe9f2 50%, #a7d59a 51%, #6fae5c 100%); border: 1px solid rgba(255, 255, 255, .2); }
+.dh-spr { position: absolute; right: -8%; bottom: -6%; height: 120%; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .3)); }
+.dh-info { position: absolute; left: 0; top: 0; bottom: 0; width: 62%; padding: 12px 14px; display: flex; flex-direction: column; justify-content: center; gap: 4px; background: linear-gradient(90deg, rgba(5, 18, 12, .9), rgba(5, 18, 12, .5) 75%, transparent); }
+.dh-k { font-size: 11px; color: var(--muted); }
+.dh-info b.disp { font-size: 24px; }
+.dh-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.dh-chips span { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 99px; background: rgba(255, 255, 255, .12); }
+.dh-chips .bad { background: rgba(255, 111, 97, .3); } .dh-chips .warn { background: rgba(255, 197, 61, .25); }
+.gcgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.gcp { position: relative; height: 150px; border-radius: 16px; overflow: hidden; text-align: left; border: 1.5px solid rgba(255, 255, 255, .25); text-shadow: none !important;
+  --c1: color-mix(in srgb, var(--team) 55%, #fff); --c2: var(--team); --c3: color-mix(in srgb, var(--team) 55%, #000);
+  background: radial-gradient(ellipse at 50% 30%, var(--c1), var(--c2) 60%, var(--c3)); }
+.gcp.fx { --c1: #8fc4ff; --c2: #3b82f6; --c3: #1e3a8a; } .gcp.yg { --c1: #9ff0c6; --c2: #10b981; --c3: #065f46; } .gcp.inj { --c1: #b9c2bd; --c2: #6b7a72; --c3: #34403a; }
+.gcp img { position: absolute; left: 50%; bottom: 38px; height: 104px; transform: translateX(-50%); object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, .35)); }
+.gcp-d { position: absolute; right: 6px; top: 6px; font-family: var(--display); font-size: 20px; color: #fff; background: #10b981; padding: 0 8px; border-radius: 99px; box-shadow: 0 2px 0 #065f46; }
+.gcp.down .gcp-d { background: #e8452c; box-shadow: 0 2px 0 #8f2414; }
+.gcp-pot { position: absolute; right: 6px; top: 6px; font-size: 11px; font-weight: 900; color: #3d2300; background: var(--gold); padding: 1px 7px; border-radius: 99px; }
+.gcp-n { position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 6px 5px; background: rgba(5, 15, 10, .82); color: var(--chalk); }
+.gcp-n b { display: block; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gcp-n small { display: block; font-size: 10px; color: var(--muted); }
+.gcp-n em { font-style: normal; color: var(--gold-hi); font-weight: 900; }
+.potbar { position: relative; display: block; height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .12); margin-top: 3px; overflow: hidden; }
+.potbar .now { position: absolute; left: 0; top: 0; bottom: 0; background: #63d48f; }
+.potbar .cap { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(90deg, var(--gold) 0 3px, var(--gold-lo) 3px 5px); }

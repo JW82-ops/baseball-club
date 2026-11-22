@@ -6,6 +6,33 @@ import { teamPlayers } from '../../engine/roster.js';
 import { INTENSITY, TRAINING_FOCUS, PHILOSOPHIES } from '../../data/constants.js';
 import { scoutLevel } from './draft.js';
 import { PLAN_SLOTS, BLOCKS, planOf, planSummary } from '../../engine/dev2.js';
+import { ui } from '../ui-state.js';
+import { registerActions } from '../dom.js';
+import { rerender } from '../ui-state.js';
+import { playerImg } from '../portraits.js';
+import { bLv } from '../../engine/club.js';
+import { gradeFromOvr } from '../../engine/player.js';
+
+registerActions({ devView: (d) => { ui.devView = d.v; rerender(); window.scrollTo(0, 0); } });
+const tone = (p) => (p.injury ? 'inj' : p.foreign ? 'fx' : p.age <= 23 ? 'yg' : 'tm');
+// 성장 카드: 전신 + 이번 주 변화
+function growCard(p, delta, before) {
+  const ovr = calcOvr(p);
+  return `<button class="gcp ${tone(p)} ${delta < 0 ? 'down' : ''}" data-act="openPlayer" data-pid="${p.id}">
+    <img src="${playerImg(p)}" alt="" loading="lazy"><span class="gcp-d">${delta > 0 ? '+' : ''}${delta}</span>
+    <span class="gcp-n"><b>${esc(p.name)}</b><small>${before ?? ovr - delta} → <em>${ovr}</em> ${gradeFromOvr(ovr)}</small></span></button>`;
+}
+// 유망주 카드: 지금 OVR에서 잠재력까지 막대
+function prospectCard(p, lv) {
+  const est = potentialEstimate(p, lv);
+  const ovr = calcOvr(p);
+  const lo = Math.max(ovr, est.lo), hi = Math.max(lo, est.hi);
+  const f = TRAINING_FOCUS[p.focus];
+  return `<button class="gcp pros ${tone(p)}" data-act="openPlayer" data-pid="${p.id}">
+    <img src="${playerImg(p)}" alt="" loading="lazy"><span class="gcp-pot">${est.loG === est.hiG ? est.loG : `${est.loG}~${est.hiG}`}</span>
+    <span class="gcp-n"><b>${esc(p.name)}</b><small>${posShort(p)} · ${p.age}세 · ${p.level === 1 ? '1군' : '2군'} · ${f?.icon || ''}</small>
+    <i class="potbar"><em class="now" style="width:${ovr}%"></em><em class="cap" style="left:${lo}%;width:${Math.max(2, hi - lo)}%"></em></i></span></button>`;
+}
 
 function planSection(team) {
   const plan = planOf(team);
@@ -27,54 +54,46 @@ export function renderDevelop() {
   const w = state.weekLog;
   const phil = PHILOSOPHIES[team.philosophy];
   const risers = (w?.risers || []).filter((r) => state.players[r.pid]);
-  const ups = risers.filter((r) => r.after > r.before).slice(0, 8);
-  const downs = risers.filter((r) => r.after < r.before).sort((a, b) => (a.after - a.before) - (b.after - b.before)).slice(0, 4);
-  const prospects = all.filter((p) => p.age <= 24).sort((a, b) => potentialEstimate(b, lv).hi - potentialEstimate(a, lv).hi).slice(0, 12);
+  const ups = risers.filter((r) => r.after > r.before).sort((a, b) => (b.after - b.before) - (a.after - a.before)).slice(0, 12);
+  const downs = risers.filter((r) => r.after < r.before).sort((a, b) => (a.after - a.before) - (b.after - b.before)).slice(0, 6);
+  const prospects = all.filter((p) => p.age <= 24).sort((a, b) => potentialEstimate(b, lv).hi - potentialEstimate(a, lv).hi).slice(0, 16);
   const injured = all.filter((p) => p.injury);
   const tired = all.filter((p) => !p.injury && p.level === 1 && p.cond < 45);
-  const focusCount = {};
-  all.forEach((p) => { focusCount[p.focus] = (focusCount[p.focus] || 0) + 1; });
+  const view = ui.devView || 'week';
+  const flv = Math.max(1, Math.min(5, bLv(team, 'futures')));
+  const gain = ups.reduce((a, r) => a + (r.after - r.before), 0);
+  const hero = `<section class="devhero">
+      <img class="dh-spr" src="img/campus/fu${flv}.webp" alt="">
+      <div class="dh-info"><span class="dh-k">${phil.icon} ${phil.ko} 구단 · 훈련장 Lv.${flv}</span>
+        <b class="disp">육성 센터</b>
+        <div class="dh-chips"><span>📈 이번 주 +${gain}</span><span>🌱 유망주 ${all.filter((p) => p.age <= 24).length}</span><span class="${injured.length ? 'bad' : ''}">🚑 ${injured.length}</span><span class="${tired.length ? 'warn' : ''}">😮‍💨 ${tired.length}</span></div></div>
+    </section>
+    <div class="seg mt">${[['week', '이번 주'], ['pros', '유망주'], ['plan', '훈련 계획'], ['care', '관리']].map(([k, l]) => `<button class="${view === k ? 'on' : ''}" data-act="devView" data-v="${k}">${l}</button>`).join('')}</div>`;
 
-  return `
-  <section class="sec">
-    <div class="sec-h"><h2>팀 훈련 강도</h2><span class="sub">${phil.icon} ${phil.ko} 구단</span></div>
+  const weekV = `<section class="sec"><div class="sec-h"><h2>이번 주 성장</h2><span class="sub">${w ? (w.camp ? '스프링캠프' : `${w.season} 시즌 ${w.week}주차`) : '아직 없음'}</span></div>
+      ${ups.length ? `<div class="gcgrid">${ups.map((r) => growCard(state.players[r.pid], r.after - r.before, r.before)).join('')}</div>` : '<div class="panel empty">첫 주가 지나면 성장한 선수가 여기 나와요.</div>'}
+      ${downs.length ? `<div class="sec-h mt-l"><h2 style="font-size:15px">하락</h2><span class="sub">나이·부상·출전 부족</span></div><div class="gcgrid">${downs.map((r) => growCard(state.players[r.pid], r.after - r.before, r.before)).join('')}</div>` : ''}
+      ${w?.events?.length ? `<ul class="news mt">${w.events.map((e) => `<li class="${e.type === 'injury' ? 'bad' : 'big'}">${esc(e.text)}</li>`).join('')}</ul>` : ''}
+    </section>`;
+  const prosV = `<section class="sec"><div class="sec-h"><h2>유망주 보드</h2><span class="sub">24세 이하 · 잠재력 순</span></div>
+      <div class="gcgrid">${prospects.map((p) => prospectCard(p, lv)).join('')}</div>
+      <p class="tiny faint mt">막대: 초록 = 지금 능력, 금색 = 잠재력 추정 범위. 오래 지켜볼수록(스카우트) 범위가 좁아져요. 선수를 눌러 훈련 포인트를 정해 주세요.</p></section>`;
+  const planV = `<section class="sec">
+    <div class="sec-h"><h2>팀 훈련 강도</h2></div>
     <div class="panel">
       <div class="seg">${Object.entries(INTENSITY).map(([k, v]) => `<button class="${state.settings.intensity === k ? 'on' : ''}" data-act="setIntensity" data-v="${k}">${v.ko}</button>`).join('')}</div>
-      <p class="small muted mt">${{
-        light: '성장 속도 70%. 피로와 부상 위험이 낮아요. 시즌 후반 체력 관리용.',
-        normal: '표준 성장 속도와 부상 위험.',
-        hard: '성장 속도 135%. 대신 피로가 빨리 쌓이고 부상 위험이 약 2배예요.',
-      }[state.settings.intensity]}</p>
+      <p class="small muted mt">${{ light: '성장 속도 70%. 피로와 부상 위험이 낮아요. 시즌 후반 체력 관리용.', normal: '표준 성장 속도와 부상 위험.', hard: '성장 속도 135%. 대신 피로가 빨리 쌓이고 부상 위험이 약 2배예요.' }[state.settings.intensity]}</p>
       <p class="tiny faint mt">훈련은 매주(6경기마다) 반영돼요. 1군 출전 경험과 2군 실전도 성장에 보탬이 돼요.</p>
-    </div>
-  </section>
-
-  ${planSection(team)}
-  <section class="sec">
-    <div class="sec-h"><h2>주간 육성 리포트</h2><span class="sub">${w ? (w.camp ? '스프링캠프' : `${w.season} 시즌 ${w.week}주차`) : '아직 없음'}</span></div>
-    <div class="panel plist">
-      ${ups.length ? ups.map((r) => row(state.players[r.pid], team, `<span class="delta-up">+${r.after - r.before}</span>`)).join('') : '<div class="empty">첫 주가 지나면 성장한 선수가 여기 나와요.</div>'}
-      ${downs.map((r) => row(state.players[r.pid], team, `<span class="delta-dn">${r.after - r.before}</span>`)).join('')}
-    </div>
-    ${w?.events?.length ? `<ul class="news mt">${w.events.map((e) => `<li class="${e.type === 'injury' ? 'bad' : 'big'}">${esc(e.text)}</li>`).join('')}</ul>` : ''}
-  </section>
-
-  <section class="sec">
-    <div class="sec-h"><h2>유망주 보드</h2><span class="sub">24세 이하 · 잠재력 순</span></div>
-    <div class="panel plist">${prospects.map((p) => row(p, team, potTag(p, lv), `${p.level === 1 ? '1군' : '2군'} · ${TRAINING_FOCUS[p.focus]?.icon || ''} ${TRAINING_FOCUS[p.focus]?.ko || '균형'}`)).join('')}</div>
-    <p class="tiny faint mt">선수를 눌러 훈련 포인트를 정해주세요. 잠재력은 추정치이고, 오래 지켜볼수록 정확해져요.</p>
-  </section>
-
-  ${specialOverview(all, team)}
-  <section class="sec">
-    <div class="sec-h"><h2>컨디션 관리</h2></div>
+    </div></section>${planSection(team)}`;
+  const careV = `${specialOverview(all, team)}
+    <section class="sec"><div class="sec-h"><h2>컨디션 관리</h2></div>
     <div class="panel plist">
       ${injured.map((p) => row(p, team, `<span class="small bad">${p.injury.weeks}주</span>`, esc(p.injury.name))).join('')}
       ${tired.map((p) => row(p, team, `<span class="small amber">${Math.round(p.cond)}</span>`, '피로 누적')).join('')}
       ${!injured.length && !tired.length ? '<div class="empty">부상자나 지친 선수가 없어요.</div>' : ''}
     </div>
-    <div class="row gap mt"><button class="btn sm grow" data-act="restTired">지친 1군 선수 휴식 훈련</button><button class="btn sm grow" data-act="resetFocus">전원 균형 훈련</button></div>
-  </section>`;
+    <div class="row gap mt"><button class="btn sm grow" data-act="restTired">지친 1군 선수 휴식 훈련</button><button class="btn sm grow" data-act="resetFocus">전원 균형 훈련</button></div></section>`;
+  return hero + { week: weekV, pros: prosV, plan: planV, care: careV }[view];
 }
 
 function row(p, team, right, meta) {
