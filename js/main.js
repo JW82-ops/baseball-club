@@ -48,6 +48,9 @@ import { gameDate } from './engine/calendar.js';
 import { stadiumArt } from './ui/components.js';
 import { showLearn, shortWhy } from './ui/screens/learn.js';
 import { openPitchCall } from './ui/screens/pitchcall.js';
+import { backupToFile, restoreFromFile, restoreToEmptySlot } from './ui/backup.js';
+let saveFailShown = 0;
+window.addEventListener('savefail', () => { if (Date.now() - saveFailShown > 60000) { saveFailShown = Date.now(); toast('기기 저장 공간이 부족해 저장하지 못했어요. 구단 → 재정·설정에서 백업 파일로 저장하고, 안 쓰는 슬롯을 지워 주세요', 'bad'); } });
 import { upgradeDept, assignScout, DEPTS, REGIONS } from './engine/front.js';
 import { waivePlayer, claimWaiver, signDev, convertDev, secondDraftPick, capInfo, faGrade } from './engine/kborules.js';
 import { planOf, startMech, REHAB, sendWinter } from './engine/dev2.js';
@@ -664,6 +667,9 @@ registerActions({
     commit();
   },
   seasonLen: (d) => { state.settings.seasonLength = Number(d.v); commit('다음 시즌부터 적용돼요'); },
+  backupFile: () => backupToFile(),
+  restoreFile: () => confirmBox('백업 파일로 지금 슬롯을 덮어쓸까요? 지금 진행은 사라져요.', '불러오기', () => restoreFromFile(() => { upgradeSave(state); fillUserFirstTeam(state); save(); closeModal(); ui.tab = 'home'; render(); window.scrollTo(0, 0); })),
+  restoreNewSlot: () => restoreToEmptySlot(() => { upgradeSave(state); fillUserFirstTeam(state); save(); ui.tab = 'home'; render(); window.scrollTo(0, 0); }),
   exportSave: () => {
     const txt = exportSave();
     openModal(`<button class="sheet-close" data-act="closeModal">×</button><h2 class="disp" style="font-size:20px">세이브 내보내기</h2>

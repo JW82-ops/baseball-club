@@ -321,9 +321,15 @@ function financeView(t) {
       <div class="seg mt">${[['easy', '쉬움'], ['normal', '보통'], ['hard', '어려움']].map(([k, l]) => `<button class="${(state.settings.difficulty || 'normal') === k ? 'on' : ''}" data-act="setDifficulty" data-v="${k}">${l}</button>`).join('')}</div>
       <p class="small mt">다음 시즌부터 적용할 경기 수</p>
       <div class="seg mt">${SEASON_LENGTHS.map((n) => `<button class="${state.settings.seasonLength === n ? 'on' : ''}" data-act="seasonLen" data-v="${n}">${n}경기</button>`).join('')}</div>
-      <div class="row gap mt-l wrap">
-        <button class="btn sm" data-act="exportSave">세이브 내보내기</button>
-        <button class="btn sm" data-act="importSave">세이브 불러오기</button>
+      <div class="backupbox mt-l">
+        <b class="small">💾 세이브 백업</b>
+        <p class="tiny muted">폰 브라우저 저장은 기록을 지우거나 앱을 정리하면 사라질 수 있어요. 시즌이 끝날 때마다 파일로 저장해 두세요. 다른 기기에서도 이 파일로 이어서 할 수 있어요.</p>
+        <p class="tiny faint">${state.lastBackup ? `마지막 백업: ${state.lastBackup.season}시즌 ${state.lastBackup.day + 1}일째` : '아직 백업한 적이 없어요'}</p>
+        <div class="row gap mt"><button class="btn sm primary grow" data-act="backupFile">파일로 저장</button><button class="btn sm grow" data-act="restoreFile">파일에서 불러오기</button></div>
+      </div>
+      <div class="row gap mt wrap">
+        <button class="btn sm ghost" data-act="exportSave">텍스트로 내보내기</button>
+        <button class="btn sm ghost" data-act="importSave">텍스트로 불러오기</button>
         <button class="btn sm" data-act="toTitle">슬롯 선택 화면 (현재 ${curSlot}번)</button>
         <button class="btn sm danger" data-act="resetGame">처음부터 다시</button>
       </div>

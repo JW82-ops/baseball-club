@@ -1030,3 +1030,4 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .gchart .gl { font-size: 10px; fill: var(--muted); font-weight: 700; }
 .gchart .gl.up { fill: #7ee2a0; } .gchart .gl.dn { fill: #ff9d92; }
 .modal-box .sheet-close { z-index: 5; background: rgba(5, 15, 10, .6); color: #fff; }
+.backupbox { padding: 12px; border-radius: 14px; background: rgba(255, 197, 61, .06); border: 1px solid rgba(255, 197, 61, .25); }

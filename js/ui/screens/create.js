@@ -20,6 +20,7 @@ export function renderTitle() {
       <p>신생 구단을 창단해 유망주를 키우고, KBO를 넘어 NPB·MLB까지 정복하세요.</p>
     </div>
     ${[1, 2, 3].map((n) => { const i = slotInfo(n); return i ? `<div class="slotcard"><button class="grow row gap" data-act="loadSlot" data-n="${n}" style="text-align:left">${emblem({ color: i.color, color2: '#000', emblem: i.emblem, emblemImg: i.emblemImg }, 48)}<div class="grow"><span class="tiny faint">슬롯 ${n}</span><br><b>${esc(i.name)}</b><div class="tiny muted">${LEAGUES[i.league].flag} ${i.season} ${PH[i.phase] || ''} · ${i.w}승 ${i.l}패</div></div></button><button class="btn sm ghost" data-act="deleteSlot" data-n="${n}" aria-label="삭제">🗑</button></div>` : `<button class="slotcard empty" data-act="newSlot" data-n="${n}"><span class="tiny faint">슬롯 ${n}</span><b>＋ 새 구단 창단</b></button>`; }).join('')}
+    <button class="btn sm ghost block mt" data-act="restoreNewSlot">📂 백업 파일 불러오기 (빈 슬롯에)</button>
   </div>`;
 }
 

@@ -26,6 +26,7 @@ export function save() {
     return true;
   } catch (e) {
     console.warn('save failed', e);
+    try { window.dispatchEvent(new CustomEvent('savefail')); } catch { /* noop */ }
     return false;
   }
 }
