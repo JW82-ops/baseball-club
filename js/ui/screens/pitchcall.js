@@ -3,7 +3,7 @@ import { state } from '../../core/store.js';
 import { ui } from '../ui-state.js';
 import { registerActions, openModal, closeModal } from '../dom.js';
 import { esc, avatar } from '../components.js';
-import { previewPA } from '../../engine/match.js';
+import { previewPA, stepPA } from '../../engine/match.js';
 import { paSetup, pitchStep, isFastball, PITCH_SPEED_GAP } from '../../engine/pitch.js';
 import { PITCHES } from '../../data/constants.js';
 import { cellName, zoneSummary } from '../../engine/analysis.js';
@@ -99,7 +99,7 @@ function closed() {
   const pc = ui.pc;
   if (!pc) return;
   ui.pc = null;
-  if (!pc.result) {
+  if (!pc.result && !pc.applied) {
     let r = null;
     for (let n = 0; n < 24 && !r; n++) r = pitchStep(pc.K, pc.st, null);
     pc.g.orders = { ...(pc.g.orders || {}), forcedPR: r || { outcome: 'play', seq: pc.st.seq, powAdj: 0, conAdj: 0 } };
@@ -114,7 +114,16 @@ function finish(pc, r) {
   if (r.outcome === 'so') { sfx.mitt?.(); pc.result = { cls: 'good', title: r.looking ? '루킹 삼진!' : '헛스윙 삼진!', sub: `${n}구 승부 끝에 잡아냈어요.` }; }
   else if (r.outcome === 'bb') pc.result = { cls: 'bad', title: '볼넷…', sub: `${n}구 승부. 볼카운트가 불리해지면 유인구가 통하지 않아요.` };
   else if (r.outcome === 'hbp') pc.result = { cls: 'bad', title: '몸에 맞는 공', sub: '몸쪽 유인구는 사구 위험이 있어요.' };
-  else pc.result = { cls: '', title: '타격!', sub: r.middle ? '한가운데 공을 맞았어요. 결과는 중계에서 확인해요.' : `${n}구째를 쳐냈어요. 결과는 중계에서 확인해요.` };
+  else pc.result = { cls: '', title: '타격!', sub: `${n}구째를 쳐냈어요.` };
+  // 이 타석을 바로 처리해서 결과(안타·아웃)를 보여줘요
+  const before = g.log.length;
+  try { stepPA(state, g); } catch (e) { console.warn(e); }
+  const ev = g.log.slice(before).filter((e) => ['out', 'so', 'hit', 'hr', 'err', 'walkoff'].includes(e.type)).shift();
+  if (ev && r.outcome === 'play') {
+    const good = ev.type === 'out';
+    pc.result = { cls: good ? 'good' : 'bad', title: good ? '잡아냈어요!' : ev.type === 'hr' ? '맞았어요… 홈런' : ev.type === 'err' ? '수비 실책…' : '안타를 맞았어요', sub: `${ev.text}${r.middle ? ' — 한가운데로 몰린 공이었어요.' : ''}` };
+  }
+  pc.applied = true;
 }
 
 registerActions({

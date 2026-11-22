@@ -89,6 +89,17 @@ export function upgradeSave(state) {
     state.version = 5;
   }
   if (state.version < 6) { ensureFront(state); state.version = 6; }
+  if (state.version < 7) {
+    // v7: 은퇴했는데 남아 있던 선수 데이터 정리
+    const onRoster = new Set(state.teamOrder.flatMap((tid) => state.teams[tid].roster));
+    for (const e of state.retired || []) {
+      if (state.players[e.id] && !onRoster.has(e.id)) {
+        delete state.players[e.id];
+        for (const k in state.rels || {}) if (k.split('|').includes(e.id)) delete state.rels[k];
+      }
+    }
+    state.version = 7;
+  }
   ensureClub(user);
   state.version = Math.max(state.version, SAVE_VERSION);
   return state;

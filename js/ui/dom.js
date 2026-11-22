@@ -36,15 +36,23 @@ export function toast(msg, tone = 'info') {
 }
 
 let modalOnClose = null;
+let navHook = null;
+// 모달·화면 이동 때 브라우저 뒤로가기를 잡기 위한 연결점
+export function setNavHook(fn) { navHook = fn; }
+const CLOSE_BTN = '<button class="sheet-close" data-act="closeModal" aria-label="닫기">×</button>';
 export function openModal(html, opts = {}) {
   const ov = $('#modal');
   const box = $('#modal-box');
+  const wasOpen = !ov.hidden;
   box.className = `modal-box ${opts.wide ? 'wide' : ''} ${opts.sheet === false ? 'center' : ''}`;
-  box.innerHTML = html;
+  // 모든 창에 닫기 버튼(스크롤해도 따라오는)과 아래로 끌어 닫는 손잡이
+  const body = html.includes('class="sheet-close"') ? html.replace(/<button class="sheet-close"[^>]*>×<\/button>/, '') : html;
+  box.innerHTML = `<div class="sheet-top">${opts.sheet === false ? '' : '<span class="sheet-grip" aria-hidden="true"></span>'}${CLOSE_BTN}</div>${body}`;
   ov.hidden = false;
   document.body.classList.add('modal-open');
   modalOnClose = opts.onClose || null;
-  box.scrollTop = 0;
+  if (!opts.keepScroll) box.scrollTop = 0;
+  if (!wasOpen) navHook?.('modal');
 }
 export function closeModal() {
   const ov = $('#modal');
@@ -55,6 +63,29 @@ export function closeModal() {
   if (cb) cb();
 }
 export function isModalOpen() { return !$('#modal').hidden; }
+
+// 시트를 아래로 끌어서 닫기 (맨 위에서 아래로 90px 이상)
+(() => {
+  let y0 = null, dy = 0;
+  document.addEventListener('touchstart', (e) => {
+    const box = e.target.closest?.('#modal-box');
+    if (!box || box.classList.contains('center') || box.scrollTop > 0 || e.target.closest('.lufield,.pzone,[data-fdrag]')) { y0 = null; return; }
+    y0 = e.touches[0].clientY; dy = 0;
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (y0 == null) return;
+    dy = e.touches[0].clientY - y0;
+    const box = $('#modal-box');
+    if (dy > 0 && box.scrollTop <= 0) box.style.transform = `translateY(${Math.min(dy, 240)}px)`;
+  }, { passive: true });
+  document.addEventListener('touchend', () => {
+    if (y0 == null) return;
+    const box = $('#modal-box');
+    box.style.transform = '';
+    if (dy > 90 && !$('#modal').hidden) closeModal();
+    y0 = null;
+  });
+})();
 
 export function confirmBox(text, okLabel, onOk, tone = '') {
   openModal(`

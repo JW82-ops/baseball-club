@@ -1,5 +1,5 @@
 export const SAVE_KEY = 'baseball_club_save';
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export const ROSTER = {
   FIRST_MAX: 28,       // 1군 엔트리

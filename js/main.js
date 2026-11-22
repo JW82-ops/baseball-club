@@ -1,7 +1,7 @@
 import { state, setState, save, load, hasSave, wipe, exportSave, importSave, setSlot, slot as curSlot } from './core/store.js';
 import { formatMoney, formatFans } from './core/util.js';
 import { ui, setRenderer, rerender } from './ui/ui-state.js';
-import { $, $$, registerActions, initActions, toast, openModal, closeModal, confirmBox, isModalOpen } from './ui/dom.js';
+import { $, $$, registerActions, initActions, toast, openModal, closeModal, confirmBox, isModalOpen, setNavHook } from './ui/dom.js';
 import { esc, emblem } from './ui/components.js';
 import { renderTitle, initCreateActions, title } from './ui/screens/create.js';
 import { renderHome, lineScore } from './ui/screens/home.js';
@@ -87,12 +87,14 @@ function render() {
     setScene(null);
     setSeason(null);
     main.innerHTML = renderTitle();
+    if (title.creating) ensureGuard();
     return;
   }
   $('#hud').hidden = false;
   $('#tabs').hidden = !!ui.live;
   renderHud();
   if (ui.live) {
+    ensureGuard();
     setScene(null);
     setSeason(null);
     if (!$('#lv-canvas')) { main.innerHTML = liveShell(); mountLive(); }
@@ -109,6 +111,7 @@ function render() {
   }
   const screens = { home: renderHome, roster: renderRoster, develop: renderDevelop, league: renderLeague, club: renderClub, mail: renderMail };
   main.innerHTML = (screens[ui.tab] || renderHome)();
+  if (!atRoot()) ensureGuard();
   document.documentElement.style.setProperty('--hudH', `${$('#hud').offsetHeight}px`);
   setScene(sceneFor(ui.tab));
   setSeason(gameDate(state).season);
@@ -177,6 +180,25 @@ function setScene(name) {
   sceneFlip ^= 1;
 }
 setRenderer(render);
+
+// ───────── 뒤로가기: 폰의 뒤로 버튼·제스처를 게임 안에서 처리 ─────────
+// 창 → 구단 세부 화면 → 다른 탭 → 로비 순서로 한 단계씩 돌아가요. 로비에서 한 번 더 누르면 게임을 나가요.
+let navGuard = false;
+function ensureGuard() { if (!navGuard) { try { history.pushState({ g: Date.now() }, ''); navGuard = true; } catch { /* noop */ } } }
+const atRoot = () => !state ? !title.creating : (!isModalOpen() && !ui.live && ui.tab === 'home');
+function appBack() {
+  if (isModalOpen()) { closeModal(); return true; }
+  if (!state) { if (title.creating) { title.creating = false; render(); return true; } return false; }
+  if (ui.live) { confirmBox('중계를 끝내고 이 경기를 끝까지 자동으로 진행할까요?', '자동 진행', () => finishLive()); return true; }
+  if (ui.tab === 'club' && ui.clubView && ui.clubView !== 'map') { ui.clubView = 'map'; render(); window.scrollTo(0, 0); return true; }
+  if (ui.tab !== 'home') { ui.tab = 'home'; ui.lineupSel = null; render(); window.scrollTo(0, 0); return true; }
+  return false;
+}
+window.addEventListener('popstate', () => {
+  navGuard = false;
+  if (appBack() && !atRoot()) ensureGuard();
+});
+setNavHook(() => ensureGuard());
 
 function commit(msg, tone) {
   save();

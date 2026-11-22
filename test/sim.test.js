@@ -48,6 +48,7 @@ for (let season = 0; season < seasons; season++) {
   console.log('teams', s.teamOrder.map(id => s.teams[id].short + ':' + teamOvr(s, s.teams[id]) + '(' + s.teams[id].roster.length + ')').join(' '));
 }
 console.log('time ms', Date.now() - t0, 'save KB', Math.round(JSON.stringify(s).length / 1024));
+const sizes = {}; for (const k in s) sizes[k] = Math.round(JSON.stringify(s[k] ?? null).length / 1024); console.log('sizes', JSON.stringify(Object.entries(sizes).sort((a, b) => b[1] - a[1]).slice(0, 8))); const pv = Object.values(s.players)[0]; const ps = {}; for (const k in pv) ps[k] = JSON.stringify(pv[k] ?? null).length; console.log('player keys', JSON.stringify(Object.entries(ps).sort((a, b) => b[1] - a[1]).slice(0, 8)));
 // 신규 시스템 점검
 import('../js/engine/club.js').then(({ startUpgrade, facLv }) => {
   const u = s.teams.user;

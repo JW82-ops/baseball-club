@@ -1068,3 +1068,10 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .retire img { width: 84px; height: 110px; object-fit: contain; object-position: bottom; flex: none; filter: sepia(.25) drop-shadow(0 4px 6px rgba(0, 0, 0, .4)); }
 .retire b.disp { font-size: 20px; }
 .retire-q { font-size: 12.5px; color: var(--gold-hi); margin-top: 4px; font-style: italic; }
+
+/* 모든 창 공통: 따라오는 닫기 버튼 + 손잡이 */
+.modal-box { transition: transform .15s ease-out; }
+.sheet-top { position: sticky; top: -16px; z-index: 20; height: 0; margin: 0; }
+.sheet-top .sheet-close { position: absolute; right: -6px; top: -6px; width: 40px; height: 40px; border-radius: 50%; background: rgba(5, 15, 10, .78); color: #fff; font-size: 22px; line-height: 1; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .25); box-shadow: 0 3px 10px rgba(0, 0, 0, .4); }
+.sheet-grip { position: absolute; left: 50%; top: -10px; width: 44px; height: 5px; margin-left: -22px; border-radius: 99px; background: rgba(255, 255, 255, .3); }
+.modal-box.center .sheet-top .sheet-close { right: -8px; top: -8px; }

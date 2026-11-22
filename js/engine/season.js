@@ -363,7 +363,7 @@ function userFinanceGame(state, sg) {
   const team = userTeam(state);
   if (sg.home !== team.id) return;
   const eff = clubEffects(team);
-  const winF = 0.75 + pct(team) * 0.6;
+  const winF = 0.82 + pct(team) * 0.55;
   const priceF = Math.pow(1.5 * (LEAGUES[state.league || 'KBO'].ticketMult) / Math.max(0.3, team.ticket), 0.6);
   const rivalF = team.rivalId && (sg.away === team.rivalId) ? 1.25 : 1;
   const diffF = { easy: 1.2, normal: 1, hard: 0.85 }[state.settings.difficulty || 'normal'];
@@ -371,7 +371,7 @@ function userFinanceGame(state, sg) {
   const pk = activePromo(state);
   const P = pk ? PROMOS[pk] : null;
   const gateF = 1 + gf.reduce((a, f) => a + f.v, 0) + (P ? P.att : 0);
-  const demand = (4000 + team.fans * 0.11) * winF * priceF * rivalF * diffF * gateF * (0.9 + Math.random() * 0.2);
+  const demand = (4600 + team.fans * 0.12) * winF * priceF * rivalF * diffF * gateF * (0.9 + Math.random() * 0.2);
   const att = Math.round(Math.min(team.capacity, demand));
   const ticket = Math.round(att * team.ticket * (1 + (P?.ticket || 0)));
   const merch = Math.round(att * 0.35 * (1 + eff.merch) * merchMult(state, team) * (1 + (P?.merch || 0)) * LEAGUES[state.league || 'KBO'].ticketMult) + eff.vip;
@@ -615,6 +615,11 @@ export function proceedToDraft(state) {
   state.phase = 'draft';
 }
 
+// 은퇴 선수 데이터 정리(세이브 용량): 관계 기록까지 같이 지워요
+export function dropPlayer(state, id) {
+  delete state.players[id];
+  for (const k in state.rels || {}) if (k.split('|').includes(id)) delete state.rels[k];
+}
 function retirePlayer(state, p) {
   const team = state.teams[p.team];
   if (team) team.roster = team.roster.filter((x) => x !== p.id);
@@ -623,8 +628,8 @@ function retirePlayer(state, p) {
   state.retired.push(entry);
   considerHof(state, entry);
   if (state.retired.length > 400) state.retired.shift();
+  dropPlayer(state, p.id);
   return entry;
-  delete state.players[p.id];
 }
 
 export function releasePlayer(state, p) {
