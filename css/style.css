@@ -948,3 +948,21 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .plat.n { background: rgba(255, 255, 255, .1); color: var(--muted); }
 .sugg .sg { font-size: 13px; padding: 5px 0; }
 .sugg .sg small { color: var(--muted); font-size: 10.5px; margin-left: 2px; }
+
+/* 스폰서 미션 카드 · 스폰서 로고 */
+.mlist { display: flex; flex-direction: column; gap: 10px; }
+.mcard { border-radius: 18px; overflow: hidden; background: var(--glass); border: 1px solid rgba(255, 255, 255, .12); box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
+.mc-art { position: relative; height: 104px; background-size: cover; background-position: center 35%; }
+.mcard.active .mc-art { height: 128px; }
+.mc-logo { position: absolute; left: 10px; bottom: -18px; width: 52px; height: 52px; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .45)); z-index: 1; }
+.mc-sp { position: absolute; left: 68px; bottom: 8px; font-size: 12px; font-weight: 800; text-shadow: 0 1px 4px rgba(0, 0, 0, .9); }
+.mc-rw { position: absolute; right: 10px; top: 10px; font-family: var(--display); font-size: 16px; color: #3d2300; background: linear-gradient(180deg, var(--gold-hi), var(--gold)); padding: 2px 10px; border-radius: 99px; box-shadow: 0 2px 0 var(--gold-edge); text-shadow: none; }
+.mc-body { padding: 22px 12px 12px; }
+.mc-body > b { font-size: 15px; }
+.mc-prog { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; }
+.mc-prog .bar { flex: 1; }
+.splogo { width: 40px; height: 40px; object-fit: contain; flex: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35)); }
+.campus .cb { position: absolute; transform: translate(-50%, -50%); pointer-events: none; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .25)); }
+.bld-art.spr { background: radial-gradient(ellipse at 50% 85%, #7fbf6a 0 34%, transparent 35%), linear-gradient(180deg, #8ec9ec 0%, #cfe9f2 55%, #a7d59a 56%, #6fae5c 100%); overflow: hidden; }
+.bld-art.spr .bld-spr { position: absolute; left: 50%; bottom: 6px; height: 92%; max-width: 80%; object-fit: contain; transform: translateX(-50%); filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .3)); }
+.bld-art.spr.building .bld-spr { left: 46%; height: 80%; opacity: .85; filter: grayscale(.25) drop-shadow(0 6px 6px rgba(0, 0, 0, .3)); }

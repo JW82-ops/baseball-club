@@ -133,7 +133,7 @@ function sceneFor(tab) {
     if (ph === 'post') return 'crowd';
     return `stadium${Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1))}`;
   }
-  if (tab === 'club') return { map: 'campus', front: 'office', facility: 'stadium' + Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1)), staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'map'] || 'office';
+  if (tab === 'club') return { map: 'stadium1', front: 'office', facility: 'stadium' + Math.max(1, Math.min(5, t.buildings?.stadium?.lv || 1)), staff: 'meeting', sponsor: 'press', market: 'airport', trade: 'meeting', hof: 'hof', achv: 'awards', finance: 'office' }[ui.clubView || 'map'] || 'office';
   if (tab === 'roster' && ui.rosterView === 'futures') return 'futures';
   return { roster: 'clubhouse', develop: 'gym', league: 'crowd', mail: 'contract' }[tab] || 'stadium1';
 }

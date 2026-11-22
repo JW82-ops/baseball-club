@@ -16,6 +16,7 @@ import { moodLabel } from '../../engine/mood.js';
 import { ACHV } from '../../engine/achievements.js';
 import { CLUB_COLORS } from '../../data/teams.js';
 import { avatar as av } from '../components.js';
+import { sponsorLogo } from '../../data/brandArt.js';
 import { slot as curSlot } from '../../core/store.js';
 import { staffImg, bodyHtml, icon, ownerImg } from '../portraits.js';
 import { ensureFront, frontLv, DEPTS, DEPT_COST, DEPT_UPKEEP, REGIONS, satLabel, goalProgress, boardSupportBase } from '../../engine/front.js';
@@ -76,9 +77,10 @@ function buildingCard(t, k) {
   const built = subs.filter(([sk]) => subLv(t, sk) || t.subs[sk]?.build);
   const used = slotsUsed(t, k), total = slotsTotal(t, k);
   const eff = k === 'stadium' ? `${info.cap.toLocaleString()}석` : `성장 ×${info.growth.toFixed(2)}`;
-  const artN = k === 'stadium' ? `stadium${lv}` : k;
+  const artN = `stadium${lv}`;
+  const artStyle = k === 'stadium' ? artBg(artN, 'linear-gradient(180deg,rgba(6,16,11,0) 40%,rgba(22,50,34,.95) 100%)') : '';
   return `<div class="bld">
-    <div class="bld-art ${b ? 'building' : ''}" style="${artBg(artN, 'linear-gradient(180deg,rgba(6,16,11,0) 40%,rgba(22,50,34,.95) 100%)')}">${b ? `<span class="bld-tag">🏗️ Lv.${b.to} 증축 중</span>${constructionFx(b)}` : ''}</div>
+    <div class="bld-art ${k !== 'stadium' ? 'spr' : ''} ${b ? 'building' : ''}" style="${artStyle}">${k !== 'stadium' ? `<img class="bld-spr" src="${buildingSprite(k, Math.max(1, Math.min(5, lv)))}" alt="">` : ''}${b ? `<span class="bld-tag">🏗️ Lv.${b.to} 증축 중</span>${constructionFx(b)}` : ''}</div>
     <div class="bld-h">
       <div class="ic">${B.icon}</div>
       <div class="grow"><div class="row between"><h3>${B.ko}</h3><span class="small amber">Lv.${lv}</span></div>
@@ -189,11 +191,11 @@ function sponsorView(t) {
     <div class="sec-h mt-l"><h2>계약 중</h2></div>
     <div class="panel">${Object.entries(SPONSOR_SLOTS).map(([slot, def]) => {
       const s = t.sponsors[slot];
-      return `<div class="subrow"><span class="si">${def.icon}</span><div class="grow"><b>${def.ko}</b><div class="tiny muted">${s ? `${esc(s.name)} (${SPONSOR_TIERS[s.tier].ko}) · 시즌 ${formatMoney(s.perSeason)} · 남은 ${s.left}년${s.cond ? ` · ${s.cond.v}위 이내 조건` : ''}` : def.needStadium && bLv(t, 'stadium') < def.needStadium ? `구장 Lv.${def.needStadium} 필요` : '비어 있음'}</div></div>
+      return `<div class="subrow">${s ? `<img class="splogo" src="${sponsorLogo(s.name)}" alt="">` : `<span class="si">${def.icon}</span>`}<div class="grow"><b>${def.ko}</b><div class="tiny muted">${s ? `${esc(s.name)} (${SPONSOR_TIERS[s.tier].ko}) · 시즌 ${formatMoney(s.perSeason)} · 남은 ${s.left}년${s.cond ? ` · ${s.cond.v}위 이내 조건` : ''}` : def.needStadium && bLv(t, 'stadium') < def.needStadium ? `구장 Lv.${def.needStadium} 필요` : '비어 있음'}</div></div>
       ${s ? `<button class="btn sm ghost" data-act="cancelSponsor" data-s="${slot}">해지</button>` : ''}</div>`;
     }).join('')}</div>
     <div class="sec-h mt-l"><h2>들어온 제안</h2><span class="sub">시즌마다 갱신</span></div>
-    <div class="panel">${offers.map((o) => `<div class="subrow"><span class="si">${SPONSOR_SLOTS[o.slot].icon}</span>
+    <div class="panel">${offers.map((o) => `<div class="subrow"><img class="splogo" src="${sponsorLogo(o.name)}" alt="">
       <div class="grow"><b>${esc(o.name)}</b> <span class="tier t${o.tier}">${SPONSOR_TIERS[o.tier].ko}</span><div class="tiny muted">${SPONSOR_SLOTS[o.slot].ko} · ${o.years}년 · 가을야구 +${formatMoney(o.postBonus)} · 우승 +${formatMoney(o.titleBonus)}${o.cond ? ` · <span class="bad">${o.cond.v}위 밖이면 해지</span>` : ''}</div></div>
       <div class="right"><b class="amber">${formatMoney(o.perSeason)}</b><button class="btn sm primary" data-act="signSponsor" data-id="${o.id}" ${t.sponsors[o.slot] ? 'disabled' : ''}>계약</button></div></div>`).join('') || '<div class="empty">지금은 제안이 없어요. 성적을 올려 브랜드 가치를 키워보세요.</div>'}</div>
     <p class="tiny faint mt">후원금은 시즌 동안 매주 나눠 들어오고, 주간 스폰서 미션 보상도 계약사 등급에 따라 커져요.</p>`;
@@ -338,14 +340,30 @@ function achvView() {
 // ───────── 구단 캠퍼스 지도 ─────────
 const SPOTS = [
   // [보기, 아이콘, 이름, x%, y%]
-  ['facility', 'home', '홈 구장', 50, 17],
-  ['staff', 'roster', '클럽하우스', 23, 41],
-  ['front', 'club', '프런트', 74, 37],
-  ['sponsor', 'sponsor', '스폰서 광장', 46, 54.5],
-  ['develop', 'develop', '훈련장', 20, 68.7],
-  ['hof', 'league', '명예의 전당', 76, 68.7],
-  ['market', 'scout', '공항', 45, 82.8],
+  ['facility', 'home', '홈 구장', 50, 14],
+  ['staff', 'roster', '클럽하우스', 24, 45],
+  ['front', 'club', '프런트', 80, 46],
+  ['sponsor', 'sponsor', '스폰서 광장', 50, 56],
+  ['develop', 'develop', '훈련장', 27, 75.5],
+  ['hof', 'league', '명예의 전당', 79, 71.5],
+  ['market', 'scout', '공항', 36, 84.5],
 ];
+// 레벨에 따라 바뀌는 건물: [이미지 접두어, 중심 x%, 중심 y%, 너비%]
+const LOTS = { stadium: ['st', 50, 23, 80], clubhouse: ['ch', 17, 37, 34], front: ['fo', 82, 35.5, 27], plaza: ['pz', 50, 48.5, 37], futures: ['fu', 31, 65.5, 56], hof: ['hf', 79, 62.5, 33] };
+function campusLevels(t) {
+  const deptSum = Object.values(t.front || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+  const sp = Object.keys(t.sponsors || {}).length;
+  const hof = (state.hof || []).length;
+  return {
+    stadium: Math.max(1, Math.min(5, bLv(t, 'stadium'))),
+    clubhouse: Math.max(1, Math.min(5, bLv(t, 'clubhouse'))),
+    futures: Math.max(1, Math.min(5, bLv(t, 'futures'))),
+    front: deptSum <= 7 ? 1 : deptSum <= 13 ? 2 : 3,
+    plaza: sp <= 1 ? 1 : sp <= 3 ? 2 : 3,
+    hof: hof === 0 ? 1 : hof <= 3 ? 2 : 3,
+  };
+}
+export const buildingSprite = (k, lv) => `img/campus/${LOTS[k][0]}${lv}.webp`;
 function spotInfo(t, k) {
   const sb = t.buildings?.stadium;
   switch (k) {
@@ -359,10 +377,12 @@ function spotInfo(t, k) {
     default: return {};
   }
 }
-const CAMPUS_BUILD = { stadium: [66, 6], clubhouse: [0, 24], futures: [26, 56] };
+const CAMPUS_BUILD = { stadium: [72, 9], clubhouse: [1, 27], futures: [40, 56] };
 function mapView(t) {
+  const lv = campusLevels(t);
+  const sprites = Object.entries(LOTS).sort((a, b) => a[1][2] - b[1][2]).map(([k, [pre, x, y, w]]) => `<img class="cb cb-${k}" src="img/campus/${pre}${lv[k]}.webp" alt="" style="left:${x}%;top:${y}%;width:${w}%">`).join('');
   const cranes = Object.entries(CAMPUS_BUILD).filter(([k]) => t.buildings?.[k]?.build).map(([, [x, y]]) => `<div class="map-cons" style="left:${x}%;top:${y}%"><img class="c-crane" src="img/ui/c_crane.webp" alt=""><img class="c-worker" src="img/ui/c_worker.webp" alt=""></div>`).join('');
-  return `<section class="campus" style="background-image:url(img/art/campus.webp)">${cranes}
+  return `<section class="campus" style="background-image:url(img/campus/base.webp)">${sprites}${cranes}
     ${SPOTS.map(([k, ico, ko, x, y]) => { const inf = spotInfo(t, k); return `<button class="hot ${inf.cls || ''} ${inf.alert ? 'alert' : ''}" style="left:${x}%;top:${y}%" ${k === 'develop' ? 'data-act="tab" data-tab="develop"' : `data-act="clubView" data-v="${k}"`}>${icon(ico, 28)}${ko}${inf.sub ? `<small>${inf.sub}</small>` : ''}</button>`; }).join('')}
   </section>
   <div class="campus-more">

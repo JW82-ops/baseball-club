@@ -22,6 +22,7 @@ import { devCandidates, secondDraftYear, secondDraftPool, SECOND_FEES } from '..
 import { scoutLevelOf } from '../../engine/club.js';
 import { WINTER } from '../../engine/dev2.js';
 import { prepDone } from './analysis.js';
+import { sponsorLogo, missionImg } from '../../data/brandArt.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -124,15 +125,20 @@ function missionCard() {
   const m = state.mission;
   if (m) {
     const pctv = Math.min(100, Math.round((m.progress / m.target) * 100));
-    return `<section class="sec"><div class="panel card-accent">
-      <div class="mission"><div class="grow"><span class="tiny amber">🎯 ${esc(m.sponsor)} 스폰서 미션</span><br><b>${esc(m.title)}</b>
-      <div class="bar"><i style="width:${pctv}%"></i></div></div><div class="center"><b class="disp amber" style="font-size:20px">${m.progress}/${m.target}</b><br><span class="tiny muted">보상 ${formatMoney(m.reward)}</span></div></div>
+    return `<section class="sec"><div class="mcard active">
+      <div class="mc-art" style="background-image:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(6,18,12,.85)),url(${missionImg(m)})"><img class="mc-logo" src="${sponsorLogo(m.sponsor)}" alt=""><span class="mc-sp">${esc(m.sponsor)} 스폰서 미션</span></div>
+      <div class="mc-body"><b>${esc(m.title)}</b>
+        <div class="mc-prog"><div class="bar"><i style="width:${pctv}%"></i></div><b class="disp amber">${m.progress}/${m.target}</b></div>
+        <span class="tiny muted">성공 보상 ${formatMoney(m.reward)} · 이번 주가 끝나면 정산돼요</span></div>
     </div></section>`;
   }
   const offers = state.missionOffers || [];
   if (!offers.length) return '';
   return `<section class="sec"><div class="sec-h"><h2>이번 주 스폰서 미션</h2><span class="sub">하나만 고를 수 있어요</span></div>
-    <div class="panel">${offers.map((o) => `<div class="offer"><div class="grow"><span class="tiny muted">${esc(o.sponsor)}</span><br><b>${esc(o.title)}</b></div><span class="small amber">${formatMoney(o.reward)}</span><button class="btn sm" data-act="acceptMission" data-id="${o.id}">수락</button></div>`).join('')}</div></section>`;
+    <div class="mlist">${offers.map((o) => `<div class="mcard">
+      <div class="mc-art" style="background-image:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(6,18,12,.85)),url(${missionImg(o)})"><img class="mc-logo" src="${sponsorLogo(o.sponsor)}" alt=""><span class="mc-sp">${esc(o.sponsor)}</span><span class="mc-rw">${formatMoney(o.reward)}</span></div>
+      <div class="mc-body row gap"><b class="grow">${esc(o.title)}</b><button class="btn sm primary" data-act="acceptMission" data-id="${o.id}">수락</button></div>
+    </div>`).join('')}</div></section>`;
 }
 
 function synergyCard() {
