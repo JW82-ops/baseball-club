@@ -12,6 +12,7 @@ import { brandValue, tierFor, genSponsorOffers } from './sponsor.js';
 import { resolvePress } from './story.js';
 import { resolvePartnerMail, resolveCityEvent } from './region.js';
 import { resolveIncident } from './character.js';
+import { resolveBigInjury } from './clubhouse.js';
 import { resolveMgrReq, resolveMgrQuit, resolveMgrPoach, resolveMgrRenew } from './manager.js';
 
 export const weekAbs = (state) => state.season * 100 + Math.floor(state.day / 6);
@@ -311,6 +312,7 @@ export function resolveMail(state, id, idx) {
     case 'cityEv': return resolveCityEvent(state, m, idx);
     case 'mgrReq': return resolveMgrReq(state, m, idx);
     case 'incident': return resolveIncident(state, m, idx);
+    case 'bigInjury': return resolveBigInjury(state, m, idx);
     case 'mgrQuit': return resolveMgrQuit(state, m, idx);
     case 'mgrPoach': return resolveMgrPoach(state, m, idx);
     case 'mgrRenew': return resolveMgrRenew(state, m, idx);

@@ -37,6 +37,7 @@ import { rehabWeek, mechProgress, planCondBonus, workloadWeek, settleWinter } fr
 import { ensureRegion, regionWeek, regionSeasonStart, regionSeasonEnd, perkSum } from './region.js';
 import { makeGoals, settleGoals } from './goals.js';
 import { characterWeek, potentialDrift } from './character.js';
+import { mentorWeek, injuryWeek, deadlineWeek, makeMeeting } from './clubhouse.js';
 import { managerWeek, managerOffseason, managerContractEnd, offseasonReq, closeOffReq } from './manager.js';
 
 export const CAMP_WEEKS = 6;
@@ -260,6 +261,9 @@ export function weeklyCycle(state, opts = {}) {
   for (const n of regionWeek(state, { camp: !!opts.camp })) addNews(state, n.text, n.t);
   if (!opts.camp) for (const n of managerWeek(state)) addNews(state, n.text, n.t);
   for (const n of characterWeek(state, { camp: !!opts.camp })) addNews(state, n.text, n.t);
+  for (const n of mentorWeek(state)) addNews(state, n.text, n.t);
+  for (const n of injuryWeek(state)) addNews(state, n.text, n.t);
+  if (!opts.camp) { for (const n of deadlineWeek(state)) addNews(state, n.text, n.t); if (state.phase === 'regular' && state.day < state.schedule.length) makeMeeting(state); }
   for (const d of tickConstruction(user)) {
     addNews(state, `🏗️ ${d.name} 공사 완료! ${d.title}${d.kind === 'b' ? ` (Lv.${d.lv})` : ''}`, 'big');
     report.events.push({ type: 'build', text: `${d.name} 완공` });

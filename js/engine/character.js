@@ -40,7 +40,7 @@ export const ethicLabel = (e) => e >= 75 ? ['연습벌레', 'good'] : e >= 58 ? 
 // 성장 배율: 성실도 + 슬럼프(사건 후유증)
 export function charGrowthMult(p) {
   if (p.ethic == null) return 1;
-  return (0.86 + p.ethic / 100 * 0.28) * (p.slump > 0 ? 0.6 : 1);
+  return (0.86 + p.ethic / 100 * 0.28) * (p.slump > 0 ? 0.6 : 1) * (p.mentorF || 1);
 }
 
 // ───────── 주간: 사건 발생 · 회복 ─────────

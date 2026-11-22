@@ -1,5 +1,6 @@
 import { state, save } from '../../core/store.js';
 import { makeGoals, goalStatus, backGoal } from '../../engine/goals.js';
+import { answerMeeting, meetingPending, deadlineLeft } from '../../engine/clubhouse.js';
 import { ui, rerender } from '../ui-state.js';
 import { artBg, artHero, stadiumArt, esc, emblem, gradeTag, avatar, posShort, potTag } from '../components.js';
 import { standings, pct } from '../../engine/league.js';
@@ -162,6 +163,14 @@ function natCard() {
     <button class="btn sm mt" data-act="natSeen">확인</button>`, 'tall')}</section>`;
 }
 
+function meetingCard() {
+  const mt = state.meeting;
+  if (!mt || mt.season !== state.season || !mt.items.length || state.phase !== 'regular') return '';
+  return `<section class="sec"><div class="panel meetc"><div class="row between"><b class="small">🗣️ 주간 코치 회의</b><span class="tiny muted">${meetingPending(state) ? `건의 ${meetingPending(state)}건` : '모두 결정함'}</span></div>
+    ${mt.items.map((i) => `<div class="mt-item ${i.done ? 'done' : ''}"><small>${esc(i.who)}</small><p>${esc(i.text)}</p>
+      ${i.done ? `<span class="tiny ${i.done === 'yes' ? 'good' : 'muted'}">${i.done === 'yes' ? '✅ 받아들임' : '반려함'}</span>` : `<div class="row gap"><button class="btn sm primary grow" data-act="meetAns" data-id="${i.id}" data-y="1">좋아요, 그렇게 해요</button><button class="btn sm ghost" data-act="meetAns" data-id="${i.id}" data-y="0">반려</button></div>`}</div>`).join('')}
+    <p class="tiny faint mt">건의를 받아들이면 코치진·감독과의 관계가 좋아지고, 반려하면 조금 서운해해요.</p></div></section>`;
+}
 function goalsCard() {
   if (state.phase !== 'regular') return '';
   if (state.goals?.season !== state.season) makeGoals(state);
@@ -214,6 +223,8 @@ function coachLine(sg) {
   if (gs) return { act: 'guideGo', html: `<span class="gprog">📘 가이드 ${state.guide.step + 1}/${GUIDE.length} · ${gs.title}</span>${gs.text}`, cta: gs.cta, guide: true };
   const mails = (state.inbox || []).filter((m) => !m.resolved).length;
   if (mails) return { act: 'tab', tab: 'mail', html: `✉️ 답장을 기다리는 메일이 <b>${mails}통</b> 있어요.`, cta: '메일함 열기' };
+  { const dl = deadlineLeft(state); if (state.dl?.opened && !state.dl.closed && dl > 0) return { act: 'tab', tab: 'mail', html: `📅 <b>트레이드 마감 D-${dl}</b>! 제안이 몰려 있어요. 사든 팔든 지금 결정해야 해요.`, cta: '메일함에서 제안 보기' }; }
+  if (meetingPending(state) && state.phase === 'regular') return { act: 'lobbyBrief2', html: `🗣️ 코치진이 이번 주 <b>건의 ${meetingPending(state)}건</b>을 올렸어요.`, cta: '코치 회의 보기' };
   if (!state.mission && (state.missionOffers || []).length) return { act: 'lobbyMission', html: `🎯 스폰서 미션 제안이 <b>${state.missionOffers.length}건</b> 왔어요.`, cta: '미션 고르기' };
   if (!user.staff?.manager) return { act: 'lobbyStaff', html: '아직 <b>감독</b>이 없어요. 감독이 있어야 선수 기용과 성장이 안정돼요.', cta: '감독 뽑으러 가기' };
   if (!sg) return { html: '오늘은 쉬어 가는 날이에요. 선수들 컨디션을 챙기죠.' };
@@ -272,7 +283,9 @@ function fastSheet() {
 registerActions({
   lobbyEvent: () => openModal(eventCard()),
   lobbyMission: () => openModal(missionCard() || '<div class="panel empty">지금은 스폰서 미션이 없어요.</div>'),
+  meetAns: (d) => { const r = answerMeeting(state, d.id, d.y === '1'); if (r.msg) toast(r.msg, r.ok ? 'good' : 'bad'); save(); rerender(); if (document.querySelector('#modal:not([hidden]) .meetc')) openModal(meetingCard() || '<div class="panel empty">이번 주 건의를 모두 처리했어요.</div>', { sheet: true, keepScroll: true }); },
   backGoal: (d) => { const g = backGoal(state, d.pid); if (!g) return; toast(`${state.players[d.pid]?.name}의 목표를 공개 응원했어요 📣`, 'good'); save(); rerender(); },
+  lobbyBrief2: () => openModal(meetingCard() || '<div class="panel empty">이번 주 건의가 없어요.</div>', { sheet: true }),
   lobbyBrief: () => openModal(`${miniStandings()}${lastGameCard()}`),
   lobbyStaff: () => { ui.tab = 'club'; ui.clubView = 'staff'; rerender(); window.scrollTo(0, 0); },
   lobbyFast: () => openModal(fastSheet()),
@@ -280,7 +293,7 @@ registerActions({
 });
 
 function briefing() {
-  const body = `${natCard()}${allStarCard()}${boardCard()}${goalsCard()}${state.mission ? missionCard() : ''}${lastGameCard()}${snsCard()}${paperCard()}${weekCard()}${synergyCard()}`;
+  const body = `${natCard()}${allStarCard()}${meetingCard()}${boardCard()}${goalsCard()}${state.mission ? missionCard() : ''}${lastGameCard()}${snsCard()}${paperCard()}${weekCard()}${synergyCard()}`;
   return `<div class="lb-more"><div class="lb-grip"><span></span>구단 브리핑</div>${body}${newsCard()}</div>`;
 }
 

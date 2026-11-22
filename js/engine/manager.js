@@ -8,6 +8,7 @@ import { genStaff, staffOvr, gradeOfStaff, staffWeeklyOf, staffSignOf, bLv, acti
 import { pushMail, weekAbs } from './mail.js';
 import { brandValue } from './sponsor.js';
 import { standings } from './league.js';
+import { deadlineReqMet } from './clubhouse.js';
 
 const U = (state) => state.teams[state.userTeamId];
 const r100 = (n) => Math.round(n / 100) * 100;
@@ -240,6 +241,7 @@ function reqMet(state, t, r) {
     case 'dump': return p && (p.team !== t.id || p.level === 2);
     case 'resign': return p && p.team === t.id && (state.nego?.items || []).find((x) => x.pid === p.id)?.status === 'done';
     case 'faSign': return p && p.team === t.id;
+    case 'dlBuy': case 'dlSell': return deadlineReqMet(state, r);
     default: return false;
   }
 }

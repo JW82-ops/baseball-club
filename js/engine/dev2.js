@@ -147,7 +147,7 @@ export function rehabWeek(p, healBonus = 1, healFn) {
   const steps = plan.speed >= 1 ? 1 + (chance(plan.speed - 1) ? 1 : 0) : chance(plan.speed) ? 1 : 0;
   let healed = false;
   for (let i = 0; i < steps && p.injury; i++) healed = healFn(p, healBonus) || healed;
-  if (healed && chance(plan.re)) {
+  if (healed && chance(plan.re + ((p.chronic || []).length ? 0.05 : 0))) {
     const name = p.lastInjury || '부상';
     p.injury = { name: `${name} 재발`, weeks: randInt(2, 5), cause: 'reinjury' };
     return 'reinjury';

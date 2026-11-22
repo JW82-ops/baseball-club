@@ -52,6 +52,7 @@ export function evaluateTrade(state, otherId, give, get, cash = 0) {
 export function executeTrade(state, otherId, give, get, cash = 0) {
   const other = state.teams[otherId];
   const user = state.teams[state.userTeamId];
+  state.tradeLog = [...(state.tradeLog || []), { season: state.season, day: state.day, other: otherId, giveOvr: Math.max(0, ...give.map((id) => calcOvr(state.players[id]))), getOvr: Math.max(0, ...get.map((id) => calcOvr(state.players[id]))), giveAges: give.map((id) => state.players[id].age), getAges: get.map((id) => state.players[id].age) }].slice(-30);
   for (const id of give) moveTo(state, state.players[id], user, other);
   for (const id of get) moveTo(state, state.players[id], other, user);
   user.cash -= cash; other.cash = (other.cash || 0) + cash;
@@ -64,6 +65,7 @@ export function executeTrade(state, otherId, give, get, cash = 0) {
 function moveTo(state, p, from, to) {
   from.roster = from.roster.filter((x) => x !== p.id);
   to.roster.push(p.id);
+  p.exTeams = [...new Set([...(p.exTeams || []), from.id])];
   p.team = to.id;
   p.level = 2;
   p.tradeBlock = false;

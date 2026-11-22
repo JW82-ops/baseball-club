@@ -12,6 +12,11 @@ import { rerender } from '../ui-state.js';
 import { playerImg } from '../portraits.js';
 import { bLv } from '../../engine/club.js';
 import { gradeFromOvr } from '../../engine/player.js';
+import { mentorMax, mentorCands, mentorFit, fitLabel, setMentor, endMentor } from '../../engine/clubhouse.js';
+import { openModal, closeModal, toast } from '../dom.js';
+import { save } from '../../core/store.js';
+import { PERSONALITIES } from '../../data/club.js';
+import { VICES } from '../../engine/character.js';
 
 registerActions({ devView: (d) => { ui.devView = d.v; rerender(); window.scrollTo(0, 0); } });
 const tone = (p) => (p.injury ? 'inj' : p.foreign ? 'fx' : p.age <= 23 ? 'yg' : 'tm');
@@ -85,7 +90,7 @@ export function renderDevelop() {
       <p class="small muted mt">${{ light: '성장 속도 70%. 피로와 부상 위험이 낮아요. 시즌 후반 체력 관리용.', normal: '표준 성장 속도와 부상 위험.', hard: '성장 속도 135%. 대신 피로가 빨리 쌓이고 부상 위험이 약 2배예요.' }[state.settings.intensity]}</p>
       <p class="tiny faint mt">훈련은 매주(6경기마다) 반영돼요. 1군 출전 경험과 2군 실전도 성장에 보탬이 돼요.</p>
     </div></section>${planSection(team)}`;
-  const careV = `${specialOverview(all, team)}
+  const careV = `${mentorSection(team)}${specialOverview(all, team)}
     <section class="sec"><div class="sec-h"><h2>컨디션 관리</h2></div>
     <div class="panel plist">
       ${injured.map((p) => row(p, team, `<span class="small bad">${p.injury.weeks}주</span>`, esc(p.injury.name))).join('')}
@@ -95,6 +100,36 @@ export function renderDevelop() {
     <div class="row gap mt"><button class="btn sm grow" data-act="restTired">지친 1군 선수 휴식 훈련</button><button class="btn sm grow" data-act="resetFocus">전원 균형 훈련</button></div></section>`;
   return hero + { week: weekV, pros: prosV, plan: planV, care: careV }[view];
 }
+
+// ───────── 멘토링 ─────────
+const persTag = (p) => (PERSONALITIES[p.personality] ? `${PERSONALITIES[p.personality].icon} ${PERSONALITIES[p.personality].ko}` : '');
+function mentorSection(team) {
+  const ms = team.mentors || [];
+  return `<section class="sec"><div class="sec-h"><h2>🤝 멘토링</h2><span class="sub">${ms.length}/${mentorMax(team)}쌍</span></div>
+    <div class="panel">${ms.map((m) => { const y = state.players[m.y], v = state.players[m.v]; if (!y || !v) return ''; const f = fitLabel(mentorFit(v, y));
+      return `<div class="mentor-row"><button class="mr-p" data-act="openPlayer" data-pid="${v.id}">${avatar(v, team.color, 34)}<span><b>${esc(v.name)}</b><small>${persTag(v)} · ${v.age}세</small></span></button><span class="mr-arrow">→</span>
+        <button class="mr-p" data-act="openPlayer" data-pid="${y.id}">${avatar(y, team.color, 34)}<span><b>${esc(y.name)}</b><small>${persTag(y)} · ${y.age}세</small></span></button>
+        <div class="mr-meta"><span class="${f[1]}">${f[0]}</span><small>${m.w}주째</small><button class="linkish" data-act="mentorEnd" data-y="${y.id}">해제</button></div></div>`; }).join('') || '<p class="small muted">베테랑 선배와 유망주를 짝지어 주세요. 성장이 최대 10% 빨라지고, 성실한 멘토는 나쁜 버릇도 고쳐줘요. 대신 성격이 안 맞으면 부딪히고, 노는 걸 좋아하는 선배는 버릇을 옮길 수도 있어요.</p>'}
+      ${ms.length < mentorMax(team) ? '<button class="btn sm primary block mt" data-act="mentorPick">＋ 멘토 짝 짓기</button>' : ''}</div></section>`;
+}
+function mentorPickHtml(yId) {
+  const t = userTeam(state);
+  if (!yId) {
+    const ys = teamPlayers(state, t).filter((p) => p.age <= 24 && !(t.mentors || []).some((m) => m.y === p.id)).sort((a, b) => calcOvr(b) - calcOvr(a));
+    return `<h2 class="disp" style="font-size:20px">🤝 누구를 가르칠까요?</h2><p class="small muted">24세 이하 유망주</p>
+      <div class="plist mt">${ys.map((p) => `<button class="prow" data-act="mentorPick" data-y="${p.id}">${avatar(p, t.color, 36)}<div class="grow"><div class="nm">${esc(p.name)} <span class="tiny muted">${persTag(p)}</span></div><div class="meta">${posShort(p)} · ${p.age}세${p.vice && p.viceKnown ? ` · ${VICES[p.vice].icon} ${VICES[p.vice].ko}` : ''}</div></div>${gradeTag(calcOvr(p))}</button>`).join('') || '<div class="empty">유망주가 없어요.</div>'}</div>`;
+  }
+  const y = state.players[yId];
+  const cs = mentorCands(state, y);
+  return `<h2 class="disp" style="font-size:20px">${esc(y.name)}의 멘토 고르기</h2><p class="small muted">${persTag(y)} · 같은 투수·타자 중 27세 이상, 4살 이상 많은 선배. 실력보다 성실함과 성격이 중요해요</p>
+    <div class="plist mt">${cs.map((v) => { const f = fitLabel(mentorFit(v, y)); return `<button class="prow" data-act="mentorSet" data-y="${y.id}" data-v="${v.id}">${avatar(v, t.color, 36)}<div class="grow"><div class="nm">${esc(v.name)} <span class="tiny ${f[1]}">${f[0]}</span></div><div class="meta">${persTag(v)} · ${v.age}세 · 훈련 태도 ${(v.ethic ?? 55) >= 58 ? '성실' : (v.ethic ?? 55) >= 42 ? '보통' : '게으름'}${v.vice && v.viceKnown ? ` · ⚠️ ${VICES[v.vice].ko}` : ''}</div></div>${gradeTag(calcOvr(v))}</button>`; }).join('') || '<div class="empty">조건에 맞는 선배가 없어요.</div>'}</div>
+    <button class="btn sm ghost block mt" data-act="mentorPick">← 다른 유망주</button>`;
+}
+registerActions({
+  mentorPick: (d) => openModal(mentorPickHtml(d.y), { sheet: true }),
+  mentorSet: (d) => { const r = setMentor(state, d.y, d.v); toast(r.msg, r.ok ? 'good' : 'bad'); if (r.ok) { closeModal(); save(); rerender(); } },
+  mentorEnd: (d) => { endMentor(state, d.y); save(); rerender(); },
+});
 
 function row(p, team, right, meta) {
   return `<button class="prow" data-act="openPlayer" data-pid="${p.id}">${avatar(p, team.color, 36)}
