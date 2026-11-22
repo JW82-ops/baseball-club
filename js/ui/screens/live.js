@@ -403,8 +403,23 @@ async function playOne() {
   // 접전 후반일수록 관중 소리가 커져요
   setCrowd(g.inning >= 7 && Math.abs(g.home.runs - g.away.runs) <= 2 ? 1.9 : g.bases.some(Boolean) ? 1.4 : 1);
   const snap = { runners: anim.scene.runners.map((r) => ({ ...r })), batter: anim.scene.batter ? { ...anim.scene.batter } : null };
+  const preRisp = !!(g.bases[1] || g.bases[2]);
   stepPA(state, g);
   const evs = g.halfEvents.slice();
+  // 하이라이트 모드: 득점·홈런·끝내기·접전 후반·득점권 삼진만 장면으로 보여주고 나머지는 바로 넘어가요
+  if (ui.liveHL) {
+    const close = g.inning >= 8 && Math.abs(g.home.runs - g.away.runs) <= 2;
+    const big = evs.some((e) => e.runs > 0 || e.type === 'hr' || e.type === 'walkoff' || e.type === 'change' || (preRisp && e.type === 'so'));
+    if (!big && !close) {
+      anim.busy = false;
+      anim.skipped = (anim.skipped || 0) + 1;
+      buildScene();
+      updateLiveDom();
+      if (g.over) { anim.playing = false; showEnd(); }
+      return 'skip';
+    }
+    if (anim.skipped) { setOverlay('#lv-call', `⏩ ${anim.skipped}타석 넘김`); anim.skipped = 0; }
+  }
   try {
     for (const ev of evs) {
       if (my !== anim.token) break;
@@ -425,8 +440,8 @@ async function playOne() {
 async function loop() {
   const my = anim.token;
   while (anim.playing && ui.live && !ui.live.over && my === anim.token) {
-    await playOne();
-    await wait(ui.liveSpeed >= 4 ? 120 : 450);
+    const r = await playOne();
+    await wait(r === 'skip' ? 30 : ui.liveSpeed >= 4 ? 120 : 450);
   }
   updateLiveDom();
 }
@@ -568,6 +583,7 @@ export function mountLive() {
   buildScene();
   if (!anim.raf) anim.raf = requestAnimationFrame(frame);
   ui.liveSpeed = ui.liveSpeed || 1;
+  if (ui.liveHL == null) { try { ui.liveHL = localStorage.getItem('bc_hl') === '1'; } catch { ui.liveHL = false; } }
   setBSO(0, 0, 0);
   anim.playing = true;
   anim.token++;
@@ -629,7 +645,7 @@ export function updateLiveDom() {
       <button class="ord" data-act="lvPitchChange">🔁 투수 교체</button>
       <button class="ord ${o.ibb ? 'on' : ''}" data-act="lvOrder" data-k="ibb">🚶 고의사구</button>${synHtml}`);
   setOverlay('#lv-ctrl', g.over ? '' : `
-    <div class="seg spd">${[1, 2, 4].map((v) => `<button class="${ui.liveSpeed === v ? 'on' : ''}" data-act="lvSpeed" data-v="${v}">${v}x</button>`).join('')}</div>
+    <div class="seg spd">${[1, 2, 4].map((v) => `<button class="${ui.liveSpeed === v ? 'on' : ''}" data-act="lvSpeed" data-v="${v}">${v}x</button>`).join('')}<button class="${ui.liveHL ? 'on' : ''}" data-act="lvHL" title="득점·승부처만 보기">⚡주요</button></div>
     <button class="btn sm ${anim.playing ? '' : 'primary'}" data-act="lvPlay">${anim.playing ? '⏸ 정지' : '▶ 재생'}</button>
     ${!anim.playing && anim.lastPA && (anim.lastPA.ev.type === 'hr' || anim.lastPA.ev.runs) ? '<button class="btn sm" data-act="lvReplay">⏪</button>' : `<button class="btn sm" data-act="lvStep" ${anim.playing ? 'disabled' : ''}>한 타석</button>`}
     <button class="btn sm ghost" data-act="lvSkip" data-m="half">이닝⏭</button>
@@ -674,6 +690,7 @@ registerActions({
   lvReplay: () => liveReplay(),
   lvSkip: (d) => liveSkip(d.m),
   lvSpeed: (d) => { ui.liveSpeed = Number(d.v); updateLiveDom(); },
+  lvHL: () => { ui.liveHL = !ui.liveHL; try { localStorage.setItem('bc_hl', ui.liveHL ? '1' : '0'); } catch { /* noop */ } toast(ui.liveHL ? '⚡ 주요 장면만 보기: 득점·홈런·승부처만 보여줘요' : '모든 타석을 보여줘요'); updateLiveDom(); },
   lvOrder: (d) => {
     const g = ui.live;
     const on = !(g.orders || {})[d.k];
