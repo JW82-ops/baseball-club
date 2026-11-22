@@ -1,4 +1,4 @@
-import { state } from '../../core/store.js';
+import { state, save } from '../../core/store.js';
 import { ui } from '../ui-state.js';
 import { esc, avatar, gradeTag, posShort } from '../components.js';
 import { calcOvr, potentialEstimate, batLine, pitLine } from '../../engine/player.js';
@@ -12,20 +12,35 @@ export function renderMail() {
   const open = ui.mailOpen && box.find((m) => m.id === ui.mailOpen);
   if (open) return mailDetail(open);
   const pending = box.filter((m) => !m.resolved);
-  return `
-  <section class="sec">
-    <div class="sec-h"><h2>✉️ 구단주 메일함</h2><span class="sub">답장 대기 ${pending.length}</span></div>
-    <p class="tiny faint">선수들이 보내는 건의·요청이에요. 답장에 따라 기분과 선수 사이 관계가 달라져요. 2주 동안 답이 없으면 무시한 걸로 처리돼요.</p>
-    <div class="panel plist mt">${box.map((m) => {
-      const p = m.from && state.players[m.from];
-      const ml = p ? moodLabel(p.morale) : null;
-      return `<button class="prow mailrow ${m.resolved ? 'done' : ''} ${m.read ? '' : 'unread'}" data-act="openMail" data-id="${m.id}">
+  const rest = box.filter((m) => m.resolved);
+  const row = (m) => {
+    const p = m.from && state.players[m.from];
+    const ml = p ? moodLabel(p.morale) : null;
+    const info = !m.choices;
+    const tag = !m.resolved ? ['답장 필요', 'amber'] : info ? (m.read ? ['알림', 'faint'] : ['새 소식', 'amber']) : m.auto ? ['무응답', 'faint'] : ['답장함', 'faint'];
+    return `<button class="prow mailrow ${m.resolved ? 'done' : ''} ${m.read ? '' : 'unread'}" data-act="openMail" data-id="${m.id}">
         ${p ? avatar(p, state.teams[p.team]?.color || '#5f6f66', 36) : faceHtml(npcImg(m), '#3d5a4b', 36)}
         <div class="grow"><div class="nm">${esc(m.fromName || '구단')} ${ml ? `<span title="${ml.ko}">${ml.e}</span>` : ''}</div><div class="meta">${esc(m.subject)}</div></div>
-        <span class="tiny ${m.resolved ? 'faint' : 'amber'}">${m.resolved ? (m.auto ? '무응답' : '답장함') : '답장 필요'}</span>
+        <span class="tiny ${tag[1]}">${tag[0]}</span>
       </button>`;
-    }).join('') || '<div class="empty">아직 받은 메일이 없어요.</div>'}</div>
+  };
+  const html = `
+  <section class="sec">
+    <div class="sec-h"><h2>✉️ 구단주 메일함</h2><span class="sub">답장 대기 ${pending.length}</span></div>
+    <p class="tiny faint">선수·감독·시청이 보내는 건의와 소식이에요. 답장에 따라 기분과 관계가 달라져요. 2주 동안 답이 없으면 무시한 걸로 처리돼요.</p>
+    ${pending.length ? `<div class="sec-h mt"><h2 style="font-size:15px">답장이 필요해요</h2></div><div class="panel plist">${pending.map(row).join('')}</div>` : '<div class="panel mt small muted center">답장할 메일이 없어요 👍</div>'}
+    <div class="sec-h mt-l"><h2 style="font-size:15px">지난 메일</h2>${rest.some((m) => !m.read) ? '<button class="linkish" data-act="mailReadAll">모두 읽음</button>' : ''}</div>
+    <div class="panel plist">${rest.map(row).join('') || '<div class="empty">아직 받은 메일이 없어요.</div>'}</div>
   </section>`;
+  // 끝난 메일은 목록에서 제목을 본 것으로 읽음 처리해요 (배지 숫자는 답장 대기만 남아요)
+  let changed = false;
+  for (const m of rest) if (!m.read) { m.read = true; changed = true; }
+  if (changed) setTimeout(() => {
+    save();
+    const em = document.querySelector('.mailbtn em');
+    if (em) { if (pending.length) em.textContent = pending.length; else em.remove(); }
+  }, 0);
+  return html;
 }
 
 // 메일에 나온 선수를 바로 눌러볼 수 있는 카드

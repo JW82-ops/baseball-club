@@ -24,7 +24,8 @@ function push(state, m) {
   state.inbox.unshift({ id: uid('m'), season: state.season, day: state.day, week: weekAbs(state), read: false, resolved: !m.choices, ...m });
   if (state.inbox.length > 50) state.inbox.length = 50;
 }
-export const unreadCount = (state) => (state.inbox || []).filter((m) => !m.read || !m.resolved).length;
+// 배지 숫자: 답장 대기 + 아직 못 본 소식
+export const unreadCount = (state) => (state.inbox || []).filter((m) => !m.resolved || !m.read).length;
 
 // ───────── 메일 생성기 ─────────
 const GEN = {

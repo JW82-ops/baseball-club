@@ -479,6 +479,7 @@ registerActions({
     t.captain = p.id; addMoodEvent(p, '주장 임명', 10, 5);
     save(); openModal(renderPlayer(p.id)); render(); toast(`${p.name} 주장 임명`, 'good');
   },
+  mailReadAll: () => { for (const m of state.inbox || []) if (m.resolved) m.read = true; save(); render(); },
   openMail: (d) => {
     ui.mailOpen = d.id || null;
     const m = (state.inbox || []).find((x) => x.id === d.id);
