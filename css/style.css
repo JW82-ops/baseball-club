@@ -1178,3 +1178,22 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .lv-top .sc span.flip { display: inline-block; animation: scFlip .7s ease-out; color: #fff3c8; }
 @keyframes scFlip { 0% { transform: rotateX(90deg) scale(1.4); } 60% { transform: rotateX(-10deg) scale(1.2); } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .lv-cut *, .lv-top .sc span.flip { animation: none !important; } }
+
+/* 에이전트 협상 */
+.negh { display: flex; align-items: flex-end; gap: 8px; margin: -16px -16px 0; padding: 14px 14px 0; border-radius: 18px 18px 0 0; background: linear-gradient(180deg, rgba(255, 197, 61, .14), transparent); }
+.negh h2 { font-size: 20px; }
+.neg-ag { width: 64px; height: 84px; object-fit: contain; object-position: bottom; }
+.neg-pl { width: 70px; height: 92px; object-fit: contain; object-position: bottom; }
+.neg-tries { display: flex; align-items: center; gap: 3px; margin-top: 4px; }
+.neg-tries i { width: 10px; height: 10px; border-radius: 50%; background: #7ee2a0; }
+.neg-tries i.used { background: #4a5a52; }
+.neg-tries span { margin-left: 4px; }
+.neg-chat { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-height: 190px; overflow-y: auto; }
+.nc { max-width: 84%; padding: 8px 11px; border-radius: 14px; font-size: 13px; line-height: 1.45; }
+.nc.ag { align-self: flex-start; background: #fffaf0; color: #2b2014; border-bottom-left-radius: 4px; text-shadow: none; }
+.nc.me { align-self: flex-end; background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: #3d2300; border-bottom-right-radius: 4px; font-weight: 700; text-shadow: none; }
+.neg-box { margin-top: 10px; padding: 12px; border-radius: 16px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1); }
+.neg-meter { position: relative; height: 8px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.neg-meter i { display: block; height: 100%; border-radius: 99px; background: #ff6f61; transition: width .25s; }
+.neg-meter i.warn { background: var(--gold); } .neg-meter i.good { background: #63d48f; }
+.small.warn { color: var(--gold); }

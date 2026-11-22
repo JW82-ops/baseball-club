@@ -18,7 +18,6 @@ import {
   finishDraft, runCampAndStartSeason, releasePlayer, fillUserFirstTeam,
 } from './engine/season.js';
 import { simToEnd, stepPA, currentBatter, currentPitcher, userBatting } from './engine/match.js';
-import { playerImg } from './ui/portraits.js';
 import { velocityKmh, batLine, pitLine } from './engine/player.js';
 import { fmtAvg, fmtEra } from './core/util.js';
 import { isClutch, clutchOptions, clutchSituation } from './engine/clutch.js';
@@ -27,7 +26,8 @@ import { slotSheetHtml, subSheetHtml, staffMarketHtml } from './ui/screens/club.
 import { renderMail } from './ui/screens/mail.js';
 import { resolveMail, unreadCount } from './engine/mail.js';
 import { signSponsor, cancelSponsor } from './engine/sponsor.js';
-import { annualOffer, multiOffer, releaseNego, faMarketOffer, fairSalary } from './engine/contracts.js';
+import { annualOffer, multiOffer, releaseNego, faMarketOffer, fairSalary, negoPreview } from './engine/contracts.js';
+import { npcImg, playerImg } from './ui/portraits.js';
 import { evaluateTrade, executeTrade } from './engine/trade.js';
 import { addMoodEvent } from './engine/mood.js';
 import { proceedToDraft, userGameToday, currentPostGame } from './engine/season.js';
@@ -435,37 +435,13 @@ registerActions({
     if (r.ok) { sfx.coin(); closeModal(); }
     commit(r.msg, r.ok ? 'good' : 'bad');
   },
-  faSheet: (d) => openModal(offerSheet(d.pid, 'fa')),
-  negoSheet: (d) => openModal(offerSheet(d.pid, 'nego')),
-  offerYears: (d) => { ui.offerYears = Number(d.v); openModal(offerSheet(d.pid, d.mode)); },
-  makeOffer: (d) => {
-    const p = state.players[d.pid];
-    const sal = Math.round(Number(d.s) / 100) * 100;
-    const yrs = ui.offerYears || 1;
-    const r = d.mode === 'fa' ? faMarketOffer(state, d.pid, sal, yrs) : multiOffer(state, d.pid, sal, yrs);
-    if (r.ok) {
-      sfx.levelup();
-      if (d.mode === 'fa') {
-        const t = userTeam(state);
-        state.faPool = state.faPool.filter((x) => x !== p.id);
-        p.team = t.id; p.market = null; p.level = 2; t.roster.push(p.id);
-        assignNumber(state, t, p);
-      }
-      closeModal();
-    } else if (r.gone) {
-      // 다른 구단행
-      const ai = state.teamOrder.filter((id) => id !== state.userTeamId);
-      const tid = ai[Math.floor(Math.random() * ai.length)];
-      state.faPool = state.faPool.filter((x) => x !== p.id);
-      p.team = tid; p.market = null; p.salary = p.askSalary || p.salary; p.contract = { years: p.askYears || 1, type: 'fa' };
-      state.teams[tid].roster.push(p.id);
-      assignNumber(state, state.teams[tid], p);
-      closeModal();
-      r.msg += ` → ${state.teams[tid].name}`;
-    } else if (r.left) closeModal();
-    else openModal(offerSheet(d.pid, d.mode, r.msg));
-    commit(r.msg, r.ok ? 'good' : 'bad');
-  },
+  faSheet: (d) => { negStart(d.pid, 'fa'); openModal(offerSheet()); },
+  negoSheet: (d) => { negStart(d.pid, 'nego'); openModal(offerSheet()); },
+  offerYears: (d) => { ui.neg.yrs = Number(d.v); openModal(offerSheet(), { keepScroll: true }); },
+  negStep: (d) => { const n = ui.neg; n.sal = Math.max(100, Math.round((n.sal + n.ask * Number(d.d)) / 100) * 100); openModal(offerSheet(), { keepScroll: true }); },
+  negIncChk: (d) => { ui.neg.inc = !!d.checked; openModal(offerSheet(), { keepScroll: true }); },
+  negCounter: () => { if (ui.neg.counter) { ui.neg.sal = ui.neg.counter; doOffer(true); } },
+  makeOffer: () => doOffer(false),
   nego: (d) => { const msg = annualOffer(state, d.pid, d.m); commit(msg); },
   negoAll: (d) => {
     let n = 0;
@@ -765,28 +741,79 @@ registerActions({
   resetGame: () => confirmBox('이 슬롯의 진행이 모두 지워져요. 처음부터 다시 창단할까요?', '처음부터', () => { const n = curSlot; wipe(); title.creating = true; title.slot = n; ui.tab = 'home'; render(); }, 'danger'),
 });
 
-function offerSheet(pid, mode, note = '') {
+// ───────── 에이전트 협상 ─────────
+function negStart(pid, mode) {
   const p = state.players[pid];
   const it = mode === 'nego' ? state.nego.items.find((x) => x.pid === pid) : null;
   const ask = mode === 'fa' ? (p.askSalary || fairSalary(state, p)) : it.demand;
-  const askYrs = mode === 'fa' ? (p.askYears || 1) : (it.years || 1);
-  if (!ui.offerYears || ui.offerPid !== pid) { ui.offerYears = askYrs; ui.offerPid = pid; }
-  const tries = mode === 'fa' ? (p.faTries || 0) : (it.tries || 0);
-  const maxTries = mode === 'fa' ? 4 : 3;
-  const yrs = ui.offerYears;
-  const pcts = [0.85, 0.95, 1, 1.1];
-  const fee = (s) => (mode === 'fa' || it?.kind === 'fa' ? Math.round(s * yrs * 0.2 / 100) * 100 : it?.kind === 'foreign' ? Math.round(s * 0.15 / 100) * 100 : 0);
-  return `<button class="sheet-close" data-act="closeModal">×</button>
-    <h2 class="disp" style="font-size:22px">${esc(p.name)} 계약 협상</h2>
-    <p class="small muted mt">${p.age}세 · OVR ${calcOvr(p)} · 요구 <b class="amber">연봉 ${formatMoney(ask)} · ${askYrs}년</b> · 남은 기회 ${maxTries - tries}번</p>
-    ${mode === 'fa' && p.prevTeam && p.prevTeam !== state.userTeamId ? `<div class="bar-note mt">📑 ${p.faGrade || faGrade(state, p)}등급 FA — 영입하면 ${esc(state.teams[p.prevTeam]?.short || '')}에 ${(p.faGrade || faGrade(state, p)) === 'C' ? '보상금(전 연봉 150%)' : `보상선수(보호 ${(p.faGrade || faGrade(state, p)) === 'A' ? 20 : 25}인 외) + 보상금, 또는 보상금만`}을 줘야 해요. <button class="linkish" data-act="learn" data-k="FA">자세히</button></div>` : ''}
-    ${(() => { const ci = capInfo(state); const after = ci.used + ask; return `<p class="tiny ${after > ci.limit ? 'bad' : 'faint'} mt">샐러리캡(상위 40명): ${formatMoney(ci.used)} → 약 ${formatMoney(after)} / 상한 ${formatMoney(ci.limit)}${after > ci.limit ? ' · 초과하면 시즌 후 제재금' : ''}</p>`; })()}
-    ${note ? `<div class="bar-note mt">${esc(note)}</div>` : ''}
-    <p class="small mt">계약 기간</p>
-    <div class="seg mt">${[1, 2, 3, 4].map((y) => `<button class="${yrs === y ? 'on' : ''}" data-act="offerYears" data-v="${y}" data-pid="${pid}" data-mode="${mode}">${y}년</button>`).join('')}</div>
-    <p class="small mt">연봉 제시 <span class="tiny faint">(계약금 별도)</span></p>
-    <div class="mt">${pcts.map((r) => { const sal = Math.round(ask * r / 100) * 100; return `<button class="choice" data-act="makeOffer" data-pid="${pid}" data-mode="${mode}" data-s="${sal}"><b>${formatMoney(sal)}</b> <span class="tiny muted" style="display:inline">요구의 ${Math.round(r * 100)}%</span>${fee(sal) ? `<span>계약금 ${formatMoney(fee(sal))}</span>` : ''}</button>`; }).join('')}</div>
-    <p class="tiny faint mt">기분이 좋고 충성도가 높을수록, 구단 브랜드 가치가 클수록 낮은 금액에도 사인해요.</p>`;
+  const yrs = mode === 'fa' ? (p.askYears || 1) : (it.years || 1);
+  if (ui.neg?.pid === pid && ui.neg.mode === mode) return;
+  ui.neg = { pid, mode, ask, askYrs: yrs, yrs, sal: Math.round(ask * 0.9 / 100) * 100, inc: false, counter: null, log: [{ who: 'ag', text: `${p.name} 선수 측 에이전트입니다. 저희 요구는 연봉 ${formatMoney(ask)}, ${yrs}년이에요.` }] };
+}
+function doOffer(fromCounter) {
+  const n = ui.neg;
+  const p = state.players[n.pid];
+  const sal = n.sal, yrs = n.yrs;
+  n.log.push({ who: 'me', text: `연봉 ${formatMoney(sal)} · ${yrs}년${n.inc ? ' · 성적 옵션 포함' : ''}${fromCounter ? ' (역제안 수락)' : ''}` });
+  const r = n.mode === 'fa' ? faMarketOffer(state, n.pid, sal, yrs, { incentive: n.inc }) : multiOffer(state, n.pid, sal, yrs, { incentive: n.inc });
+  if (r.ok) {
+    sfx.levelup();
+    if (n.mode === 'fa') {
+      const t = userTeam(state);
+      state.faPool = state.faPool.filter((x) => x !== p.id);
+      p.team = t.id; p.market = null; p.level = 2; t.roster.push(p.id);
+      assignNumber(state, t, p);
+    }
+    ui.neg = null;
+    closeModal();
+  } else if (r.gone) {
+    const ai = state.teamOrder.filter((id) => id !== state.userTeamId);
+    const tid = ai[Math.floor(Math.random() * ai.length)];
+    state.faPool = state.faPool.filter((x) => x !== p.id);
+    p.team = tid; p.market = null; p.salary = p.askSalary || p.salary; p.contract = { years: p.askYears || 1, type: 'fa' };
+    state.teams[tid].roster.push(p.id);
+    assignNumber(state, state.teams[tid], p);
+    ui.neg = null;
+    closeModal();
+    r.msg += ` → ${state.teams[tid].name}`;
+  } else if (r.left) { ui.neg = null; closeModal(); }
+  else {
+    const pv = negoPreview(state, n.pid, n.mode, sal, yrs, { incentive: n.inc });
+    n.counter = Math.max(pv.counter, sal + 100);
+    const gap = pv.need - pv.score;
+    n.log.push({ who: 'ag', text: `${r.msg.replace(/^[^:]+:\s*/, '')} ${gap < 0.12 ? `${formatMoney(n.counter)}${n.yrs !== n.askYrs ? '' : ''}이면 바로 사인할게요.` : `최소 ${formatMoney(n.counter)}은 돼야 이야기가 됩니다.`}` });
+    openModal(offerSheet(), { keepScroll: true });
+  }
+  commit(r.msg, r.ok ? 'good' : 'bad');
+}
+function offerSheet() {
+  const n = ui.neg;
+  const p = state.players[n.pid];
+  const pv = negoPreview(state, n.pid, n.mode, n.sal, n.yrs, { incentive: n.inc });
+  const ratio = pv.score / pv.need;
+  const mood = ratio >= 1 ? ['good', '사인할 것 같아요'] : ratio >= 0.95 ? ['warn', '조금만 더'] : ratio >= 0.85 ? ['warn', '부족해요'] : ['bad', '많이 부족해요'];
+  const fee = (n.mode === 'fa' || state.nego?.items.find((x) => x.pid === n.pid)?.kind === 'fa' ? Math.round(n.sal * n.yrs * 0.2 / 100) * 100 : state.nego?.items.find((x) => x.pid === n.pid)?.kind === 'foreign' ? Math.round(n.sal * 0.15 / 100) * 100 : 0) + (n.inc ? Math.round(n.sal * 0.06 / 100) * 100 : 0);
+  const fg = p.faGrade || faGrade(state, p);
+  return `<div class="negh">
+      <img class="neg-ag" src="${npcImg({ fromName: '에이전트' })}" alt="">
+      <div class="grow"><h2 class="disp">${esc(p.name)} 계약 협상</h2><p class="tiny muted">${p.age}세 · OVR ${calcOvr(p)} · 요구 <b class="amber">${formatMoney(n.ask)} · ${n.askYrs}년</b></p>
+        <div class="neg-tries">${Array.from({ length: Math.max(0, pv.left) + (n.log.filter((x) => x.who === 'me').length) }, (_, i) => `<i class="${i < n.log.filter((x) => x.who === 'me').length ? 'used' : ''}"></i>`).join('')}<span class="tiny muted">남은 기회 ${Math.max(0, pv.left)}번</span></div></div>
+      <img class="neg-pl" src="${playerImg(p)}" alt="">
+    </div>
+    ${n.mode === 'fa' && p.prevTeam && p.prevTeam !== state.userTeamId ? `<div class="bar-note mt">📑 ${fg}등급 FA — 영입하면 ${esc(state.teams[p.prevTeam]?.short || '')}에 ${fg === 'C' ? '보상금(전 연봉 150%)' : `보상선수(보호 ${fg === 'A' ? 20 : 25}인 외) + 보상금, 또는 보상금만`}을 줘야 해요. <button class="linkish" data-act="learn" data-k="FA">자세히</button></div>` : ''}
+    <div class="neg-chat">${n.log.slice(-6).map((l) => `<div class="nc ${l.who}">${esc(l.text)}</div>`).join('')}</div>
+    <div class="neg-box">
+      <div class="row between"><span class="small">연봉 제시</span><span class="small ${mood[0]}">예상 반응: ${mood[1]}</span></div>
+      <div class="row gap mt"><button class="btn sm" data-act="negStep" data-d="-0.05">−5%</button><b class="disp grow center" style="font-size:24px">${formatMoney(n.sal)}</b><button class="btn sm" data-act="negStep" data-d="0.05">+5%</button></div>
+      <div class="neg-meter mt"><i style="width:${Math.min(100, Math.round(ratio * 100))}%" class="${mood[0]}"></i><span style="left:100%"></span></div>
+      <p class="small mt">계약 기간</p>
+      <div class="seg mt">${[1, 2, 3, 4].map((y) => `<button class="${n.yrs === y ? 'on' : ''}" data-act="offerYears" data-v="${y}">${y}년</button>`).join('')}</div>
+      <label class="row gap small mt"><input type="checkbox" data-change="negIncChk" ${n.inc ? 'checked' : ''}><span class="grow">성적 옵션 추가<br><span class="tiny muted">연봉 대신 보너스로 마음을 얻어요 (계약금 +6%)</span></span></label>
+      <p class="tiny muted mt">계약금 ${formatMoney(fee)}${(() => { const ci = capInfo(state); const after = ci.used + n.sal; return ` · 샐러리캡 ${formatMoney(after)} / ${formatMoney(ci.limit)}${after > ci.limit ? ' <b class="bad">초과</b>' : ''}`; })()}</p>
+      <button class="btn primary block mt" data-act="makeOffer">이 조건으로 제안</button>
+      ${n.counter ? `<button class="btn block mt" data-act="negCounter">에이전트 역제안 수락 · ${formatMoney(n.counter)}</button>` : ''}
+    </div>
+    <p class="tiny faint mt">기분이 좋고 충성도가 높을수록, 구단 브랜드 가치가 클수록 낮은 금액에도 사인해요. 제안을 거듭할수록 선수 마음이 식어요. <button class="linkish" data-act="learn" data-k="salary">연봉 협상이란?</button></p>`;
 }
 
 function doDraft(pid) {

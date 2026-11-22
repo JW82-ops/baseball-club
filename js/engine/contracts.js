@@ -89,18 +89,18 @@ export function annualOffer(state, pid, mode) {
 }
 
 // FA·잔류·외국인 재계약 협상
-export function multiOffer(state, pid, salary, years) {
+export function multiOffer(state, pid, salary, years, opts = {}) {
   const it = state.nego.items.find((x) => x.pid === pid);
   const p = state.players[pid];
   const t = state.teams[state.userTeamId];
   if (!it || it.status !== 'pending') return { ok: false, msg: '' };
-  const ratio = salary / it.demand;
+  const ratio = (salary * (opts.incentive ? 1.05 : 1)) / it.demand;
   const yrFit = it.years ? 1 - Math.abs((years || 1) - it.years) * 0.06 : 1;
   const mood = (p.morale ?? 60) / 100, loyal = (p.loyalty ?? 40) / 100, brand = Math.min(1, brandValue(state) / 200);
   const score = ratio * 0.8 + yrFit * 0.1 + (mood - 0.55) * 0.12 + (loyal - 0.4) * 0.1 + brand * 0.05 - (it.tries || 0) * 0.015;
   const need = it.kind === 'stay' ? 0.84 : it.kind === 'foreign' ? 0.88 : 0.91;
   it.tries = (it.tries || 0) + 1;
-  const fee = it.kind === 'foreign' ? Math.round(salary * 0.15 / 100) * 100 : it.kind === 'fa' ? Math.round(salary * years * 0.2 / 100) * 100 : 0;
+  const fee = (it.kind === 'foreign' ? Math.round(salary * 0.15 / 100) * 100 : it.kind === 'fa' ? Math.round(salary * years * 0.2 / 100) * 100 : 0) + (opts.incentive ? Math.round(salary * 0.06 / 100) * 100 : 0);
   if (score >= need) {
     if (t.cash < fee) return { ok: false, msg: `계약금 ${fee.toLocaleString()}만이 필요해요` };
     t.cash -= fee; t.ledger.expense += fee; t.ledger.signing = (t.ledger.signing || 0) + fee;
@@ -174,7 +174,7 @@ export function finishContractPhase(state) {
 }
 
 // FA 시장 영입 제안 (유저)
-export function faMarketOffer(state, pid, salary, years) {
+export function faMarketOffer(state, pid, salary, years, opts = {}) {
   const p = state.players[pid];
   const t = state.teams[state.userTeamId];
   if (!p || p.market !== 'fa') return { ok: false, msg: '' };
@@ -184,9 +184,9 @@ export function faMarketOffer(state, pid, salary, years) {
   const comp = 1 + ((p.faTries || 0) * 0.02); // 시간이 지날수록 경쟁 제안이 붙음
   const brand = Math.min(1, brandValue(state) / 200);
   const returning = p.prevTeam === t.id ? ((p.loyalty ?? 40) - 50) / 400 : 0;
-  const score = (salary / ask) * (1 - Math.abs(years - yrs) * 0.05) + brand * 0.06 + returning;
+  const score = ((salary * (opts.incentive ? 1.05 : 1)) / ask) * (1 - Math.abs(years - yrs) * 0.05) + brand * 0.06 + returning;
   p.faTries = (p.faTries || 0) + 1;
-  const fee = Math.round(salary * years * 0.2 / 100) * 100;
+  const fee = Math.round(salary * years * 0.2 / 100) * 100 + (opts.incentive ? Math.round(salary * 0.06 / 100) * 100 : 0);
   if (score >= 0.97 * comp) {
     if (t.cash < fee) return { ok: false, msg: `계약금 ${fee.toLocaleString()}만이 필요해요` };
     t.cash -= fee; t.ledger.expense += fee; t.ledger.signing = (t.ledger.signing || 0) + fee;
@@ -203,6 +203,33 @@ export function faMarketOffer(state, pid, salary, years) {
   }
   if (p.faTries >= 4) return { ok: false, gone: true, msg: `${p.name}: "다른 구단과 계약하기로 했어요."` };
   return { ok: false, msg: score >= 0.9 * comp ? `${p.name}: "조금만 더 올려주시면 사인할게요."` : `${p.name}: "다른 구단 제안이 더 좋네요."` };
+}
+
+// 협상 미리보기: 지금 조건의 점수와 사인에 필요한 연봉(에이전트 역제안)
+export function negoPreview(state, pid, mode, salary, years, opts = {}) {
+  const p = state.players[pid];
+  const inc = opts.incentive ? 1.05 : 1;
+  if (mode === 'fa') {
+    const ask = p.askSalary || fairSalary(state, p);
+    const yrs = p.askYears || 1;
+    const t = state.teams[state.userTeamId];
+    const comp = 1 + ((p.faTries || 0) * 0.02);
+    const brand = Math.min(1, brandValue(state) / 200);
+    const returning = p.prevTeam === t.id ? ((p.loyalty ?? 40) - 50) / 400 : 0;
+    const yf = 1 - Math.abs(years - yrs) * 0.05;
+    const score = ((salary * inc) / ask) * yf + brand * 0.06 + returning;
+    const need = 0.97 * comp;
+    const counter = Math.ceil((((need + 0.01 - brand * 0.06 - returning) / yf) * ask) / inc / 100) * 100;
+    return { score, need, counter, ask, left: 4 - (p.faTries || 0) };
+  }
+  const it = state.nego.items.find((x) => x.pid === pid);
+  const yrFit = it.years ? 1 - Math.abs((years || 1) - it.years) * 0.06 : 1;
+  const mood = (p.morale ?? 60) / 100, loyal = (p.loyalty ?? 40) / 100, brand = Math.min(1, brandValue(state) / 200);
+  const rest = yrFit * 0.1 + (mood - 0.55) * 0.12 + (loyal - 0.4) * 0.1 + brand * 0.05 - (it.tries || 0) * 0.015;
+  const score = ((salary * inc) / it.demand) * 0.8 + rest;
+  const need = it.kind === 'stay' ? 0.84 : it.kind === 'foreign' ? 0.88 : 0.91;
+  const counter = Math.ceil((((need + 0.012 - rest + 0.015) / 0.8) * it.demand) / inc / 100) * 100;
+  return { score, need, counter, ask: it.demand, left: 3 - (it.tries || 0) };
 }
 
 export { LEAGUES };
