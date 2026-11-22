@@ -57,6 +57,33 @@ function noise(dur, gain = 0.1, freq = 1200, q = 0.8, when = 0, attack = 0.005) 
   src.start(t); src.stop(t + dur + 0.02);
 }
 
+// 관중 함성 배경음: 낮게 깔리는 웅성거림 + 가끔 파도처럼 커지는 소리
+let crowd = null;
+export function startCrowd(level = 0.025) {
+  const c = ensure();
+  if (!c || crowd) return;
+  const len = c.sampleRate * 3;
+  const buf = c.createBuffer(1, len, c.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < len; i++) { last = last * 0.97 + (Math.random() * 2 - 1) * 0.03; d[i] = last * 6; }
+  const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+  const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 0.5;
+  const g = c.createGain(); g.gain.value = level;
+  src.connect(f); f.connect(g); g.connect(c.destination); src.start();
+  crowd = { src, g, base: level, swell: setInterval(() => { if (Math.random() < 0.35) noise(1.6, level * 1.6, 1300, 0.5, 0, 0.5); }, 2600) };
+}
+export function setCrowd(mult = 1) {
+  if (!crowd || !ctx) return;
+  crowd.g.gain.setTargetAtTime(crowd.base * mult, ctx.currentTime, 0.4);
+}
+export function stopCrowd() {
+  if (!crowd) return;
+  try { crowd.src.stop(); } catch { /* noop */ }
+  clearInterval(crowd.swell);
+  crowd = null;
+}
+
 export const sfx = {
   click: () => tone(720, 'sine', 0.05, 0.04),
   pitch: () => noise(0.12, 0.05, 2400, 1.2),

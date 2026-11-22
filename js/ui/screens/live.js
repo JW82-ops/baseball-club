@@ -2,7 +2,7 @@ import { state } from '../../core/store.js';
 import { ui } from '../ui-state.js';
 import { esc, emblem, gradeTag, condDot } from '../components.js';
 import { $, openModal, closeModal, registerActions, toast } from '../dom.js';
-import { sfx } from '../sound.js';
+import { startCrowd, stopCrowd, setCrowd, sfx } from '../sound.js';
 import { PITCHES } from '../../data/constants.js';
 import { calcOvr, batLine, pitLine } from '../../engine/player.js';
 import { firstTeam } from '../../engine/roster.js';
@@ -15,6 +15,34 @@ import { isClutch } from '../../engine/clutch.js';
 import { formIcon } from '../../engine/form.js';
 import { pick } from '../../core/rng.js';
 import { batterZones } from '../../engine/pitch.js';
+import { playerImg } from '../portraits.js';
+
+// 홈런·끝내기 컷인: 화면 전체에 선수와 큰 글자 (누르면 넘어가요)
+let cutSkip = null;
+function cutin(kind, ev) {
+  const el = $('#lv-cut');
+  if (!el || speed() >= 4) return Promise.resolve();
+  const g = ui.live;
+  const bat = ev?.batter && state.players[ev.batter];
+  const offId = g ? (ev?.top ?? g.top ? g.awayId : g.homeId) : null;
+  const team = state.teams[kind === 'walkoff' ? g.homeId : offId] || {};
+  const mine = team.id === state.userTeamId;
+  const hrN = bat?.cur?.bat?.hr;
+  const dist = 105 + Math.round(Math.random() * 35);
+  const title = kind === 'walkoff' ? '끝내기!!' : ev?.runs >= 4 ? '만루 홈런!!' : '홈런!!';
+  const sub = kind === 'walkoff' ? `${esc(team.name || '')} 승리!` : `${bat ? esc(bat.name) : ''}${hrN ? ` 시즌 ${hrN}호` : ''} · 비거리 ${dist}m${ev?.runs > 1 ? ` · ${ev.runs}점 홈런` : ''}`;
+  el.style.setProperty('--ct', team.color || '#e8452c');
+  el.className = `lv-cut show ${kind} ${mine ? 'mine' : 'opp'}`;
+  el.innerHTML = `<div class="ct-rays"></div>${kind === 'walkoff' ? '<img class="ct-bg" src="img/mission/m_win.webp" alt="">' : bat ? `<img class="ct-body" src="${playerImg(bat)}" alt="">` : ''}
+    <div class="ct-txt"><b>${title}</b><span>${sub}</span></div><i class="ct-conf"></i><i class="ct-conf c2"></i><i class="ct-conf c3"></i>`;
+  if (mine) setCrowd(4);
+  return new Promise((res) => {
+    const done = () => { cutSkip = null; el.className = 'lv-cut'; el.innerHTML = ''; setCrowd(1); res(); };
+    cutSkip = done;
+    setTimeout(() => { if (cutSkip === done) done(); }, (kind === 'walkoff' ? 2600 : 2000) / Math.min(2, speed()));
+  });
+}
+registerActions({ cutSkip: () => cutSkip?.() });
 
 // 캐스터 멘트
 function casterLine(ev) {
@@ -306,6 +334,7 @@ async function animatePA(ev, outsBefore) {
     }
     await runnersDone;
     sc.ball.v = 0;
+    if (res === 'hr') await cutin('hr', ev);
     const lbl = res === 'hr' ? '홈런!!' : res === 'hit' ? ({ 1: '안타', 2: '2루타', 3: '3루타' }[ev.hit] || '안타') : res === 'err' ? '실책!' : ev.dp ? '병살' : ev.text.includes('희생') ? '희생타' : '아웃';
     if (res === 'hit' || res === 'err') sfx.cheer(0.05, 0.8);
     if (res === 'out') sfx.out();
@@ -371,6 +400,8 @@ async function playOne() {
   const my = anim.token;
   const outsBefore = g.outs;
   if (userBatting(state, g) && (g.bases[1] || g.bases[2])) sfx.chant?.();
+  // 접전 후반일수록 관중 소리가 커져요
+  setCrowd(g.inning >= 7 && Math.abs(g.home.runs - g.away.runs) <= 2 ? 1.9 : g.bases.some(Boolean) ? 1.4 : 1);
   const snap = { runners: anim.scene.runners.map((r) => ({ ...r })), batter: anim.scene.batter ? { ...anim.scene.batter } : null };
   stepPA(state, g);
   const evs = g.halfEvents.slice();
@@ -381,7 +412,7 @@ async function playOne() {
       else if (ev.type === 'steal' || (ev.type === 'out' && ev.cs)) await animateSteal(ev);
       else if (ev.seq) { anim.lastPA = { ev, snap, outsBefore }; await animatePA(ev, outsBefore); }
       else if (ev.type === 'half') { await wait(300); await banner(`${ev.inn}회${ev.top ? '초' : '말'}`, 'half', 900); }
-      else if (ev.type === 'walkoff') { anim.scene.cheer = true; sfx.homerun(); await banner('끝내기!!', 'hr', 1600); }
+      else if (ev.type === 'walkoff') { anim.scene.cheer = true; sfx.homerun(); await cutin('walkoff', ev); }
     }
   } catch (e) { console.warn(e); }
   anim.busy = false;
@@ -505,6 +536,7 @@ export function liveShell() {
       <div class="lv-zone" id="lv-zone"></div>
       <div class="lv-banner" id="lv-banner"></div>
       <div class="lv-end" id="lv-end" hidden></div>
+      <div class="lv-cut" id="lv-cut" data-act="cutSkip"></div>
     </div>
     <div class="lv-matchup" id="lv-matchup"></div>
     <div class="lv-orders" id="lv-orders"></div>
@@ -514,6 +546,8 @@ export function liveShell() {
 }
 
 export function mountLive() {
+  startCrowd();
+  anim.lastA = null; anim.lastH = null;
   const cv = $('#lv-canvas');
   anim.canvas = cv;
   anim.ctx = cv.getContext('2d');
@@ -544,6 +578,7 @@ export function mountLive() {
 
 export function unmountLive() {
   hardStop();
+  stopCrowd();
   if (anim.raf) cancelAnimationFrame(anim.raf);
   anim.raf = null;
   if (anim.resize) window.removeEventListener('resize', anim.resize);
@@ -555,11 +590,13 @@ export function updateLiveDom() {
   if (!g || !$('#lv-score')) return;
   const home = state.teams[g.homeId], away = state.teams[g.awayId];
   const n = Math.max(9, g.away.line.length);
+  const flipA = anim.lastA != null && anim.lastA !== g.away.runs, flipH = anim.lastH != null && anim.lastH !== g.home.runs;
+  anim.lastA = g.away.runs; anim.lastH = g.home.runs;
   const cell = (line, i) => (i < line.length ? (g.over && g.top && line === g.home.line && i === line.length - 1 ? 'X' : line[i]) : '');
   setOverlay('#lv-score', `
     <div class="lv-top">
       <div class="tm">${emblem(away, 26)}<b>${esc(away.short)}</b></div>
-      <div class="sc"><span>${g.away.runs}</span><em>${g.over ? '종료' : `${g.inning}회${g.top ? '초' : '말'}`}</em><span>${g.home.runs}</span></div>
+      <div class="sc"><span class="${flipA ? 'flip' : ''}">${g.away.runs}</span><em>${g.over ? '종료' : `${g.inning}회${g.top ? '초' : '말'}`}</em><span class="${flipH ? 'flip' : ''}">${g.home.runs}</span></div>
       <div class="tm r"><b>${esc(home.short)}</b>${emblem(home, 26)}</div>
     </div>
     <div class="scroll-x"><table class="linescore mini">

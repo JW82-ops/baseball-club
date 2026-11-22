@@ -1156,3 +1156,25 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .potbar { position: relative; display: block; height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .12); margin-top: 3px; overflow: hidden; }
 .potbar .now { position: absolute; left: 0; top: 0; bottom: 0; background: #63d48f; }
 .potbar .cap { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(90deg, var(--gold) 0 3px, var(--gold-lo) 3px 5px); }
+
+/* 중계 컷인 · 전광판 */
+.lv-cut { position: absolute; inset: 0; z-index: 30; display: none; overflow: hidden; cursor: pointer; }
+.lv-cut.show { display: block; animation: ctIn .25s ease-out; }
+.lv-cut .ct-rays { position: absolute; inset: -50%; background: repeating-conic-gradient(from 0deg, var(--ct) 0 10deg, color-mix(in srgb, var(--ct) 60%, #000) 10deg 20deg); animation: ctSpin 6s linear infinite; opacity: .92; }
+.lv-cut.opp .ct-rays { filter: grayscale(.5) brightness(.6); }
+.lv-cut .ct-body { position: absolute; left: 50%; bottom: -10px; height: 92%; transform: translateX(-50%); filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .5)); animation: ctPop .5s cubic-bezier(.2, 1.5, .4, 1) both; }
+.lv-cut .ct-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .85; animation: ctZoom 2.6s ease-out both; }
+.lv-cut .ct-txt { position: absolute; left: 0; right: 0; top: 5%; text-align: center; z-index: 2; }
+.lv-cut .ct-txt b { display: block; white-space: nowrap; font-family: var(--display); font-weight: 400; font-size: 46px; line-height: 1.1; color: #fff3c8; text-shadow: 0 4px 0 var(--gold-edge), 0 0 30px rgba(255, 197, 61, .9); transform: rotate(-5deg); animation: vsstamp .5s .15s cubic-bezier(.2, 1.6, .4, 1) both; }
+.lv-cut .ct-txt span { display: inline-block; margin-top: 14px; font-size: 13px; font-weight: 800; padding: 4px 12px; border-radius: 99px; background: rgba(0, 0, 0, .6); color: #fff; }
+.lv-cut .ct-conf { position: absolute; top: -10%; left: 10%; width: 8px; height: 14px; background: var(--gold); animation: conf 1.8s linear infinite; z-index: 3; }
+.lv-cut .ct-conf.c2 { left: 50%; background: #ff6f61; animation-delay: .4s; } .lv-cut .ct-conf.c3 { left: 80%; background: #7ee2a0; animation-delay: .8s; }
+.lv-cut.opp .ct-conf { display: none; }
+@keyframes ctIn { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: none; } }
+@keyframes ctSpin { to { transform: rotate(360deg); } }
+@keyframes ctPop { from { transform: translateX(-50%) scale(.4) translateY(40%); } to { transform: translateX(-50%) scale(1); } }
+@keyframes ctZoom { from { transform: scale(1.15); } to { transform: scale(1); } }
+@keyframes conf { from { transform: translateY(0) rotate(0); } to { transform: translateY(520px) rotate(720deg); } }
+.lv-top .sc span.flip { display: inline-block; animation: scFlip .7s ease-out; color: #fff3c8; }
+@keyframes scFlip { 0% { transform: rotateX(90deg) scale(1.4); } 60% { transform: rotateX(-10deg) scale(1.2); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .lv-cut *, .lv-top .sc span.flip { animation: none !important; } }
