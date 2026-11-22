@@ -1,3 +1,4 @@
+import { prepFor, prepEffect } from './analysis.js';
 import { simPitches } from './pitch.js';
 import { rng, chance, pick, randInt } from '../core/rng.js';
 import { clamp } from '../core/util.js';
@@ -60,6 +61,8 @@ function side(state, team) {
     style: team.isUser ? mgrStyle(team) : null,
     chem: team.isUser ? teamChem(state, team) : 0,
     anal: team.isUser ? (team.front?.analytics || 1) - 1 : (team.aiInvest ?? 1) * 0.6,
+    prep: team.isUser ? prepFor(state) : null,
+    prepFx: team.isUser && prepFor(state) ? prepEffect(team, prepFor(state)) : null,
     homeAdv: 0,
     teamId: team.id,
     lineup,
@@ -155,6 +158,8 @@ function batterEff(state, g, b, pit, slotIdx = 0) {
   else adj -= 3;
   const f = formAdj(b);
   cAdj += f; pAdj += f * 0.7;
+  // 전력분석(타격): 상대 선발을 상대할 때만
+  if (o.prepFx && pit.id === def(g).starter) { cAdj += o.prepFx.contact; eAdj += o.prepFx.eye; pAdj += o.prepFx.power; }
   return {
     contact: b.r.contact * m + adj + cAdj,
     power: b.r.power * m + adj * 0.8 + pAdj,
@@ -183,9 +188,10 @@ function pitcherEff(state, g, p, sd) {
   if (sd.pitcher !== sd.starter) adj += sd.pitMgmt;
   if (sd.style === 'pitching') adj += 1.5;
   adj += formAdj(p);
+  const px = sd.prepFx;
   return {
-    stuff: (p.r.velo * 0.5 + p.r.breaking * 0.5) * m - tired + adj,
-    control: p.r.control * m - tired * 0.8 + adj * 0.5 + (sd.anal || 0) * 0.8,
+    stuff: (p.r.velo * 0.5 + p.r.breaking * 0.5) * m - tired + adj + (px ? px.stuff : 0),
+    control: p.r.control * m - tired * 0.8 + adj * 0.5 + (sd.anal || 0) * 0.8 + (px ? px.control : 0),
   };
 }
 

@@ -21,6 +21,7 @@ import { satLabel, goalProgress } from '../../engine/front.js';
 import { devCandidates, secondDraftYear, secondDraftPool, SECOND_FEES } from '../../engine/kborules.js';
 import { scoutLevelOf } from '../../engine/club.js';
 import { WINTER } from '../../engine/dev2.js';
+import { prepDone } from './analysis.js';
 
 function probable(team) {
   const rot = team.rotation || [];
@@ -194,6 +195,7 @@ function coachLine(sg) {
   if (!state.mission && (state.missionOffers || []).length) return { act: 'lobbyMission', html: `🎯 스폰서 미션 제안이 <b>${state.missionOffers.length}건</b> 왔어요.`, cta: '미션 고르기' };
   if (!user.staff?.manager) return { act: 'lobbyStaff', html: '아직 <b>감독</b>이 없어요. 감독이 있어야 선수 기용과 성장이 안정돼요.', cta: '감독 뽑으러 가기' };
   if (!sg) return { html: '오늘은 쉬어 가는 날이에요. 선수들 컨디션을 챙기죠.' };
+  if (!prepDone()) return { act: 'openAnalysis', html: '경기 전에 <b>전력분석</b>부터 보고 가죠. 상대 선발 공략법이 나왔어요.', cta: '전력분석실 열기' };
   const mine = sg.home === user.id ? state.teams[sg.home] : state.teams[sg.away];
   const opp = sg.home === user.id ? state.teams[sg.away] : state.teams[sg.home];
   const sp = probable(mine);
@@ -220,7 +222,7 @@ function lobby(sg, title, opts = {}) {
       <div class="lb-rail">
         ${railBtn('lobbyMission', 'sponsor', '미션', state.mission ? `${state.mission.progress}/${state.mission.target}` : offers ? offers : '')}
         ${railBtn('lobbyBoard', 'club', '이사회', sat != null && sat < 40 ? '!' : '')}
-        ${railBtn('tab', 'mail', '메일', unread || '', 'data-tab="mail"')}
+        ${sg ? railBtn('openAnalysis', 'staff', '전력분석', prepDone() ? '✓' : '!') : railBtn('tab', 'mail', '메일', unread || '', 'data-tab="mail"')}
         ${railBtn('lobbyBrief', 'league', '순위', '')}
       </div>
     </div>
