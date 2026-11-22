@@ -1316,3 +1316,11 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .meetc .mt-item p { font-size: 13px; margin: 3px 0 8px; line-height: 1.45; }
 .meetc .mt-item.done { opacity: .6; }
 .meetc .mt-item.done p { margin-bottom: 2px; }
+.campopts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.campopt { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 10px 12px; border-radius: 14px; background: var(--glass); border: 1.5px solid rgba(255,255,255,.12); }
+.campopt.on { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255,197,61,.22); }
+.campopt b { font-size: 13.5px; }
+.campopt small { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.campopt em { font-style: normal; font-size: 11.5px; font-weight: 800; color: var(--gold); }
+.ph-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ph-badges span { font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 99px; background: rgba(255,197,61,.2); color: #ffe39a; }

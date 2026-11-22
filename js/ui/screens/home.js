@@ -1,5 +1,6 @@
 import { state, save } from '../../core/store.js';
 import { makeGoals, goalStatus, backGoal } from '../../engine/goals.js';
+import { CAMP_LOCS, CAMP_THEMES, campPlan, campCost } from '../../engine/camp.js';
 import { answerMeeting, meetingPending, deadlineLeft } from '../../engine/clubhouse.js';
 import { ui, rerender } from '../ui-state.js';
 import { artBg, artHero, stadiumArt, esc, emblem, gradeTag, avatar, posShort, potTag } from '../components.js';
@@ -283,6 +284,7 @@ function fastSheet() {
 registerActions({
   lobbyEvent: () => openModal(eventCard()),
   lobbyMission: () => openModal(missionCard() || '<div class="panel empty">지금은 스폰서 미션이 없어요.</div>'),
+  campSet: (d) => { campPlan(state)[d.f] = d.v; save(); rerender(); },
   meetAns: (d) => { const r = answerMeeting(state, d.id, d.y === '1'); if (r.msg) toast(r.msg, r.ok ? 'good' : 'bad'); save(); rerender(); if (document.querySelector('#modal:not([hidden]) .meetc')) openModal(meetingCard() || '<div class="panel empty">이번 주 건의를 모두 처리했어요.</div>', { sheet: true, keepScroll: true }); },
   backGoal: (d) => { const g = backGoal(state, d.pid); if (!g) return; toast(`${state.players[d.pid]?.name}의 목표를 공개 응원했어요 📣`, 'good'); save(); rerender(); },
   lobbyBrief2: () => openModal(meetingCard() || '<div class="panel empty">이번 주 건의가 없어요.</div>', { sheet: true }),
@@ -381,8 +383,8 @@ function winterSection() {
   const user = userTeam(state);
   const sent = state.winterLeague || [];
   const young = user.roster.map((id) => state.players[id]).filter((p) => p && p.age <= 25 && !p.injury && !p.foreign && !p.devContract).sort((a, b) => ovrOf(b) - ovrOf(a)).slice(0, 10);
-  return `<section class="sec mt-l"><div class="sec-h"><h2>✈️ 해외 윈터리그 파견</h2><span class="sub">${sent.length}/3명</span></div>
-    <p class="tiny faint">25세 이하 유망주를 겨울 동안 해외 리그에 보내 실전 경험을 쌓게 해요. 캠프가 시작될 때 성장한 채로 돌아와요. 한 번 더 누르면 취소(비용은 환불 안 됨).</p>
+  return `<section class="sec mt-l"><div class="sec-h"><h2>✈️ 해외 윈터·교육리그 파견</h2><span class="sub">${sent.length}/4명</span></div>
+    <p class="tiny faint">25세 이하 유망주를 겨울 동안 해외 리그에 보내요. 현지에서 대박이 나면 잠재력까지 오르지만, 적응에 실패하거나 향수병에 걸리기도 해요. 성실한 선수일수록 대박 확률이 높아요. 한 번 더 누르면 취소(비용은 환불 안 됨).</p>
     <div class="panel plist mt">${young.map((p) => { const w = sent.find((x) => x.pid === p.id); return `<div class="prow">${avatar(p, user.color, 36)}<div class="grow"><div class="nm">${esc(p.name)}${w ? ` <span class="gem">${WINTER[w.lg].icon} ${WINTER[w.lg].ko}</span>` : ''}</div><div class="meta">${posShort(p)} · ${p.age}세 · OVR ${ovrOf(p)}</div></div><div class="row gap" style="gap:4px">${Object.entries(WINTER).map(([k, W]) => `<button class="btn sm ${w?.lg === k ? 'primary' : 'ghost'}" title="${W.ko} · ${W.desc} · ${formatMoney(W.cost)}" data-act="sendWinter" data-pid="${p.id}" data-k="${k}">${W.icon}</button>`).join('')}</div></div>`; }).join('')}</div>
     <p class="tiny faint mt">${Object.values(WINTER).map((W) => `${W.icon} ${W.ko}: ${W.desc} · ${formatMoney(W.cost)}`).join(' / ')}</p></section>`;
 }
@@ -403,7 +405,13 @@ function campView() {
     <div class="panel">
       <p class="small muted">캠프 동안 모든 선수가 ${CAMP_WEEKS}주 훈련해요. 강도가 높을수록 성장은 빠르지만 부상 위험도 커져요. 개인별 훈련 포인트는 선수 카드에서 바꿀 수 있어요.</p>
       <div class="seg mt">${Object.entries(INTENSITY).map(([k, v]) => `<button class="${state.settings.intensity === k ? 'on' : ''}" data-act="setIntensity" data-v="${k}">${v.ko}</button>`).join('')}</div>
-      <p class="small mt">소속 ${user.roster.length}명 · 자금 ${formatMoney(user.cash)}</p>
+    </div>
+    <div class="sec-h mt-l"><h2>🏕️ 캠프 장소</h2></div>
+    <div class="campopts">${Object.entries(CAMP_LOCS).map(([k, L]) => `<button class="campopt ${campPlan(state).loc === k ? 'on' : ''}" data-act="campSet" data-f="loc" data-v="${k}"><b>${L.icon} ${L.ko}</b><small>${L.desc}</small><em>${L.cost ? formatMoney(Math.round(L.cost * LEAGUES[state.league || 'KBO'].ticketMult / 100) * 100) : '무료'}</em></button>`).join('')}</div>
+    <div class="sec-h mt-l"><h2>🎯 훈련 테마</h2></div>
+    <div class="campopts">${Object.entries(CAMP_THEMES).map(([k, T]) => `<button class="campopt ${campPlan(state).theme === k ? 'on' : ''}" data-act="campSet" data-f="theme" data-v="${k}"><b>${T.icon} ${T.ko}</b><small>${T.desc}</small></button>`).join('')}</div>
+    <div class="panel mt"><p class="small">소속 ${user.roster.length}명 · 자금 ${formatMoney(user.cash)} · 캠프 비용 <b class="amber">${formatMoney(campCost(state))}</b></p>
+      <p class="tiny faint mt">캠프가 끝나면 가장 많이 큰 1군 선수가 캠프 MVP, 2군 어린 선수 중 깜짝 성장한 선수가 '깜짝 스타'로 뽑혀요.</p>
       <button class="btn primary block mt" data-act="runCamp">캠프 진행하고 개막</button>
     </div>
   </section>

@@ -572,7 +572,10 @@ registerActions({
     const ups = userTeam(state).roster.map((id) => state.players[id]).filter((p) => before[p.id] != null)
       .map((p) => ({ p, d: calcOvr(p) - before[p.id] })).sort((a, b) => b.d - a.d).slice(0, 6);
     commit(`${state.season} 시즌 개막!`, 'big');
-    openModal(`<button class="sheet-close" data-act="closeModal">×</button><h2 class="disp" style="font-size:22px">스프링캠프 결과</h2>
+    const cr = state.campResult || {};
+    const nm = (x) => (x && state.players[x.pid] ? `<button class="mp-card" data-act="openPlayer" data-pid="${x.pid}"><span class="grow"><b>${esc(state.players[x.pid].name)}</b><small>${state.players[x.pid].age}세 · ${state.players[x.pid].level === 1 ? '1군' : '2군'} · OVR ${calcOvr(state.players[x.pid])} (+${x.d})</small></span><span class="mp-r"><i>›</i></span></button>` : '');
+    openModal(`<h2 class="disp" style="font-size:22px">스프링캠프 결과</h2>
+      ${cr.mvp ? `<p class="small amber mt">🏅 캠프 MVP</p>${nm(cr.mvp)}` : ''}${cr.star ? `<p class="small amber mt">🌟 깜짝 스타 (2군)</p>${nm(cr.star)}<p class="tiny muted">1군에 올려 기회를 줘 보세요.</p>` : ''}${cr.mlb?.length ? `<p class="small good mt">🇺🇸 MLB 교류로 ${esc(cr.mlb.join(', '))} 잠재력이 올랐어요</p>` : ''}
       <p class="small muted mt">가장 많이 성장한 선수</p>
       <div class="plist mt">${ups.map(({ p, d }) => `<button class="prow" data-act="openPlayer" data-pid="${p.id}"><div class="grow"><div class="nm">${esc(p.name)}</div><div class="meta">${p.age}세 · ${p.level === 1 ? '1군' : '2군'}</div></div><b>${calcOvr(p)}</b><span class="${d >= 0 ? 'delta-up' : 'delta-dn'}">${d >= 0 ? '+' : ''}${d}</span></button>`).join('')}</div>
       <button class="btn primary block mt" data-act="closeModal">시즌 시작</button>`);

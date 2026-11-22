@@ -18,6 +18,7 @@ import { CLUB_COLORS } from '../../data/teams.js';
 import { avatar as av } from '../components.js';
 import { sponsorLogo } from '../../data/brandArt.js';
 import { recordsView } from './league.js';
+import { franchiseList, userSeasons } from '../../engine/camp.js';
 import { playerImg } from '../portraits.js';
 import { ensureRegion, ACTS, actState, apMax, partnerMax, partnerWeekly, PETITIONS, petitionState, petitionOdds, electionYear, PRESS_COST } from '../../engine/region.js';
 import { weekAbs } from '../../engine/mail.js';
@@ -29,9 +30,15 @@ function museumView(t) {
   const v = ui.musView || 'time';
   const hist = (state.history || []);
   const titles = hist.filter((h) => h.champion === t.id);
-  const tabs = `<div class="seg mt">${[['time', '연표'], ['album', `우승 앨범 ${titles.length ? titles.length : ''}`], ['hof', '명예의 전당'], ['rec', '기록']].map(([k, l]) => `<button class="${v === k ? 'on' : ''}" data-act="musView" data-v="${k}">${l}</button>`).join('')}</div>`;
+  const tabs = `<div class="seg mt">${[['time', '연표'], ['album', `우승 앨범 ${titles.length ? titles.length : ''}`], ['ours', '우리 선수'], ['hof', '명예의 전당'], ['rec', '기록']].map(([k, l]) => `<button class="${v === k ? 'on' : ''}" data-act="musView" data-v="${k}">${l}</button>`).join('')}</div>`;
   const head = artHero('hof', `<span class="k">${LG_FLAG(state.league)} 창단 ${(hist[0]?.season ?? state.season)}년 · ${hist.length + 1}번째 시즌</span><h2>구단 역사관</h2><p>우승 ${titles.length}회 · 가을야구 ${hist.filter((h) => h.post).length}회 · 명예의 전당 ${(state.hof || []).length}명</p>`);
   if (v === 'hof') return head + tabs + `<div class="mt">${hofView(t, true)}</div>`;
+  if (v === 'ours') {
+    const L = franchiseList(state);
+    return head + tabs + `<div class="mt"><p class="small muted">창단 멤버와 우리가 직접 뽑은 선수들이에요. 4시즌 넘게 함께하며 크게 성장하거나 상을 받으면 '프랜차이즈 스타'가 돼요. 프랜차이즈 스타는 충성도가 높고 팬이 많이 따라요.</p>
+      <div class="panel plist mt">${L.map((p) => `<button class="prow" data-act="openPlayer" data-pid="${p.id}">${avatar(p, t.color, 38)}<div class="grow"><div class="nm">${esc(p.name)} ${p.franchise ? '<span class="gem">⭐ 프랜차이즈</span>' : ''}</div><div class="meta">${p.founder ? '🏗️ 창단 멤버' : '🌱 드래프트 출신'} · ${p.age}세 · ${userSeasons(p, t.id) + 1}번째 시즌${p.num != null ? ` · #${p.num}` : ''}</div></div>${gradeTag(calcOvr(p))}</button>`).join('') || '<div class="empty">아직 없어요.</div>'}</div>
+      ${(t.retiredNums || []).length ? `<div class="sec-h mt-l"><h2>영구결번</h2></div><div class="chips">${t.retiredNums.map((r) => `<span class="chip">#${r.num} ${esc(r.name)}</span>`).join('')}</div>` : ''}</div>`;
+  }
   if (v === 'rec') return head + tabs + `<div class="mt">${recordsView()}</div>`;
   if (v === 'album') {
     return head + tabs + (titles.length ? `<div class="album mt">${titles.slice().reverse().map((h) => `<div class="alb" style="${artBg('champion', 'linear-gradient(180deg,rgba(0,0,0,.05),rgba(6,16,11,.92))')}">

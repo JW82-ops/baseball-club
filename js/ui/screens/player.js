@@ -187,7 +187,7 @@ export function renderPlayer(pid, opts = {}) {
     <div class="ph-info">
       <h2>${esc(p.name)}${p.num != null && p.team ? ` <span class="num">#${p.num}</span>` : ''}</h2>
       <p>${flagOf(p)} ${team ? esc(team.short) + ' · ' : ''}${hand} · ${p.age}세 ${condDot(p)}${formIcon(p)} ${p.team ? ml.e : ''}</p>
-      <p class="ph-pot">잠재 <b>${est.loG === est.hiG ? est.loG : `${est.loG}~${est.hiG}`}</b>${p.foreign ? ' · 외국인' : ''}${p.devContract ? ' · 육성선수' : ''}</p>
+      <p class="ph-pot">잠재 <b>${est.loG === est.hiG ? est.loG : `${est.loG}~${est.hiG}`}</b>${p.foreign ? ' · 외국인' : ''}${p.devContract ? ' · 육성선수' : ''}</p>${isMine && (p.franchise || p.founder || p.homegrown || p.campStar === state.season) ? `<p class="ph-badges">${p.franchise ? '<span>⭐ 프랜차이즈 스타</span>' : ''}${p.founder ? '<span>🏗️ 창단 멤버</span>' : ''}${p.homegrown && !p.founder ? '<span>🌱 우리가 뽑은 선수</span>' : ''}${p.campStar === state.season ? '<span>🌟 캠프 깜짝 스타</span>' : ''}</p>` : ''}
     </div>
   </div>
   ${p.injury ? `<div class="bar-note mt">🚑 ${esc(p.injury.name)} — 복귀까지 ${p.injury.weeks}주</div>` : ''}

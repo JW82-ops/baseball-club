@@ -102,15 +102,25 @@ export const WINTER = {
   abl: { ko: '호주 ABL', icon: '🇦🇺', cost: 3000, rate: 0.05, inj: 0.04, desc: '안정적인 리그. 부상 위험 낮음' },
   ctbl: { ko: '대만 윈터리그', icon: '🇹🇼', cost: 4000, rate: 0.065, inj: 0.06, desc: '실전 감각. 무난한 성장' },
   lidom: { ko: '도미니카 윈터리그', icon: '🇩🇴', cost: 5500, rate: 0.085, inj: 0.1, desc: '수준 높은 리그. 크게 크지만 부상 위험' },
+  phoenix: { ko: '미야자키 교육리그', icon: '🇯🇵', cost: 2000, rate: 0.07, inj: 0.03, maxAge: 23, homesick: 0.08, desc: '23세 이하 2군 유망주 전용. 싸고 안전하지만 결과 편차가 커요' },
 };
+// 결과 편차: 대박·보통·실패 (나이 어릴수록, 성실할수록 대박 확률↑)
+function winterOutcome(p, W) {
+  const e = (p.ethic ?? 55) / 100;
+  const r = Math.random();
+  if (r < 0.1 + e * 0.12) return ['boom', 1.9];
+  if (r > 0.86 - (W.homesick || 0.04)) return ['flop', 0.3];
+  return ['ok', 1];
+}
 export function sendWinter(state, pid, lg) {
   const p = state.players[pid];
   const t = state.teams[state.userTeamId];
   state.winterLeague = state.winterLeague || [];
   if (state.winterLeague.some((w) => w.pid === pid)) { state.winterLeague = state.winterLeague.filter((w) => w.pid !== pid); return null; }
-  if (state.winterLeague.length >= 3) return '윈터리그는 3명까지 보낼 수 있어요';
+  if (state.winterLeague.length >= 4) return '해외 파견은 4명까지예요';
   if (!p || p.age > 25 || p.injury) return '25세 이하, 건강한 선수만 보낼 수 있어요';
   const W = WINTER[lg];
+  if (W.maxAge && p.age > W.maxAge) return `${W.ko}는 ${W.maxAge}세 이하만 갈 수 있어요`;
   if (t.cash < W.cost) return '자금이 부족해요';
   t.cash -= W.cost; t.ledger.expense += W.cost;
   state.winterLeague.push({ pid, lg });
@@ -124,10 +134,13 @@ export function settleWinter(state) {
     if (!p || !W) continue;
     const ageF = Math.max(0.4, ageGrowthFactor(p));
     let gain = 0;
-    for (const k in p.r) { const inc = Math.max(0, p.cap[k] - p.r[k]) * W.rate * ageF; p.r[k] = Math.min(p.cap[k], p.r[k] + inc); gain += inc; }
-    let msg = `✈️ ${p.name} ${W.ko} 마치고 복귀 — 능력치 합계 +${gain.toFixed(1)}`;
+    const [res, m] = winterOutcome(p, W);
+    for (const k in p.r) { const inc = Math.max(0, p.cap[k] - p.r[k]) * W.rate * ageF * m; p.r[k] = Math.min(p.cap[k], p.r[k] + inc); gain += inc; }
+    if (res === 'boom') for (const k in p.cap) p.cap[k] = Math.min(99, p.cap[k] + 1);
+    let msg = `✈️ ${p.name} ${W.ko} 마치고 복귀 — ${res === 'boom' ? '🌟 대박! 현지에서 MVP급 활약, 잠재력까지 올랐어요.' : res === 'flop' ? '😓 적응에 실패했어요.' : '무난하게 경험을 쌓았어요.'} 능력치 합계 +${gain.toFixed(1)}`;
     if (chance(W.inj)) { injure(p, 'winter'); msg += ` (하지만 ${p.injury.name} ${p.injury.weeks}주)`; }
-    else addMoodEvent(p, '윈터리그 경험', 4, 6);
+    else if (res === 'flop') { addMoodEvent(p, W.homesick ? '향수병' : '해외 적응 실패', -8, 5); msg += W.homesick ? ' 향수병까지 겹쳐 기분이 가라앉았어요.' : ''; }
+    else addMoodEvent(p, res === 'boom' ? '해외 리그 대박' : '윈터리그 경험', res === 'boom' ? 10 : 4, 6);
     out.push(msg);
   }
   state.winterLeague = [];

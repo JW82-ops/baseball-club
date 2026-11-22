@@ -37,6 +37,7 @@ import { rehabWeek, mechProgress, planCondBonus, workloadWeek, settleWinter } fr
 import { ensureRegion, regionWeek, regionSeasonStart, regionSeasonEnd, perkSum } from './region.js';
 import { makeGoals, settleGoals } from './goals.js';
 import { characterWeek, potentialDrift } from './character.js';
+import { CAMP_LOCS, campGrow, payCamp, finishCampPlan, markHomegrown, checkFranchise } from './camp.js';
 import { mentorWeek, injuryWeek, deadlineWeek, makeMeeting } from './clubhouse.js';
 import { managerWeek, managerOffseason, managerContractEnd, offseasonReq, closeOffReq } from './manager.js';
 
@@ -233,8 +234,9 @@ export function weeklyCycle(state, opts = {}) {
       const res = developWeek(p, {
         intensity: isUser ? state.settings.intensity : 'normal',
         philosophyBonus: phil.growthBonus,
-        tickScale: ts * (opts.camp ? 1.1 : 1),
+        tickScale: ts * (opts.camp ? 1.1 * (isUser ? campGrow(state) : 1) : 1),
         ...dc,
+        injuryMult: (dc.injuryMult ?? 1) * (isUser && state.campInj?.season === state.season && state.day < 30 ? 0.85 : 1),
       });
       const campKey = p.injury?.cause === 'camp' ? p.injury.camp : null;
       const wasLeave = p.injury?.cause === 'leave';
@@ -259,6 +261,7 @@ export function weeklyCycle(state, opts = {}) {
   const user = userTeam(state);
   ensureRegion(state);
   for (const n of regionWeek(state, { camp: !!opts.camp })) addNews(state, n.text, n.t);
+  if (!state.history.length) markHomegrown(state);
   if (!opts.camp) for (const n of managerWeek(state)) addNews(state, n.text, n.t);
   for (const n of characterWeek(state, { camp: !!opts.camp })) addNews(state, n.text, n.t);
   for (const n of mentorWeek(state)) addNews(state, n.text, n.t);
@@ -647,6 +650,7 @@ export function runOffseasonStart(state) {
   aiOffseason(state);
   state.flags = state.flags || {};
   for (const n of potentialDrift(state)) addNews(state, n.text, n.t);
+  for (const n of checkFranchise(state)) addNews(state, n, 'big');
   const left = staffOffseason(state, user);
   if (left.length) addNews(state, `👔 고령으로 코치 은퇴: ${left.join(', ')}`, 'info');
   {
@@ -836,6 +840,8 @@ export function runCampAndStartSeason(state) {
   offseasonInternational(state, 'camp');
   state.season += 1;
   for (const n of settleWinter(state)) addNews(state, n, 'big');
+  const campPaid = payCamp(state);
+  const campBefore = Object.fromEntries(userTeam(state).roster.map((id) => [id, calcOvr(state.players[id])]));
   for (let w = 0; w < CAMP_WEEKS; w++) {
     const rep = weeklyCycle(state, { camp: true });
     if (w === 0) state.campLog = { risers: [], events: [] };
@@ -843,9 +849,15 @@ export function runCampAndStartSeason(state) {
     // 캠프 누적 성장 (첫 주 시작값 대비)
     void rep;
   }
+  {
+    const cr = finishCampPlan(state, campBefore);
+    state.campResult = { season: state.season, loc: state.campPlan.loc, theme: state.campPlan.theme, paid: campPaid, mvp: cr.mvp && { pid: cr.mvp.p.id, d: cr.mvp.d }, star: cr.star && { pid: cr.star.p.id, d: cr.star.d }, mlb: cr.mlb };
+    addNews(state, `🏕️ ${cr.loc.icon} ${cr.loc.ko} 캠프(${cr.theme.icon} ${cr.theme.ko}) 종료${cr.mvp ? ` — 캠프 MVP ${cr.mvp.p.name}` : ''}${cr.star ? ` · 깜짝 스타 ${cr.star.p.name}` : ''}${cr.mlb.length ? ` · MLB 교류로 ${cr.mlb.join(', ')} 잠재력↑` : ''}`, 'big');
+  }
+  const campCondF = Math.min(0, CAMP_LOCS[state.campPlan.loc].cond || 0);
   for (const id in state.players) {
     const p = state.players[id];
-    p.cond = 100;
+    p.cond = p.team === state.userTeamId ? 100 + campCondF : 100;
     p.salary = Math.max(3000, Math.round((p.salary * 0.4 + salaryFor(p) * 0.6) / 100) * 100);
     resetSeasonStats(p);
   }
@@ -893,6 +905,7 @@ export function runCampAndStartSeason(state) {
   offerMissions(state);
   genSponsorOffers(state);
   makeGoals(state);
+  markHomegrown(state);
   pruneRels(state);
   for (const id in state.players) { const pl = state.players[id]; if (pl.team) { ensureContract(pl); ensureMil(pl); } }
   for (const n of returnFromService(state)) addNews(state, `🎖️ ${n}`, 'big');
