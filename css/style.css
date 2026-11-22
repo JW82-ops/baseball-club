@@ -1075,3 +1075,12 @@ select { background: rgba(0, 0, 0, .3); color: var(--chalk); border: 1px solid v
 .sheet-top .sheet-close { position: absolute; right: -6px; top: -6px; width: 40px; height: 40px; border-radius: 50%; background: rgba(5, 15, 10, .78); color: #fff; font-size: 22px; line-height: 1; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .25); box-shadow: 0 3px 10px rgba(0, 0, 0, .4); }
 .sheet-grip { position: absolute; left: 50%; top: -10px; width: 44px; height: 5px; margin-left: -22px; border-radius: 99px; background: rgba(255, 255, 255, .3); }
 .modal-box.center .sheet-top .sheet-close { right: -8px; top: -8px; }
+
+/* 첫 시즌 가이드 */
+.gprog { display: block; font-size: 11px; font-weight: 900; color: #b0610a; margin-bottom: 2px; }
+.guidebar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 12px; border-radius: 16px; background: #fffaf0; color: #2b2014; text-shadow: none !important; box-shadow: 0 6px 16px rgba(0, 0, 0, .3); }
+.guidebar .gi { font-size: 26px; }
+.guidebar b { font-size: 12px; color: #b0610a; }
+.guidebar p { font-size: 12.5px; line-height: 1.4; margin-top: 2px; }
+.guidebar p b { color: #c0471f; font-size: inherit; }
+.guidebar .btn { flex: none; }

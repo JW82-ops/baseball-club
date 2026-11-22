@@ -22,6 +22,7 @@ import { devCandidates, secondDraftYear, secondDraftPool, SECOND_FEES } from '..
 import { scoutLevelOf } from '../../engine/club.js';
 import { WINTER } from '../../engine/dev2.js';
 import { prepDone } from './analysis.js';
+import { guideStep, GUIDE } from '../../engine/guide.js';
 import { sponsorLogo, missionImg } from '../../data/brandArt.js';
 import { retireCards } from './story.js';
 
@@ -197,6 +198,8 @@ function coachLine(sg) {
   const user = userTeam(state);
   const ev = state.pendingEvent;
   if (ev) return { act: 'lobbyEvent', html: `📢 <b>${esc(ev.title)}</b><br>감독님 결정이 필요해요.`, cta: '눌러서 확인' };
+  const gs = guideStep(state);
+  if (gs) return { act: 'guideGo', html: `<span class="gprog">📘 가이드 ${state.guide.step + 1}/${GUIDE.length} · ${gs.title}</span>${gs.text}`, cta: gs.cta, guide: true };
   const mails = (state.inbox || []).filter((m) => !m.resolved).length;
   if (mails) return { act: 'tab', tab: 'mail', html: `✉️ 답장을 기다리는 메일이 <b>${mails}통</b> 있어요.`, cta: '메일함 열기' };
   if (!state.mission && (state.missionOffers || []).length) return { act: 'lobbyMission', html: `🎯 스폰서 미션 제안이 <b>${state.missionOffers.length}건</b> 왔어요.`, cta: '미션 고르기' };
@@ -236,7 +239,7 @@ function lobby(sg, title, opts = {}) {
     <div class="lb-bottom">
       <div class="lb-coach">
         <img src="${mgr ? staffImg({ ...mgr, role: 'manager' }) : ownerImg(user.owner || 0)}" alt="" loading="lazy">
-        <div class="lb-bubble ${line.act ? 'tap' : ''}" ${bubbleAttrs}>${line.html}${line.cta ? `<span class="cta">${line.cta}</span>` : ''}<small>${mgr ? `${esc(mgr.name)} 감독${ms ? ` · ${ms.icon} ${ms.ko}` : ''}` : '구단주'}</small></div>
+        <div class="lb-bubble ${line.act ? 'tap' : ''}" ${bubbleAttrs}>${line.html}${line.cta ? `<span class="cta">${line.cta}</span>` : ''}<small>${mgr ? `${esc(mgr.name)} 감독${ms ? ` · ${ms.icon} ${ms.ko}` : ''}` : '구단주'}${line.guide ? ' · <button class="linkish" data-act="guideSkip">가이드 끄기</button>' : ''}</small></div>
       </div>
       <div class="lb-quick">
         ${opts.quick || `<button class="qbtn" data-act="simGame">${icon('quick', 30)}결과만</button>

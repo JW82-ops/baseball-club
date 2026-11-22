@@ -50,6 +50,8 @@ import { showLearn, shortWhy } from './ui/screens/learn.js';
 import { openPitchCall } from './ui/screens/pitchcall.js';
 import { PROMOS, setPromo, upgradeMerch } from './engine/biz.js';
 import { openInterview } from './ui/screens/story.js';
+import { startGuide, guideOn, guideStep, guideFlag, guideTick, GUIDE } from './engine/guide.js';
+import { openAnalysis } from './ui/screens/analysis.js';
 function afterGameStory() { if (state?.pendingInterview && !isModalOpen()) setTimeout(() => { if (state.pendingInterview && !isModalOpen()) openInterview(); }, 900); }
 import { backupToFile, restoreFromFile, restoreToEmptySlot } from './ui/backup.js';
 let saveFailShown = 0;
@@ -109,8 +111,20 @@ function render() {
     cb.querySelector('span').textContent = cg ? (ui.tab === 'home' ? '경기 시작' : '경기') : '홈';
     cb.querySelector('img').src = `img/ui/${cg ? 'play' : 'home'}.webp`;
   }
+  if (guideOn(state)) {
+    if (ui.tab === 'roster' && ui.rosterView === 'lineup') guideFlag(state, 'lineup');
+    if (ui.tab === 'develop') guideFlag(state, 'develop');
+    if (ui.tab === 'club') guideFlag(state, 'club');
+    if (ui.tab === 'league' && ui.leagueView === 'learn') guideFlag(state, 'learn');
+    if (state.prep) guideFlag(state, 'prep');
+    for (const st of guideTick(state)) {
+      if (st.id === 'finish') { toast('🎓 가이드를 모두 마쳤어요! 보너스 1억이 들어왔어요', 'big'); sfx.coin?.(); }
+      else toast(`✅ 가이드: ${st.title} 완료`, 'good');
+      save();
+    }
+  }
   const screens = { home: renderHome, roster: renderRoster, develop: renderDevelop, league: renderLeague, club: renderClub, mail: renderMail };
-  main.innerHTML = (screens[ui.tab] || renderHome)();
+  main.innerHTML = guideBanner() + (screens[ui.tab] || renderHome)();
   if (!atRoot()) ensureGuard();
   document.documentElement.style.setProperty('--hudH', `${$('#hud').offsetHeight}px`);
   setScene(sceneFor(ui.tab));
@@ -119,6 +133,12 @@ function render() {
   lastPhase = state.phase;
 }
 let lastPhase = null;
+// 로비 말고 다른 탭에서는 위쪽 띠로 가이드를 보여줘요
+function guideBanner() {
+  const st = guideStep(state);
+  if (!st || ui.tab === 'home') return '';
+  return `<div class="guidebar"><span class="gi">${st.icon}</span><div class="grow"><b>가이드 ${state.guide.step + 1}/${GUIDE.length} · ${st.title}</b><p>${st.text}</p></div><button class="btn sm primary" data-act="guideGo">${st.cta}</button></div>`;
+}
 // 가운데 경기 버튼: 오늘 우리 경기가 있으면 경기, 없으면 홈
 function centerGame() {
   if (state.phase === 'regular') return userGameToday(state);
@@ -697,6 +717,21 @@ registerActions({
   setPromo: (d) => { const err = setPromo(state, d.k); if (err) return toast(err, 'bad'); commit(d.k ? `${PROMOS[d.k].icon} ${PROMOS[d.k].ko} 준비 완료` : '이벤트를 취소했어요', 'good'); },
   upgradeMerch: () => { const err = upgradeMerch(userTeam(state)); if (err) return toast(err, 'bad'); sfx.coin?.(); commit('굿즈 스토어 확장!', 'good'); },
   seasonLen: (d) => { state.settings.seasonLength = Number(d.v); commit('다음 시즌부터 적용돼요'); },
+  guideGo: () => {
+    const st = guideStep(state);
+    if (!st) return;
+    closeModal();
+    if (st.go === 'staff') { ui.tab = 'club'; ui.clubView = 'staff'; }
+    else if (st.go === 'analysis') { ui.tab = 'home'; render(); return openAnalysis(); }
+    else if (st.go === 'lineup') { ui.tab = 'roster'; ui.rosterView = 'lineup'; }
+    else if (st.go === 'game') { ui.tab = 'home'; if (centerGame()) return startWatch(); }
+    else if (st.go === 'develop') ui.tab = 'develop';
+    else if (st.go === 'club') { ui.tab = 'club'; ui.clubView = 'map'; }
+    else if (st.go === 'learn') { ui.tab = 'league'; ui.leagueView = 'learn'; }
+    render(); window.scrollTo(0, 0);
+  },
+  guideSkip: () => confirmBox('가이드를 끝낼까요? 구단 → 재정·설정에서 다시 볼 수 있어요.', '끝내기', () => { state.guide.on = false; commit('가이드를 껐어요'); }),
+  guideRestart: () => { startGuide(state); ui.tab = 'home'; commit('📘 첫 시즌 가이드를 다시 시작해요', 'good'); window.scrollTo(0, 0); },
   backupFile: () => backupToFile(),
   restoreFile: () => confirmBox('백업 파일로 지금 슬롯을 덮어쓸까요? 지금 진행은 사라져요.', '불러오기', () => restoreFromFile(() => { upgradeSave(state); fillUserFirstTeam(state); save(); closeModal(); ui.tab = 'home'; render(); window.scrollTo(0, 0); })),
   restoreNewSlot: () => restoreToEmptySlot(() => { upgradeSave(state); fillUserFirstTeam(state); save(); ui.tab = 'home'; render(); window.scrollTo(0, 0); }),
@@ -782,6 +817,7 @@ initCreateActions(render, (opts) => {
   wipe();
   title.creating = false;
   const s = createNewGame(opts);
+  startGuide(s);
   setState(s);
   ui.tab = 'home';
   commit(`${s.teams.user.name} 창단!`, 'big');

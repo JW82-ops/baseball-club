@@ -369,6 +369,7 @@ function financeView(t) {
       <div class="row gap mt wrap">
         <button class="btn sm ghost" data-act="exportSave">텍스트로 내보내기</button>
         <button class="btn sm ghost" data-act="importSave">텍스트로 불러오기</button>
+        <button class="btn sm ghost" data-act="guideRestart">📘 첫 시즌 가이드 다시 보기</button>
         <button class="btn sm" data-act="toTitle">슬롯 선택 화면 (현재 ${curSlot}번)</button>
         <button class="btn sm danger" data-act="resetGame">처음부터 다시</button>
       </div>
