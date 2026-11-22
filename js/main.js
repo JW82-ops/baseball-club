@@ -20,7 +20,7 @@ import {
 import { simToEnd, stepPA, currentBatter, currentPitcher, userBatting } from './engine/match.js';
 import { velocityKmh, batLine, pitLine } from './engine/player.js';
 import { fmtAvg, fmtEra } from './core/util.js';
-import { isClutch, clutchOptions, clutchSituation } from './engine/clutch.js';
+import { isClutch, clutchOptions, clutchSituation, tacticCards, useCard } from './engine/clutch.js';
 import { upgradeBuilding, buildSub, hireStaff, fireStaff, bNext } from './engine/club.js';
 import { slotSheetHtml, subSheetHtml, staffMarketHtml, petitionSheetHtml, titleSheetHtml } from './ui/screens/club.js';
 import { upgradeCheer, makeSong } from './engine/fandom.js';
@@ -314,6 +314,7 @@ function vsCut(g) {
 }
 export function showClutch(g, cb) {
   const opts = clutchOptions(state, g);
+  const tc = tacticCards(state, g);
   ui.clutchOpts = opts;
   ui.clutchCb = cb;
   sfx.cheer(0.06, 1);
@@ -325,8 +326,9 @@ export function showClutch(g, cb) {
     <h2 class="disp">${esc(away.short)} ${g.away.runs} : ${g.home.runs} ${esc(home.short)}</h2>
     <p class="small">${esc(clutchSituation(state, g))}</p>
     ${recent ? `<ul class="news mt small">${recent}</ul>` : ''}
+    <div class="tcards mt"><span class="small">🃏 작전 카드</span>${Array.from({ length: tc.left + tc.used }, (_, i) => `<i class="${i < tc.left ? 'on' : ''}"></i>`).join('')}<span class="tiny muted">${tc.left}장 남음 · 이번 시리즈</span></div>
     <p class="small muted mt">감독님, 어떻게 할까요?</p>
-    ${opts.map((o, i) => `<button class="choice" data-act="clutchPick" data-i="${i}"><b>${esc(o.label)}</b>${o.sub ? `<span>${esc(o.sub)}</span>` : ''}${o.learn ? `<span class="why">💡 ${esc(shortWhy(o.learn))}</span>` : ''}</button>`).join('')}
+    ${opts.map((o, i) => `<button class="choice ${o.card && !tc.left ? 'off' : ''}" data-act="clutchPick" data-i="${i}" ${o.card && !tc.left ? 'disabled' : ''}><b>${o.card ? '🃏 ' : ''}${esc(o.label)}</b>${o.sub ? `<span>${esc(o.sub)}</span>` : ''}${o.learn ? `<span class="why">💡 ${esc(shortWhy(o.learn))}</span>` : ''}</button>`).join('')}
     <button class="btn sm ghost block mt" data-act="clutchOff">이 경기는 그만 묻기</button>
   </div>`, { sheet: false, onClose: () => { const c = ui.clutchCb; ui.clutchCb = null; if (c) setTimeout(c, 60); } });
 }
@@ -384,6 +386,7 @@ registerActions({
       openPitchCall(ui.qs || ui.live, cb);
       return;
     }
+    if (o?.card) { const g0 = ui.qs || ui.live; if (g0 && !useCard(state, g0)) return toast('이번 시리즈 작전 카드를 다 썼어요', 'bad'); }
     if (o) o.act();
     sfx.click();
     closeModal();

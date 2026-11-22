@@ -6,9 +6,11 @@ import { setOrder, pinchHit, manualPitchChange, userSide, userBatting, currentBa
 export function isClutch(state, g) {
   if (g.over) return false;
   if (g.homeId !== state.userTeamId && g.awayId !== state.userTeamId) return false;
-  if (g.inning < 7) return false;
   const diff = Math.abs(g.home.runs - g.away.runs);
-  if (diff > 2) return false;
+  // 중반 승부처: 5회 이후 만루 + 3점 차 이내
+  const midLoaded = g.inning >= 5 && g.inning < 7 && g.bases.every(Boolean) && diff <= 3;
+  if (g.inning < 7 && !midLoaded) return false;
+  if (diff > (midLoaded ? 3 : 2)) return false;
   const risp = !!(g.bases[1] || g.bases[2]);
   const key = `${g.inning}${g.top ? 't' : 'b'}${g.outs}${g.bases.map((b) => (b ? 1 : 0)).join('')}`;
   g.clutchAsked = g.clutchAsked || {};
@@ -22,6 +24,15 @@ export function isClutch(state, g) {
   return false;
 }
 
+// 작전 카드: 한 시리즈(같은 상대 연속 경기)마다 3장 (감독 작전 능력 70 이상이면 4장)
+export function cardMax(state) { const m = state.teams[state.userTeamId].staff?.manager; return 3 + ((m?.stats?.tactics ?? 0) >= 70 ? 1 : 0); }
+export function tacticCards(state, g) {
+  const opp = g.homeId === state.userTeamId ? g.awayId : g.homeId;
+  const key = `${state.season}-${opp}-${Math.floor(state.day / 3)}`;
+  if (!state.tcards || state.tcards.key !== key) state.tcards = { key, left: cardMax(state), used: 0 };
+  return state.tcards;
+}
+export function useCard(state, g) { const c = tacticCards(state, g); if (c.left > 0) { c.left -= 1; c.used += 1; return true; } return false; }
 export function clutchOptions(state, g) {
   const sd = userSide(state, g);
   const team = state.teams[state.userTeamId];
@@ -47,12 +58,13 @@ export function clutchOptions(state, g) {
     const lead = (g.homeId === team.id ? g.home.runs - g.away.runs : g.away.runs - g.home.runs);
     let pick = null;
     if (g.inning >= 9 && lead > 0) pick = pen.find((p) => p.id === team.closer);
-    if (!pick) pick = pen.sort((a, b) => calcOvr(b) * (b.cond / 100) + (b.streak === 'hot' ? 4 : 0) - calcOvr(a) * (a.cond / 100) - (a.streak === 'hot' ? 4 : 0))[0];
+    if (!pick) pick = pen.filter((p) => g.inning >= 8 || p.id !== team.closer).sort((a, b) => calcOvr(b) * (b.cond / 100) + (b.streak === 'hot' ? 4 : 0) - calcOvr(a) * (a.cond / 100) - (a.streak === 'hot' ? 4 : 0))[0];
     if (pick && pick.id !== sd.pitcher) opts.push({ label: `${pick.name} 등판`, sub: `${team.closer === pick.id ? '마무리 · ' : ''}OVR ${calcOvr(pick)} · 체력 ${Math.round(pick.cond)}`, act: () => manualPitchChange(state, g, pick.id), learn: 'bullpen' });
     opts.push({ label: '🎯 볼배합 직접 하기', sub: `${pit.name}의 구종과 코스를 한 구씩 정해요`, act: () => {}, manual: true, learn: 'sequence' });
     if (!g.bases[0] && (g.bases[1] || g.bases[2])) opts.push({ label: `${bat.name} 고의사구`, sub: '병살 노리기', act: () => setOrder(g, 'ibb'), learn: 'ibb' });
   }
-  opts.push({ label: userBatting(state, g) ? '타자를 믿는다' : `${pit.name}을(를) 믿는다`, sub: '그대로 진행', act: () => {}, learn: 'trust' });
+  for (const o of opts) if (!o.manual) o.card = true;
+  opts.push({ label: userBatting(state, g) ? '타자를 믿는다' : `${pit.name}을(를) 믿는다`, sub: '그대로 진행 · 카드 안 씀', act: () => {}, learn: 'trust' });
   g.clutchCount = (g.clutchCount || 0) + 1;
   g.clutchHalf = `${g.inning}${g.top}`;
   return opts;
